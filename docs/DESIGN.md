@@ -273,31 +273,31 @@ public static class ToolRegistry
 
 ## Built-in Tools
 
-### Ported from Coplay
+### Complete Parity with Coplay (19 tools)
 
-| Tool | Description |
-|------|-------------|
-| `scene_get_hierarchy` | Returns GameObject tree with components |
-| `scene_load` | Load scene by name/path |
-| `scene_create` | Create new scene |
-| `gameobject_create` | Create new GameObject |
-| `gameobject_find` | Find by name, tag, or component |
-| `gameobject_modify` | Change transform, name, active state |
-| `gameobject_destroy` | Delete GameObject |
-| `component_add` | Add component to GameObject |
-| `component_modify` | Set serialized field values |
-| `component_remove` | Remove component |
-| `prefab_instantiate` | Spawn prefab instance |
-| `prefab_create` | Create prefab from GameObject |
-| `asset_find` | Search project assets |
-| `asset_import` | Import/reimport asset |
-| `script_create` | Generate new C# script |
-| `script_modify` | Modify existing script |
-| `console_read` | Get recent log messages |
-| `console_clear` | Clear console |
-| `tests_run` | Execute Unity Test Framework |
-| `tests_list` | List available tests |
-| `menu_execute` | Trigger any MenuItem |
+All tools from Coplay's MCP will be ported with identical functionality:
+
+| Tool | Description | Actions |
+|------|-------------|---------|
+| `batch_execute` | Execute multiple operations atomically | batch operations |
+| `execute_menu_item` | Trigger any Unity menu item | execute |
+| `find_gameobjects` | Search for GameObjects | by_name, by_tag, by_component, by_path |
+| `get_test_job` | Get test job status | get status |
+| `manage_asset` | Asset operations | find, import, create, delete, move, copy |
+| `manage_components` | Component operations | add, remove, set_property |
+| `manage_editor` | Editor state control | get_state, set_state |
+| `manage_gameobject` | GameObject operations | create, modify, delete, duplicate, move_relative |
+| `manage_material` | Material operations | create, modify, get, list |
+| `manage_prefabs` | Prefab operations | instantiate, create, apply, unpack |
+| `manage_scene` | Scene operations | create, load, save, get_hierarchy, get_active, screenshot |
+| `manage_script` | Script operations | create, modify, validate, delete |
+| `manage_scriptable_object` | ScriptableObject operations | create, modify, get, list |
+| `manage_shader` | Shader operations | get, list, create |
+| `manage_texture` | Texture operations | get, modify, import |
+| `manage_vfx` | VFX operations | particle, line, trail control |
+| `read_console` | Read console logs | get logs with filtering |
+| `refresh_unity` | Refresh asset database | refresh, reimport |
+| `run_tests` | Run Unity tests | run, list |
 
 ### New Tools (Gaps Filled)
 
@@ -317,6 +317,27 @@ public static class ToolRegistry
 | `uitoolkit_get_styles` | Get computed USS styles |
 | `build_check` | Verify compilation status |
 | `build_trigger` | Trigger a build |
+
+## Built-in Resources
+
+### Complete Parity with Coplay (14 resources)
+
+| Resource | Description |
+|----------|-------------|
+| `get_windows` | Open editor windows |
+| `get_tests` | Test list |
+| `get_tests_for_mode` | Tests by mode (Edit/Play) |
+| `get_selection` | Current selection |
+| `get_active_tool` | Active editor tool |
+| `get_editor_state` | Editor state (play mode, etc.) |
+| `get_prefab_stage` | Prefab editing stage info |
+| `get_gameobject` | GameObject details by ID |
+| `get_gameobject_components` | Components on a GameObject |
+| `get_gameobject_component` | Specific component details |
+| `get_menu_items` | Available menu items |
+| `get_project_info` | Project information |
+| `get_tags` | Project tags |
+| `get_layers` | Project layers |
 
 ## Extension Example
 
