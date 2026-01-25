@@ -25,7 +25,7 @@ namespace UnityMCP.Editor.Resources.Project
             return new
             {
                 identity = GetIdentitySettings(),
-                icons = GetIconSettings(namedBuildTarget),
+                icons = GetIconSettings(buildTargetGroup),
                 resolution = GetResolutionSettings(),
                 splash = GetSplashSettings(),
                 rendering = GetRenderingSettings(namedBuildTarget),
@@ -50,11 +50,12 @@ namespace UnityMCP.Editor.Resources.Project
             };
         }
 
-        private static object GetIconSettings(UnityEditor.Build.NamedBuildTarget namedBuildTarget)
+        private static object GetIconSettings(BuildTargetGroup buildTargetGroup)
         {
-            var defaultIcons = PlayerSettings.GetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, UnityEditor.Build.IconKind.Application);
-            var defaultIcon = defaultIcons?.FirstOrDefault();
-            var platformIcons = PlayerSettings.GetIcons(namedBuildTarget, UnityEditor.Build.IconKind.Application);
+#pragma warning disable CS0618 // Type or member is obsolete
+            var defaultIcon = PlayerSettings.GetIconsForTargetGroup(BuildTargetGroup.Unknown)?.FirstOrDefault();
+            var platformIcons = PlayerSettings.GetIconsForTargetGroup(buildTargetGroup);
+#pragma warning restore CS0618
 
             return new
             {
@@ -179,7 +180,9 @@ namespace UnityMCP.Editor.Resources.Project
             var platformSettings = new System.Collections.Generic.Dictionary<string, object>();
 
             // Windows settings
-            var standaloneIcons = PlayerSettings.GetIcons(UnityEditor.Build.NamedBuildTarget.Standalone, UnityEditor.Build.IconKind.Application);
+#pragma warning disable CS0618 // Type or member is obsolete
+            var standaloneIcons = PlayerSettings.GetIconsForTargetGroup(BuildTargetGroup.Standalone);
+#pragma warning restore CS0618
             platformSettings["windows"] = new
             {
                 applicationIcon = standaloneIcons?.FirstOrDefault()?.name,
