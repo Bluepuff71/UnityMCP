@@ -19,6 +19,11 @@ namespace UnityMCP.Editor
         public string Description { get; }
 
         /// <summary>
+        /// The category used to group related tools together.
+        /// </summary>
+        public string Category { get; set; } = "Uncategorized";
+
+        /// <summary>
         /// Creates a new MCP tool attribute.
         /// </summary>
         /// <param name="name">The unique name of the tool used for invocation.</param>
