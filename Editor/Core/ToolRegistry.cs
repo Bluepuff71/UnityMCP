@@ -144,10 +144,11 @@ namespace UnityMCP.Editor.Core
                 "GameObject" => 1,
                 "Component" => 2,
                 "Asset" => 3,
-                "Console" => 4,
-                "Tests" => 5,
-                "Editor" => 6,
-                "Debug" => 7,
+                "VFX" => 4,
+                "Console" => 5,
+                "Tests" => 6,
+                "Editor" => 7,
+                "Debug" => 8,
                 "Uncategorized" => 99,
                 _ => 50
             };
