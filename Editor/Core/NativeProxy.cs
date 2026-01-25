@@ -37,6 +37,9 @@ namespace UnityMCP.Editor.Core
         [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
         private static extern void SendResponse([MarshalAs(UnmanagedType.LPStr)] string json);
 
+        [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void PollEvents();
+
         #endregion
 
         /// <summary>
@@ -93,6 +96,12 @@ namespace UnityMCP.Editor.Core
                 AssemblyReloadEvents.beforeAssemblyReload += OnBeforeReload;
                 EditorApplication.quitting += OnQuit;
 
+                // Poll the native server on every editor update to process HTTP requests
+                EditorApplication.update += OnUpdate;
+
+                // Enable running in background so server responds when Unity is not focused
+                Application.runInBackground = true;
+
                 s_initialized = true;
                 Debug.Log($"[NativeProxy] Native MCP proxy initialized on port {DEFAULT_PORT}");
             }
@@ -111,13 +120,37 @@ namespace UnityMCP.Editor.Core
         }
 
         /// <summary>
+        /// Called every editor update to poll the native server for incoming HTTP requests.
+        /// This is required because Mongoose is event-driven and needs periodic polling.
+        /// </summary>
+        private static void OnUpdate()
+        {
+            if (!s_initialized)
+            {
+                return;
+            }
+
+            try
+            {
+                PollEvents();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[NativeProxy] Error polling events: {exception.Message}");
+                s_initialized = false;
+                EditorApplication.update -= OnUpdate;
+            }
+        }
+
+        /// <summary>
         /// Called before Unity reloads the C# domain (e.g., after script recompilation).
         /// Unregisters the callback to prevent the native code from calling into invalid C# code.
         /// </summary>
         private static void OnBeforeReload()
         {
-            // Unregister callback before domain unloads to prevent native code
-            // from calling into deallocated managed memory
+            // Stop polling and unregister callback before domain unloads
+            EditorApplication.update -= OnUpdate;
+
             try
             {
                 RegisterCallback(null);
@@ -134,6 +167,8 @@ namespace UnityMCP.Editor.Core
         /// </summary>
         private static void OnQuit()
         {
+            EditorApplication.update -= OnUpdate;
+
             try
             {
                 RegisterCallback(null);
@@ -156,8 +191,6 @@ namespace UnityMCP.Editor.Core
         {
             try
             {
-                // TODO: Task 5 will add MCPServer.Instance.HandleRequest() method
-                // For now, this call will fail at compile time until HandleRequest is implemented
                 string response = MCPServer.Instance.HandleRequest(jsonRequest);
                 SendResponse(response);
             }
