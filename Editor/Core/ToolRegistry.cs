@@ -147,9 +147,12 @@ namespace UnityMCP.Editor.Core
                 "VFX" => 4,
                 "Console" => 5,
                 "Tests" => 6,
-                "Editor" => 7,
-                "Debug" => 8,
-                "Uncategorized" => 99,
+                "Profiler" => 7,
+                "Build" => 8,
+                "UIToolkit" => 9,
+                "Editor" => 10,
+                "Debug" => 99,
+                "Uncategorized" => 100,
                 _ => 50
             };
         }
