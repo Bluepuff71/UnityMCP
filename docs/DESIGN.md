@@ -56,33 +56,190 @@ D:\Unity Packages\UnityMCP\
 │   └── UnityMCP.Runtime.asmdef       # Minimal - MCP is editor-only
 ├── Editor/
 │   ├── UnityMCP.Editor.asmdef
-│   ├── Core/
+│   │
+│   ├── Core/                         # Core MCP infrastructure
 │   │   ├── MCPServer.cs              # HTTP server + MCP protocol
 │   │   ├── MCPProtocol.cs            # JSON-RPC message types
 │   │   ├── ToolRegistry.cs           # Discovers and invokes tools
 │   │   └── ResourceRegistry.cs       # Discovers and serves resources
-│   ├── Attributes/
+│   │
+│   ├── Attributes/                   # Extension API
 │   │   ├── MCPToolAttribute.cs       # [MCPTool("name", "description")]
 │   │   ├── MCPResourceAttribute.cs   # [MCPResource("uri", "description")]
 │   │   └── MCPParamAttribute.cs      # [MCPParam("name", required: true)]
-│   ├── Tools/                        # Built-in tools
-│   │   ├── SceneTools.cs
-│   │   ├── GameObjectTools.cs
-│   │   ├── ComponentTools.cs
-│   │   ├── AssetTools.cs
-│   │   ├── ConsoleTools.cs
-│   │   ├── PlayModeTools.cs
-│   │   ├── ProfilerTools.cs
-│   │   ├── SelectionTools.cs
-│   │   ├── TestTools.cs
-│   │   └── UIToolkitTools.cs
-│   ├── Resources/                    # Built-in resources
-│   │   ├── HierarchyResource.cs
-│   │   ├── SelectionResource.cs
-│   │   ├── ProjectInfoResource.cs
-│   │   └── ConsoleResource.cs
-│   └── UI/
-│       └── MCPServerWindow.cs        # Editor window
+│   │
+│   ├── Tools/                        # Built-in tools (19 from Coplay + new)
+│   │   ├── BatchExecute.cs
+│   │   ├── ExecuteMenuItem.cs
+│   │   ├── FindGameObjects.cs
+│   │   ├── GetTestJob.cs
+│   │   ├── ManageAsset.cs
+│   │   ├── ManageComponents.cs
+│   │   ├── ManageEditor.cs
+│   │   ├── ManageGameObject.cs
+│   │   ├── ManageMaterial.cs
+│   │   ├── ManagePrefabs.cs
+│   │   ├── ManageScene.cs
+│   │   ├── ManageScript.cs
+│   │   ├── ManageScriptableObject.cs
+│   │   ├── ManageShader.cs
+│   │   ├── ManageTexture.cs
+│   │   ├── ManageVFX.cs
+│   │   ├── ReadConsole.cs
+│   │   ├── RefreshUnity.cs
+│   │   ├── RunTests.cs
+│   │   ├── PlayModeTools.cs          # NEW
+│   │   ├── ProfilerTools.cs          # NEW
+│   │   ├── SelectionTools.cs         # NEW
+│   │   └── UIToolkitTools.cs         # NEW
+│   │
+│   ├── Resources/                    # Built-in resources (14 from Coplay)
+│   │   ├── Editor/
+│   │   │   ├── ActiveTool.cs
+│   │   │   ├── EditorState.cs
+│   │   │   ├── PrefabStage.cs
+│   │   │   ├── Selection.cs
+│   │   │   └── Windows.cs
+│   │   ├── Project/
+│   │   │   ├── Layers.cs
+│   │   │   ├── ProjectInfo.cs
+│   │   │   └── Tags.cs
+│   │   ├── Scene/
+│   │   │   └── GameObjectResource.cs
+│   │   ├── Tests/
+│   │   │   └── GetTests.cs
+│   │   └── MenuItems/
+│   │       └── GetMenuItems.cs
+│   │
+│   ├── Helpers/                      # Utility classes (25 from Coplay)
+│   │   ├── AssetPathUtility.cs
+│   │   ├── ComponentOps.cs
+│   │   ├── ConfigJsonBuilder.cs
+│   │   ├── ExecPath.cs
+│   │   ├── GameObjectLookup.cs
+│   │   ├── GameObjectSerializer.cs
+│   │   ├── HttpEndpointUtility.cs
+│   │   ├── MaterialOps.cs
+│   │   ├── McpConfigurationHelper.cs
+│   │   ├── McpJobStateStore.cs
+│   │   ├── McpLog.cs
+│   │   ├── ObjectResolver.cs
+│   │   ├── Pagination.cs
+│   │   ├── ParamCoercion.cs
+│   │   ├── PortManager.cs
+│   │   ├── ProjectIdentityUtility.cs
+│   │   ├── PropertyConversion.cs
+│   │   ├── RendererHelpers.cs
+│   │   ├── RenderPipelineUtility.cs
+│   │   ├── Response.cs
+│   │   ├── TextureOps.cs
+│   │   ├── UnityJsonSerializer.cs
+│   │   ├── UnityTypeResolver.cs
+│   │   └── VectorParsing.cs
+│   │
+│   ├── Services/                     # Service layer (15 from Coplay)
+│   │   ├── Interfaces/
+│   │   │   ├── IClientConfigurationService.cs
+│   │   │   ├── IPackageDeploymentService.cs
+│   │   │   ├── IPackageUpdateService.cs
+│   │   │   ├── IPathResolverService.cs
+│   │   │   ├── IPlatformService.cs
+│   │   │   ├── IServerManagementService.cs
+│   │   │   ├── ITestRunnerService.cs
+│   │   │   └── IToolDiscoveryService.cs
+│   │   ├── ClientConfigurationService.cs
+│   │   ├── EditorPrefsWindowService.cs
+│   │   ├── EditorStateCache.cs
+│   │   ├── MCPServiceLocator.cs
+│   │   ├── McpEditorShutdownCleanup.cs
+│   │   ├── PackageUpdateService.cs
+│   │   ├── PathResolverService.cs
+│   │   ├── PlatformService.cs
+│   │   ├── ServerManagementService.cs
+│   │   ├── TestRunnerService.cs
+│   │   ├── TestJobManager.cs
+│   │   ├── TestRunStatus.cs
+│   │   └── ToolDiscoveryService.cs
+│   │
+│   ├── Clients/                      # Client configurators (15 from Coplay)
+│   │   ├── IMcpClientConfigurator.cs
+│   │   ├── McpClientConfiguratorBase.cs
+│   │   ├── McpClientRegistry.cs
+│   │   └── Configurators/
+│   │       ├── AntigravityConfigurator.cs
+│   │       ├── CherryStudioConfigurator.cs
+│   │       ├── ClaudeCodeConfigurator.cs
+│   │       ├── ClaudeDesktopConfigurator.cs
+│   │       ├── CodeBuddyCliConfigurator.cs
+│   │       ├── CodexConfigurator.cs
+│   │       ├── CursorConfigurator.cs
+│   │       ├── KiloCodeConfigurator.cs
+│   │       ├── KiroConfigurator.cs
+│   │       ├── OpenCodeConfigurator.cs
+│   │       ├── RiderConfigurator.cs
+│   │       ├── TraeConfigurator.cs
+│   │       ├── VSCodeConfigurator.cs
+│   │       ├── VSCodeInsidersConfigurator.cs
+│   │       └── WindsurfConfigurator.cs
+│   │
+│   ├── Dependencies/                 # Platform detection
+│   │   ├── DependencyManager.cs
+│   │   ├── Models/
+│   │   │   ├── DependencyCheckResult.cs
+│   │   │   └── DependencyStatus.cs
+│   │   └── PlatformDetectors/
+│   │       ├── IPlatformDetector.cs
+│   │       ├── PlatformDetectorBase.cs
+│   │       ├── WindowsPlatformDetector.cs
+│   │       ├── MacOSPlatformDetector.cs
+│   │       └── LinuxPlatformDetector.cs
+│   │
+│   ├── Models/                       # Data models
+│   │   ├── Command.cs
+│   │   ├── MCPConfigServer.cs
+│   │   ├── MCPConfigServers.cs
+│   │   ├── McpClient.cs
+│   │   ├── McpConfig.cs
+│   │   └── McpStatus.cs
+│   │
+│   ├── Constants/                    # Constants and enums
+│   │   ├── EditorPrefKeys.cs
+│   │   └── HealthStatus.cs
+│   │
+│   └── Windows/                      # Editor UI (UI Toolkit)
+│       ├── MCPForUnityEditorWindow.cs
+│       ├── MCPForUnityEditorWindow.uxml
+│       ├── MCPForUnityEditorWindow.uss
+│       ├── MCPSetupWindow.cs
+│       ├── MCPSetupWindow.uxml
+│       ├── MCPSetupWindow.uss
+│       ├── EditorPrefs/
+│       │   ├── EditorPrefsWindow.cs
+│       │   ├── EditorPrefsWindow.uxml
+│       │   ├── EditorPrefsWindow.uss
+│       │   └── EditorPrefItem.uxml
+│       └── Components/
+│           ├── Common.uss
+│           ├── Advanced/
+│           │   ├── McpAdvancedSection.cs
+│           │   └── McpAdvancedSection.uxml
+│           ├── ClientConfig/
+│           │   ├── McpClientConfigSection.cs
+│           │   └── McpClientConfigSection.uxml
+│           ├── Connection/
+│           │   ├── McpConnectionSection.cs
+│           │   └── McpConnectionSection.uxml
+│           ├── Tools/
+│           │   ├── McpToolsSection.cs
+│           │   └── McpToolsSection.uxml
+│           └── Validation/
+│               ├── McpValidationSection.cs
+│               └── McpValidationSection.uxml
+│
+├── Optional/                         # Optional features (disabled by default)
+│   └── RoslynCompilation/
+│       ├── ManageRuntimeCompilation.cs
+│       └── RoslynRuntimeCompiler.cs
 ```
 
 ## Core Components
@@ -261,7 +418,7 @@ public static class ToolRegistry
         return _tools.Values.Select(t => t.ToDefinition());
     }
 
-    public static object Invoke(string name, Dictionary<string, JsonElement> args)
+    public static object Invoke(string name, Dictionary<string, object> args)
     {
         if (!_tools.TryGetValue(name, out var tool))
             throw new MCPException(-32602, $"Unknown tool: {name}");
@@ -338,6 +495,186 @@ All tools from Coplay's MCP will be ported with identical functionality:
 | `get_project_info` | Project information |
 | `get_tags` | Project tags |
 | `get_layers` | Project layers |
+
+## Helper Classes (Complete Parity)
+
+All helper classes from Coplay will be ported:
+
+| Helper | Purpose |
+|--------|---------|
+| `AssetPathUtility` | Convert between asset paths and filesystem paths |
+| `CodexConfigHelper` | Helper for Codex client configuration |
+| `ComponentOps` | Add, remove, set properties on components |
+| `ConfigJsonBuilder` | Build JSON config files for MCP clients |
+| `ExecPath` | Find executable paths on different platforms |
+| `GameObjectLookup` | Find GameObjects by ID, name, path, tag, component |
+| `GameObjectSerializer` | Serialize GameObjects to JSON |
+| `HttpEndpointUtility` | HTTP endpoint helpers |
+| `MaterialOps` | Material creation and modification |
+| `McpConfigurationHelper` | MCP server configuration helpers |
+| `McpJobStateStore` | Store state for async MCP jobs (tests, etc.) |
+| `McpLog` | Logging utilities with filtering |
+| `ObjectResolver` | Resolve Unity objects from various inputs |
+| `Pagination` | Paginate large result sets |
+| `ParamCoercion` | Coerce JSON params to C# types |
+| `PortManager` | Port management for server |
+| `ProjectIdentityUtility` | Get project GUID, name, etc. |
+| `PropertyConversion` | Convert between property types |
+| `RendererHelpers` | Renderer inspection and modification |
+| `RenderPipelineUtility` | Detect URP/HDRP/Built-in |
+| `Response` | Standard response builders (SuccessResponse, ErrorResponse) |
+| `TextureOps` | Texture import and modification |
+| `UnityJsonSerializer` | Custom JSON serializer for Unity types |
+| `UnityTypeResolver` | Resolve Unity types by name |
+| `VectorParsing` | Parse Vector2/3/4, Quaternion, Color from various formats |
+
+## Services (Complete Parity)
+
+Service layer with dependency injection:
+
+| Service | Interface | Purpose |
+|---------|-----------|---------|
+| `BridgeControlService` | `IBridgeControlService` | Control MCP bridge lifecycle |
+| `ClientConfigurationService` | `IClientConfigurationService` | Configure MCP client apps |
+| `EditorPrefsWindowService` | - | Manage editor preferences |
+| `EditorStateCache` | - | Cache editor state for fast access |
+| `PackageDeploymentService` | `IPackageDeploymentService` | Deploy server package |
+| `PackageUpdateService` | `IPackageUpdateService` | Check/apply package updates |
+| `PathResolverService` | `IPathResolverService` | Resolve paths across platforms |
+| `PlatformService` | `IPlatformService` | Platform detection and info |
+| `ServerManagementService` | `IServerManagementService` | Start/stop/monitor server |
+| `TestRunnerService` | `ITestRunnerService` | Run Unity tests |
+| `ToolDiscoveryService` | `IToolDiscoveryService` | Discover [MCPTool] methods |
+| `MCPServiceLocator` | - | Service locator pattern |
+| `McpEditorShutdownCleanup` | - | Cleanup on editor shutdown |
+| `TestJobManager` | - | Manage async test jobs |
+| `TestRunStatus` | - | Test run status tracking |
+
+### Transport Layer
+
+| Component | Purpose |
+|-----------|---------|
+| `IMcpTransportClient` | Interface for transport implementations |
+| `TransportCommandDispatcher` | Dispatch commands to handlers |
+| `TransportManager` | Manage transport lifecycle |
+| `TransportState` | Track transport state |
+| `StdioBridgeHost` | Host for stdio bridge (Coplay's Python) |
+| `StdioTransportClient` | Stdio transport client |
+| `WebSocketTransportClient` | WebSocket transport client |
+
+**Note**: We will simplify to HTTP-only transport, removing stdio/WebSocket.
+
+## Client Configurators (Complete Parity)
+
+Auto-configure popular AI coding assistants:
+
+| Configurator | Application |
+|--------------|-------------|
+| `AntigravityConfigurator` | Antigravity |
+| `CherryStudioConfigurator` | Cherry Studio |
+| `ClaudeCodeConfigurator` | Claude Code CLI |
+| `ClaudeDesktopConfigurator` | Claude Desktop app |
+| `CodeBuddyCliConfigurator` | CodeBuddy CLI |
+| `CodexConfigurator` | Codex |
+| `CursorConfigurator` | Cursor IDE |
+| `KiloCodeConfigurator` | KiloCode |
+| `KiroConfigurator` | Kiro |
+| `OpenCodeConfigurator` | OpenCode |
+| `RiderConfigurator` | JetBrains Rider |
+| `TraeConfigurator` | Trae |
+| `VSCodeConfigurator` | VS Code |
+| `VSCodeInsidersConfigurator` | VS Code Insiders |
+| `WindsurfConfigurator` | Windsurf |
+
+All configurators implement `IMcpClientConfigurator` and extend `McpClientConfiguratorBase`.
+
+## Platform Detection
+
+Cross-platform support:
+
+| Component | Purpose |
+|-----------|---------|
+| `IPlatformDetector` | Interface for platform detection |
+| `PlatformDetectorBase` | Base implementation |
+| `WindowsPlatformDetector` | Windows-specific detection |
+| `MacOSPlatformDetector` | macOS-specific detection |
+| `LinuxPlatformDetector` | Linux-specific detection |
+
+## Dependencies Management
+
+| Component | Purpose |
+|-----------|---------|
+| `DependencyManager` | Check and manage dependencies |
+| `DependencyCheckResult` | Result of dependency check |
+| `DependencyStatus` | Status of a dependency |
+
+## Models
+
+Data models for MCP protocol and configuration:
+
+| Model | Purpose |
+|-------|---------|
+| `Command` | MCP command representation |
+| `MCPConfigServer` | Server configuration |
+| `MCPConfigServers` | Multiple server configurations |
+| `McpClient` | Client information |
+| `McpConfig` | Full MCP configuration |
+| `McpStatus` | Server status |
+
+## Editor Windows (Complete Parity)
+
+UI Toolkit-based editor windows:
+
+### Main Windows
+| Window | Purpose |
+|--------|---------|
+| `MCPForUnityEditorWindow` | Main MCP control panel |
+| `MCPSetupWindow` | Initial setup wizard |
+| `EditorPrefsWindow` | Editor preferences viewer |
+
+### Window Components (UI Toolkit)
+| Component | Purpose |
+|-----------|---------|
+| `McpAdvancedSection` | Advanced settings section |
+| `McpClientConfigSection` | Client configuration section |
+| `McpConnectionSection` | Connection status section |
+| `McpToolsSection` | Registered tools section |
+| `McpValidationSection` | Validation checks section |
+| `Common.uss` | Shared styles |
+
+Each section has `.cs`, `.uxml`, and optional `.uss` files.
+
+## Optional: Custom Tools
+
+Coplay includes optional custom tools that can be enabled:
+
+### Roslyn Runtime Compilation
+| Component | Purpose |
+|-----------|---------|
+| `ManageRuntimeCompilation` | MCP tool for runtime C# compilation |
+| `RoslynRuntimeCompiler` | MonoBehaviour for Roslyn integration |
+
+**Actions**: `compile_and_load`, `list_loaded`, `get_types`, `execute_with_roslyn`, `get_history`, `save_history`, `clear_history`
+
+This allows compiling and loading C# code at runtime without domain reload - useful for rapid iteration.
+
+**Note**: Requires `Microsoft.CodeAnalysis.CSharp` NuGet package and `USE_ROSLYN` scripting define.
+
+## Reference Files
+
+The Coplay reference implementation is cloned at:
+```
+D:\Unity Packages\unity-mcp-reference\
+```
+
+Key paths:
+- Tools: `MCPForUnity/Editor/Tools/`
+- Resources: `MCPForUnity/Editor/Resources/`
+- Helpers: `MCPForUnity/Editor/Helpers/`
+- Services: `MCPForUnity/Editor/Services/`
+- Windows: `MCPForUnity/Editor/Windows/`
+- Clients: `MCPForUnity/Editor/Clients/`
+- CustomTools: `CustomTools/`
 
 ## Extension Example
 
@@ -459,6 +796,14 @@ public class MCPServerWindow : EditorWindow
 1. Add UnityMCP.Editor reference to UICore
 2. Create UICoreMCPTools.cs
 3. Test full workflow
+
+## Dependencies
+
+- `System.Net.HttpListener` - HTTP server (built-in)
+- `com.unity.nuget.newtonsoft-json` (3.2.2) - JSON serialization
+- Standard Unity Editor APIs
+
+**Note**: Unity's Newtonsoft.Json package has a known signature validation issue. You may need to disable "Assembly Version Validation" in Player Settings → Other Settings. This is a Unity packaging bug (improper DLL signing), not a security issue with the library itself.
 
 ## What We're NOT Including
 
