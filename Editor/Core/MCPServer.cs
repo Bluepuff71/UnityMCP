@@ -115,6 +115,14 @@ namespace UnityMCP.Editor.Core
                 return;
             }
 
+            // If native proxy is handling HTTP, don't start managed server
+            if (NativeProxy.IsInitialized)
+            {
+                Debug.Log("[MCPServer] Native proxy is active, skipping managed HTTP server.");
+                MCPServerDomainReload.SetShouldRun(true, _port);
+                return;
+            }
+
             try
             {
                 _listener = new HttpListener();
