@@ -76,7 +76,10 @@ namespace UnityMCP.Editor.Services
     [Serializable]
     public class TestJob
     {
-        private const int MaxFailures = 25;
+        /// <summary>
+        /// Maximum number of failures to track in a job to prevent memory issues.
+        /// </summary>
+        public const int MaxFailures = 25;
 
         public string jobId;
         public TestJobStatus status;

@@ -1,0 +1,980 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityMCP.Editor;
+using UnityMCP.Editor.Core;
+
+namespace UnityMCP.Editor.Tools
+{
+    /// <summary>
+    /// Handles component operations on GameObjects including add, remove, and set_property actions.
+    /// </summary>
+    public static class ManageComponents
+    {
+        #region Main Tool Entry Point
+
+        /// <summary>
+        /// Manages components on GameObjects with add, remove, and set_property actions.
+        /// </summary>
+        [MCPTool("component_manage", "Manages components: add, remove, or set_property on GameObjects")]
+        public static object Manage(
+            [MCPParam("action", "Action to perform: add, remove, set_property", required: true)] string action,
+            [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target,
+            [MCPParam("component_type", "The component type name (e.g., 'Rigidbody', 'BoxCollider')", required: true)] string componentType,
+            [MCPParam("property", "Single property name to set (for set_property action)")] string property = null,
+            [MCPParam("value", "Value for the single property (for set_property action)")] object value = null,
+            [MCPParam("properties", "Object mapping property names to values (for multiple properties)")] object properties = null,
+            [MCPParam("search_method", "How to find the target: by_id, by_name, by_path (default: auto-detect)")] string searchMethod = null)
+        {
+            if (string.IsNullOrEmpty(action))
+            {
+                throw MCPException.InvalidParams("Action parameter is required.");
+            }
+
+            if (string.IsNullOrEmpty(target))
+            {
+                throw MCPException.InvalidParams("Target parameter is required.");
+            }
+
+            if (string.IsNullOrEmpty(componentType))
+            {
+                throw MCPException.InvalidParams("Component_type parameter is required.");
+            }
+
+            string normalizedAction = action.ToLowerInvariant();
+
+            try
+            {
+                return normalizedAction switch
+                {
+                    "add" => HandleAdd(target, componentType, properties, searchMethod),
+                    "remove" => HandleRemove(target, componentType, searchMethod),
+                    "set_property" => HandleSetProperty(target, componentType, property, value, properties, searchMethod),
+                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: add, remove, set_property")
+                };
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action '{action}': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
+
+        #region Action Handlers
+
+        /// <summary>
+        /// Handles the add action - adds a component to a GameObject.
+        /// </summary>
+        private static object HandleAdd(string target, string componentTypeName, object initialProperties, string searchMethod)
+        {
+            GameObject targetGameObject = FindGameObject(target, searchMethod);
+            if (targetGameObject == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Target GameObject '{target}' not found."
+                };
+            }
+
+            Type componentType = ResolveComponentType(componentTypeName);
+            if (componentType == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Component type '{componentTypeName}' not found."
+                };
+            }
+
+            if (!typeof(Component).IsAssignableFrom(componentType))
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Type '{componentTypeName}' is not a Component."
+                };
+            }
+
+            if (componentType == typeof(Transform))
+            {
+                return new
+                {
+                    success = false,
+                    error = "Cannot add another Transform component."
+                };
+            }
+
+            // Check for 2D/3D physics conflicts
+            var conflictResult = CheckPhysicsConflicts(targetGameObject, componentType, componentTypeName);
+            if (conflictResult != null)
+            {
+                return conflictResult;
+            }
+
+            try
+            {
+                Component newComponent = Undo.AddComponent(targetGameObject, componentType);
+                if (newComponent == null)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = $"Failed to add component '{componentTypeName}' to '{targetGameObject.name}'."
+                    };
+                }
+
+                // Set initial properties if provided
+                var propertyResults = new List<object>();
+                if (initialProperties != null)
+                {
+                    var propertiesDict = ConvertToPropertiesDictionary(initialProperties);
+                    if (propertiesDict != null && propertiesDict.Count > 0)
+                    {
+                        Undo.RecordObject(newComponent, $"Set initial properties on {componentTypeName}");
+                        propertyResults = SetPropertiesOnComponent(newComponent, propertiesDict);
+                    }
+                }
+
+                EditorUtility.SetDirty(targetGameObject);
+
+                return new
+                {
+                    success = true,
+                    message = $"Added component '{componentTypeName}' to '{targetGameObject.name}'.",
+                    gameObject = targetGameObject.name,
+                    instanceID = targetGameObject.GetInstanceID(),
+                    componentType = componentTypeName,
+                    componentInstanceID = newComponent.GetInstanceID(),
+                    propertyResults = propertyResults.Count > 0 ? propertyResults : null
+                };
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error adding component '{componentTypeName}': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Handles the remove action - removes a component from a GameObject.
+        /// </summary>
+        private static object HandleRemove(string target, string componentTypeName, string searchMethod)
+        {
+            GameObject targetGameObject = FindGameObject(target, searchMethod);
+            if (targetGameObject == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Target GameObject '{target}' not found."
+                };
+            }
+
+            Type componentType = ResolveComponentType(componentTypeName);
+            if (componentType == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Component type '{componentTypeName}' not found."
+                };
+            }
+
+            if (componentType == typeof(Transform))
+            {
+                return new
+                {
+                    success = false,
+                    error = "Cannot remove the Transform component."
+                };
+            }
+
+            Component componentToRemove = targetGameObject.GetComponent(componentType);
+            if (componentToRemove == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Component '{componentTypeName}' not found on '{targetGameObject.name}'."
+                };
+            }
+
+            try
+            {
+                int componentInstanceId = componentToRemove.GetInstanceID();
+                Undo.DestroyObjectImmediate(componentToRemove);
+
+                EditorUtility.SetDirty(targetGameObject);
+
+                return new
+                {
+                    success = true,
+                    message = $"Removed component '{componentTypeName}' from '{targetGameObject.name}'.",
+                    gameObject = targetGameObject.name,
+                    instanceID = targetGameObject.GetInstanceID(),
+                    removedComponentType = componentTypeName,
+                    removedComponentInstanceID = componentInstanceId
+                };
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error removing component '{componentTypeName}': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Handles the set_property action - sets properties on a component.
+        /// </summary>
+        private static object HandleSetProperty(
+            string target,
+            string componentTypeName,
+            string singleProperty,
+            object singleValue,
+            object multipleProperties,
+            string searchMethod)
+        {
+            GameObject targetGameObject = FindGameObject(target, searchMethod);
+            if (targetGameObject == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Target GameObject '{target}' not found."
+                };
+            }
+
+            Type componentType = ResolveComponentType(componentTypeName);
+            if (componentType == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Component type '{componentTypeName}' not found."
+                };
+            }
+
+            Component component = targetGameObject.GetComponent(componentType);
+            if (component == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Component '{componentTypeName}' not found on '{targetGameObject.name}'."
+                };
+            }
+
+            // Build properties dictionary from either single or multiple mode
+            var propertiesToSet = new Dictionary<string, object>();
+
+            if (!string.IsNullOrEmpty(singleProperty))
+            {
+                propertiesToSet[singleProperty] = singleValue;
+            }
+
+            if (multipleProperties != null)
+            {
+                var multiDict = ConvertToPropertiesDictionary(multipleProperties);
+                if (multiDict != null)
+                {
+                    foreach (var kvp in multiDict)
+                    {
+                        propertiesToSet[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+
+            if (propertiesToSet.Count == 0)
+            {
+                return new
+                {
+                    success = false,
+                    error = "No properties specified. Use 'property' + 'value' for single property or 'properties' for multiple."
+                };
+            }
+
+            Undo.RecordObject(component, $"Set properties on {componentTypeName}");
+
+            var results = SetPropertiesOnComponent(component, propertiesToSet);
+
+            EditorUtility.SetDirty(component);
+            EditorUtility.SetDirty(targetGameObject);
+
+            int successCount = results.Count(r => r is Dictionary<string, object> dict && dict.ContainsKey("success") && (bool)dict["success"]);
+            int failCount = results.Count - successCount;
+
+            string message = failCount == 0
+                ? $"Successfully set {successCount} property(ies) on '{componentTypeName}'."
+                : $"Set {successCount} property(ies), {failCount} failed on '{componentTypeName}'.";
+
+            return new
+            {
+                success = failCount == 0,
+                message,
+                gameObject = targetGameObject.name,
+                instanceID = targetGameObject.GetInstanceID(),
+                componentType = componentTypeName,
+                componentInstanceID = component.GetInstanceID(),
+                propertyResults = results
+            };
+        }
+
+        #endregion
+
+        #region Helper Methods - Property Setting
+
+        /// <summary>
+        /// Sets multiple properties on a component using reflection.
+        /// </summary>
+        private static List<object> SetPropertiesOnComponent(Component component, Dictionary<string, object> properties)
+        {
+            var results = new List<object>();
+            Type componentType = component.GetType();
+
+            foreach (var kvp in properties)
+            {
+                string propertyName = kvp.Key;
+                object propertyValue = kvp.Value;
+
+                try
+                {
+                    // Try property first
+                    PropertyInfo propertyInfo = componentType.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
+                    if (propertyInfo != null && propertyInfo.CanWrite)
+                    {
+                        object convertedValue = ConvertValueToType(propertyValue, propertyInfo.PropertyType);
+                        propertyInfo.SetValue(component, convertedValue);
+                        results.Add(new Dictionary<string, object>
+                        {
+                            { "property", propertyName },
+                            { "success", true },
+                            { "memberType", "property" }
+                        });
+                        continue;
+                    }
+
+                    // Try field
+                    FieldInfo fieldInfo = componentType.GetField(propertyName, BindingFlags.Instance | BindingFlags.Public);
+                    if (fieldInfo != null && !fieldInfo.IsInitOnly)
+                    {
+                        object convertedValue = ConvertValueToType(propertyValue, fieldInfo.FieldType);
+                        fieldInfo.SetValue(component, convertedValue);
+                        results.Add(new Dictionary<string, object>
+                        {
+                            { "property", propertyName },
+                            { "success", true },
+                            { "memberType", "field" }
+                        });
+                        continue;
+                    }
+
+                    // Not found
+                    results.Add(new Dictionary<string, object>
+                    {
+                        { "property", propertyName },
+                        { "success", false },
+                        { "error", $"Property or field '{propertyName}' not found or is read-only on {componentType.Name}." }
+                    });
+                }
+                catch (Exception exception)
+                {
+                    results.Add(new Dictionary<string, object>
+                    {
+                        { "property", propertyName },
+                        { "success", false },
+                        { "error", $"Failed to set '{propertyName}': {exception.Message}" }
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Converts a value to the target type, handling common Unity types.
+        /// </summary>
+        private static object ConvertValueToType(object value, Type targetType)
+        {
+            if (value == null)
+            {
+                return GetDefaultValue(targetType);
+            }
+
+            // Handle nullable types
+            Type underlyingType = Nullable.GetUnderlyingType(targetType);
+            if (underlyingType != null)
+            {
+                targetType = underlyingType;
+            }
+
+            // Direct assignment if types match
+            if (targetType.IsInstanceOfType(value))
+            {
+                return value;
+            }
+
+            // Vector3 conversion
+            if (targetType == typeof(Vector3))
+            {
+                return ParseVector3(value) ?? Vector3.zero;
+            }
+
+            // Vector2 conversion
+            if (targetType == typeof(Vector2))
+            {
+                return ParseVector2(value) ?? Vector2.zero;
+            }
+
+            // Color conversion
+            if (targetType == typeof(Color))
+            {
+                return ParseColor(value) ?? Color.white;
+            }
+
+            // Quaternion conversion
+            if (targetType == typeof(Quaternion))
+            {
+                var euler = ParseVector3(value);
+                return euler.HasValue ? Quaternion.Euler(euler.Value) : Quaternion.identity;
+            }
+
+            // Boolean conversion
+            if (targetType == typeof(bool))
+            {
+                if (value is bool boolValue)
+                {
+                    return boolValue;
+                }
+                if (value is string stringValue)
+                {
+                    return bool.Parse(stringValue);
+                }
+                return Convert.ToBoolean(value);
+            }
+
+            // Integer conversion
+            if (targetType == typeof(int))
+            {
+                return Convert.ToInt32(value);
+            }
+
+            // Float conversion
+            if (targetType == typeof(float))
+            {
+                return Convert.ToSingle(value);
+            }
+
+            // Double conversion
+            if (targetType == typeof(double))
+            {
+                return Convert.ToDouble(value);
+            }
+
+            // String conversion
+            if (targetType == typeof(string))
+            {
+                return value.ToString();
+            }
+
+            // Enum conversion
+            if (targetType.IsEnum)
+            {
+                if (value is string enumString)
+                {
+                    return Enum.Parse(targetType, enumString, ignoreCase: true);
+                }
+                return Enum.ToObject(targetType, Convert.ToInt32(value));
+            }
+
+            // LayerMask conversion
+            if (targetType == typeof(LayerMask))
+            {
+                if (value is string layerName)
+                {
+                    return (LayerMask)LayerMask.GetMask(layerName);
+                }
+                return (LayerMask)Convert.ToInt32(value);
+            }
+
+            // Fallback to Convert.ChangeType
+            return Convert.ChangeType(value, targetType);
+        }
+
+        /// <summary>
+        /// Parses a Vector3 from various input formats.
+        /// </summary>
+        private static Vector3? ParseVector3(object input)
+        {
+            if (input == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                // Handle List<object> (from JSON array)
+                if (input is List<object> list && list.Count >= 3)
+                {
+                    return new Vector3(
+                        Convert.ToSingle(list[0]),
+                        Convert.ToSingle(list[1]),
+                        Convert.ToSingle(list[2])
+                    );
+                }
+
+                // Handle Dictionary<string, object> (from JSON object)
+                if (input is Dictionary<string, object> dict)
+                {
+                    if (dict.TryGetValue("x", out object xValue) &&
+                        dict.TryGetValue("y", out object yValue) &&
+                        dict.TryGetValue("z", out object zValue))
+                    {
+                        return new Vector3(
+                            Convert.ToSingle(xValue),
+                            Convert.ToSingle(yValue),
+                            Convert.ToSingle(zValue)
+                        );
+                    }
+                }
+
+                // Handle array types
+                if (input is object[] array && array.Length >= 3)
+                {
+                    return new Vector3(
+                        Convert.ToSingle(array[0]),
+                        Convert.ToSingle(array[1]),
+                        Convert.ToSingle(array[2])
+                    );
+                }
+
+                // Handle double[] or float[]
+                if (input is double[] doubleArray && doubleArray.Length >= 3)
+                {
+                    return new Vector3(
+                        (float)doubleArray[0],
+                        (float)doubleArray[1],
+                        (float)doubleArray[2]
+                    );
+                }
+
+                if (input is float[] floatArray && floatArray.Length >= 3)
+                {
+                    return new Vector3(floatArray[0], floatArray[1], floatArray[2]);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageComponents] Failed to parse Vector3: {exception.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parses a Vector2 from various input formats.
+        /// </summary>
+        private static Vector2? ParseVector2(object input)
+        {
+            if (input == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                // Handle List<object> (from JSON array)
+                if (input is List<object> list && list.Count >= 2)
+                {
+                    return new Vector2(
+                        Convert.ToSingle(list[0]),
+                        Convert.ToSingle(list[1])
+                    );
+                }
+
+                // Handle Dictionary<string, object> (from JSON object)
+                if (input is Dictionary<string, object> dict)
+                {
+                    if (dict.TryGetValue("x", out object xValue) &&
+                        dict.TryGetValue("y", out object yValue))
+                    {
+                        return new Vector2(
+                            Convert.ToSingle(xValue),
+                            Convert.ToSingle(yValue)
+                        );
+                    }
+                }
+
+                // Handle array types
+                if (input is object[] array && array.Length >= 2)
+                {
+                    return new Vector2(
+                        Convert.ToSingle(array[0]),
+                        Convert.ToSingle(array[1])
+                    );
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageComponents] Failed to parse Vector2: {exception.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Parses a Color from various input formats.
+        /// </summary>
+        private static Color? ParseColor(object input)
+        {
+            if (input == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                // Handle List<object> (from JSON array [r,g,b] or [r,g,b,a])
+                if (input is List<object> list && list.Count >= 3)
+                {
+                    float red = Convert.ToSingle(list[0]);
+                    float green = Convert.ToSingle(list[1]);
+                    float blue = Convert.ToSingle(list[2]);
+                    float alpha = list.Count >= 4 ? Convert.ToSingle(list[3]) : 1f;
+                    return new Color(red, green, blue, alpha);
+                }
+
+                // Handle Dictionary<string, object> (from JSON object {r,g,b,a})
+                if (input is Dictionary<string, object> dict)
+                {
+                    if (dict.TryGetValue("r", out object rValue) &&
+                        dict.TryGetValue("g", out object gValue) &&
+                        dict.TryGetValue("b", out object bValue))
+                    {
+                        float red = Convert.ToSingle(rValue);
+                        float green = Convert.ToSingle(gValue);
+                        float blue = Convert.ToSingle(bValue);
+                        float alpha = dict.TryGetValue("a", out object aValue) ? Convert.ToSingle(aValue) : 1f;
+                        return new Color(red, green, blue, alpha);
+                    }
+                }
+
+                // Handle array types
+                if (input is object[] array && array.Length >= 3)
+                {
+                    float red = Convert.ToSingle(array[0]);
+                    float green = Convert.ToSingle(array[1]);
+                    float blue = Convert.ToSingle(array[2]);
+                    float alpha = array.Length >= 4 ? Convert.ToSingle(array[3]) : 1f;
+                    return new Color(red, green, blue, alpha);
+                }
+
+                // Handle string color names or hex
+                if (input is string colorString)
+                {
+                    if (ColorUtility.TryParseHtmlString(colorString, out Color parsedColor))
+                    {
+                        return parsedColor;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageComponents] Failed to parse Color: {exception.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Converts input to a properties dictionary.
+        /// </summary>
+        private static Dictionary<string, object> ConvertToPropertiesDictionary(object input)
+        {
+            if (input == null)
+            {
+                return null;
+            }
+
+            if (input is Dictionary<string, object> dict)
+            {
+                return dict;
+            }
+
+            // Handle other dictionary types
+            if (input is System.Collections.IDictionary iDict)
+            {
+                var result = new Dictionary<string, object>();
+                foreach (var key in iDict.Keys)
+                {
+                    result[key.ToString()] = iDict[key];
+                }
+                return result;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the default value for a type.
+        /// </summary>
+        private static object GetDefaultValue(Type type)
+        {
+            if (type.IsValueType)
+            {
+                return Activator.CreateInstance(type);
+            }
+            return null;
+        }
+
+        #endregion
+
+        #region Helper Methods - GameObject Finding
+
+        /// <summary>
+        /// Finds a GameObject by instance ID, name, or path based on the search method.
+        /// </summary>
+        private static GameObject FindGameObject(string target, string searchMethod, bool searchInactive = true)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                return null;
+            }
+
+            string normalizedMethod = (searchMethod ?? "").ToLowerInvariant().Trim();
+
+            // Auto-detect search method if not specified
+            if (string.IsNullOrEmpty(normalizedMethod))
+            {
+                if (int.TryParse(target, out _))
+                {
+                    normalizedMethod = "by_id";
+                }
+                else if (target.Contains("/"))
+                {
+                    normalizedMethod = "by_path";
+                }
+                else
+                {
+                    normalizedMethod = "by_name";
+                }
+            }
+
+            Scene activeScene = GetActiveScene();
+
+            switch (normalizedMethod)
+            {
+                case "by_id":
+                    if (int.TryParse(target, out int instanceId))
+                    {
+                        var obj = EditorUtility.InstanceIDToObject(instanceId);
+                        if (obj is GameObject gameObject)
+                        {
+                            return gameObject;
+                        }
+                        if (obj is Component component)
+                        {
+                            return component.gameObject;
+                        }
+                    }
+                    return null;
+
+                case "by_path":
+                    var roots = activeScene.GetRootGameObjects();
+                    foreach (var root in roots)
+                    {
+                        if (root == null)
+                        {
+                            continue;
+                        }
+
+                        string rootPath = root.name;
+                        if (target.Equals(rootPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return root;
+                        }
+
+                        if (target.StartsWith(rootPath + "/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var found = root.transform.Find(target.Substring(rootPath.Length + 1));
+                            if (found != null)
+                            {
+                                return found.gameObject;
+                            }
+                        }
+                    }
+                    return null;
+
+                case "by_name":
+                default:
+                    var allObjects = GetAllSceneObjects(searchInactive);
+                    foreach (var gameObject in allObjects)
+                    {
+                        if (gameObject != null && gameObject.name.Equals(target, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return gameObject;
+                        }
+                    }
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets all GameObjects in the active scene.
+        /// </summary>
+        private static IEnumerable<GameObject> GetAllSceneObjects(bool includeInactive)
+        {
+            Scene activeScene = GetActiveScene();
+            var roots = activeScene.GetRootGameObjects();
+            var allObjects = new List<GameObject>();
+
+            foreach (var root in roots)
+            {
+                if (root == null)
+                {
+                    continue;
+                }
+
+                if (includeInactive || root.activeInHierarchy)
+                {
+                    allObjects.Add(root);
+                }
+
+                var transforms = root.GetComponentsInChildren<Transform>(includeInactive);
+                foreach (var transform in transforms)
+                {
+                    if (transform != null && transform.gameObject != null && transform.gameObject != root)
+                    {
+                        allObjects.Add(transform.gameObject);
+                    }
+                }
+            }
+
+            return allObjects;
+        }
+
+        /// <summary>
+        /// Gets the active scene, handling prefab stage.
+        /// </summary>
+        private static Scene GetActiveScene()
+        {
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (prefabStage != null)
+            {
+                return prefabStage.scene;
+            }
+            return EditorSceneManager.GetActiveScene();
+        }
+
+        #endregion
+
+        #region Helper Methods - Component Type Resolution
+
+        /// <summary>
+        /// Resolves a component type by name.
+        /// </summary>
+        private static Type ResolveComponentType(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+            {
+                return null;
+            }
+
+            // Try exact match first
+            Type type = Type.GetType(typeName);
+            if (type != null)
+            {
+                return type;
+            }
+
+            // Try with UnityEngine namespace
+            type = Type.GetType($"UnityEngine.{typeName}, UnityEngine");
+            if (type != null)
+            {
+                return type;
+            }
+
+            // Try UnityEngine.UI
+            type = Type.GetType($"UnityEngine.UI.{typeName}, UnityEngine.UI");
+            if (type != null)
+            {
+                return type;
+            }
+
+            // Search all loaded assemblies
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                type = assembly.GetType(typeName);
+                if (type != null)
+                {
+                    return type;
+                }
+
+                // Try with UnityEngine prefix
+                type = assembly.GetType($"UnityEngine.{typeName}");
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Checks for 2D/3D physics component conflicts.
+        /// </summary>
+        private static object CheckPhysicsConflicts(GameObject targetGameObject, Type componentType, string componentTypeName)
+        {
+            bool isAdding2D = typeof(Rigidbody2D).IsAssignableFrom(componentType) || typeof(Collider2D).IsAssignableFrom(componentType);
+            bool isAdding3D = typeof(Rigidbody).IsAssignableFrom(componentType) || typeof(Collider).IsAssignableFrom(componentType);
+
+            if (isAdding2D)
+            {
+                if (targetGameObject.GetComponent<Rigidbody>() != null || targetGameObject.GetComponent<Collider>() != null)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = $"Cannot add 2D physics component '{componentTypeName}' - GameObject has 3D physics components."
+                    };
+                }
+            }
+            else if (isAdding3D)
+            {
+                if (targetGameObject.GetComponent<Rigidbody2D>() != null || targetGameObject.GetComponent<Collider2D>() != null)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = $"Cannot add 3D physics component '{componentTypeName}' - GameObject has 2D physics components."
+                    };
+                }
+            }
+
+            return null;
+        }
+
+        #endregion
+    }
+}

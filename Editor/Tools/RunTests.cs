@@ -12,6 +12,8 @@ namespace UnityMCP.Editor.Tools
     /// </summary>
     public static class RunTests
     {
+        private const int RetryAfterMs = 5000;
+
         /// <summary>
         /// Starts an asynchronous Unity Test Runner job and returns immediately with a job ID for polling.
         /// </summary>
@@ -41,7 +43,7 @@ namespace UnityMCP.Editor.Tools
                     success = false,
                     error = "A test run is already in progress",
                     job_id = currentJob?.jobId,
-                    retry_after_ms = 5000
+                    retry_after_ms = RetryAfterMs
                 };
             }
 
@@ -53,7 +55,7 @@ namespace UnityMCP.Editor.Tools
                 {
                     success = false,
                     error = "Failed to start test job - another job may be running",
-                    retry_after_ms = 5000
+                    retry_after_ms = RetryAfterMs
                 };
             }
 

@@ -100,14 +100,7 @@ namespace UnityMCP.Editor.Tools
                     compileRequested = true;
                 }
 
-                // Step 3: Lightweight refresh for "all" scope if not already triggered
-                if (normalizedScope == "all" && !refreshTriggered)
-                {
-                    AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-                    refreshTriggered = true;
-                }
-
-                // Step 4: Wait for Unity to be ready if requested
+                // Step 3: Wait for Unity to be ready if requested
                 // Note: For Unity 6+, skip waiting if compile was requested due to domain reload issues
                 bool shouldWait = waitForReady;
 
@@ -133,7 +126,7 @@ namespace UnityMCP.Editor.Tools
                 string resultingState = GetCurrentUnityState();
 
                 // Build success message
-                string message = "Refresh requested.";
+                string message;
                 if (refreshTriggered && compileRequested)
                 {
                     message = "Asset refresh and script compilation requested.";
@@ -145,6 +138,10 @@ namespace UnityMCP.Editor.Tools
                 else if (refreshTriggered)
                 {
                     message = "Asset refresh completed.";
+                }
+                else
+                {
+                    message = "No action taken (scope was 'scripts' without compile='request').";
                 }
 
                 // Add state-specific hints

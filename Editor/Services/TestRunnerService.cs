@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.TestTools.TestRunner.Api;
@@ -46,7 +45,6 @@ namespace UnityMCP.Editor.Services
         private int _failedCount;
         private int _skippedCount;
         private int _inconclusiveCount;
-        private double _totalDuration;
         private List<TestFailure> _failures = new List<TestFailure>();
         private DateTime _runStartTime;
 
@@ -84,7 +82,6 @@ namespace UnityMCP.Editor.Services
             _failedCount = 0;
             _skippedCount = 0;
             _inconclusiveCount = 0;
-            _totalDuration = 0;
             _failures.Clear();
             _runStartTime = DateTime.UtcNow;
 
@@ -201,7 +198,7 @@ namespace UnityMCP.Editor.Services
             }
             catch (Exception exception)
             {
-                Debug.LogError($"[TestRunnerService] Error in RunFinished: {exception.Message}");
+                Debug.LogError($"[TestRunnerService] Error in RunFinished: {exception.Message}\n{exception.StackTrace}");
                 TestJobManager.SetCurrentJobError($"Error finalizing test run: {exception.Message}");
             }
         }
@@ -232,7 +229,7 @@ namespace UnityMCP.Editor.Services
                         break;
                     case TestStatus.Failed:
                         _failedCount++;
-                        if (_failures.Count < 25) // Cap at 25 failures
+                        if (_failures.Count < TestJob.MaxFailures)
                         {
                             _failures.Add(new TestFailure
                             {
@@ -249,8 +246,6 @@ namespace UnityMCP.Editor.Services
                         _inconclusiveCount++;
                         break;
                 }
-
-                _totalDuration += result.Duration;
 
                 TestJobManager.OnLeafTestFinished(result.Test.FullName, passed, message, stackTrace);
             }
