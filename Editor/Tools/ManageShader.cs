@@ -618,11 +618,10 @@ namespace UnityMCP.Editor.Tools
 
             for (int i = 0; i < passCount; i++)
             {
-                string passName = shader.GetPassName(i);
                 passes.Add(new
                 {
                     index = i,
-                    name = string.IsNullOrEmpty(passName) ? $"Pass {i}" : passName
+                    name = $"Pass {i}"
                 });
             }
 
@@ -650,16 +649,7 @@ namespace UnityMCP.Editor.Tools
                 result["guid"] = AssetDatabase.AssetPathToGUID(assetPath);
             }
 
-            // Add subshader count if available via reflection (ShaderUtil)
-            try
-            {
-                int subshaderCount = ShaderUtil.GetSubshaderCount(shader);
-                result["subshaderCount"] = subshaderCount;
-            }
-            catch
-            {
-                // ShaderUtil method might not be available
-            }
+            // Note: ShaderUtil.GetSubshaderCount may not be available in all Unity versions
 
             return result;
         }
@@ -671,37 +661,7 @@ namespace UnityMCP.Editor.Tools
         {
             var keywords = new HashSet<string>();
 
-            // Try to get keywords from shader data
-            try
-            {
-                // Use ShaderUtil to get keyword info if available
-                var shaderData = ShaderUtil.GetShaderData(shader);
-                if (shaderData != null)
-                {
-                    for (int subshaderIndex = 0; subshaderIndex < shaderData.SubshaderCount; subshaderIndex++)
-                    {
-                        var subshader = shaderData.GetSubshader(subshaderIndex);
-                        for (int passIndex = 0; passIndex < subshader.PassCount; passIndex++)
-                        {
-                            var pass = subshader.GetPass(passIndex);
-
-                            // Get local keywords
-                            if (pass.LocalKeywordCount > 0)
-                            {
-                                for (int keywordIndex = 0; keywordIndex < pass.LocalKeywordCount; keywordIndex++)
-                                {
-                                    var keyword = pass.GetLocalKeyword(keywordIndex);
-                                    keywords.Add(keyword.name);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // Fallback: ShaderUtil methods might not be fully available
-            }
+            // Note: Detailed shader keyword extraction via ShaderUtil.GetShaderData may not be available in all Unity versions
 
             // Also check global keywords that might relate to this shader
             foreach (var globalKeyword in Shader.globalKeywords)

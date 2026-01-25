@@ -265,9 +265,7 @@ namespace UnityMCP.Editor.Services
                         buildResult.errors.Add(new BuildMessageInfo
                         {
                             type = "error",
-                            message = message.content,
-                            file = message.file,
-                            line = message.line
+                            message = message.content
                         });
                         errorCount++;
                     }
@@ -276,9 +274,7 @@ namespace UnityMCP.Editor.Services
                         buildResult.warnings.Add(new BuildMessageInfo
                         {
                             type = "warning",
-                            message = message.content,
-                            file = message.file,
-                            line = message.line
+                            message = message.content
                         });
                         warningCount++;
                     }

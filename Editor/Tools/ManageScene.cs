@@ -10,6 +10,8 @@ using UnityMCP.Editor;
 using UnityMCP.Editor.Core;
 using UnityMCP.Editor.Utilities;
 
+#pragma warning disable CS0618 // EditorUtility.InstanceIDToObject is deprecated but still functional
+
 namespace UnityMCP.Editor.Tools
 {
     /// <summary>

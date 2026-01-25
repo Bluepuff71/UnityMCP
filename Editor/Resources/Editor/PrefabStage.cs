@@ -41,7 +41,6 @@ namespace UnityMCP.Editor.Resources.Editor
                     childCount = prefabRoot.transform.childCount,
                     componentCount = prefabRoot.GetComponents<UnityEngine.Component>().Length
                 } : null,
-                autoSave = currentStage.autoSave,
                 scene = new
                 {
                     name = currentStage.scene.name,

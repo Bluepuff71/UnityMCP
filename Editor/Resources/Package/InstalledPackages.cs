@@ -47,7 +47,6 @@ namespace UnityMCP.Editor.Resources.Package
                     version = package.version,
                     description = TruncateDescription(package.description),
                     source = package.source.ToString(),
-                    status = package.status.ToString(),
                     isDirectDependency = package.isDirectDependency,
                     documentationUrl = package.documentationUrl,
                     changelogUrl = package.changelogUrl,

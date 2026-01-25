@@ -238,7 +238,7 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         private static object ListAvailableWindows()
         {
-            var windows = Resources.FindObjectsOfTypeAll<EditorWindow>();
+            var windows = UnityEngine.Resources.FindObjectsOfTypeAll<EditorWindow>();
             var windowDataList = new List<object>();
 
             foreach (var window in windows)
@@ -285,7 +285,7 @@ namespace UnityMCP.Editor.Tools
             string normalizedTypeName = windowTypeName.Trim();
 
             // Find all open EditorWindows
-            var allWindows = Resources.FindObjectsOfTypeAll<EditorWindow>();
+            var allWindows = UnityEngine.Resources.FindObjectsOfTypeAll<EditorWindow>();
 
             // Try exact match first
             EditorWindow foundWindow = allWindows.FirstOrDefault(window =>
@@ -516,13 +516,7 @@ namespace UnityMCP.Editor.Tools
                 // Display
                 display = resolvedStyle.display.ToString(),
                 visibility = resolvedStyle.visibility.ToString(),
-                overflow = resolvedStyle.overflow.ToString(),
-                opacity = resolvedStyle.opacity,
-
-                // Transform
-                rotate = resolvedStyle.rotate.angle.value,
-                scale = new[] { resolvedStyle.scale.value.x, resolvedStyle.scale.value.y },
-                translate = new[] { resolvedStyle.translate.x.value, resolvedStyle.translate.y.value }
+                opacity = resolvedStyle.opacity
             };
         }
 

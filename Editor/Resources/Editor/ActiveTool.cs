@@ -16,21 +16,21 @@ namespace UnityMCP.Editor.Resources.Editor
         {
             return new
             {
-                tool = Tools.current.ToString(),
-                viewTool = Tools.viewTool.ToString(),
-                pivotMode = Tools.pivotMode.ToString(),
-                pivotRotation = Tools.pivotRotation.ToString(),
+                tool = UnityEditor.Tools.current.ToString(),
+                viewTool = UnityEditor.Tools.viewTool.ToString(),
+                pivotMode = UnityEditor.Tools.pivotMode.ToString(),
+                pivotRotation = UnityEditor.Tools.pivotRotation.ToString(),
                 handlePosition = new
                 {
-                    x = Tools.handlePosition.x,
-                    y = Tools.handlePosition.y,
-                    z = Tools.handlePosition.z
+                    x = UnityEditor.Tools.handlePosition.x,
+                    y = UnityEditor.Tools.handlePosition.y,
+                    z = UnityEditor.Tools.handlePosition.z
                 },
                 handleRotation = new
                 {
-                    x = Tools.handleRotation.eulerAngles.x,
-                    y = Tools.handleRotation.eulerAngles.y,
-                    z = Tools.handleRotation.eulerAngles.z
+                    x = UnityEditor.Tools.handleRotation.eulerAngles.x,
+                    y = UnityEditor.Tools.handleRotation.eulerAngles.y,
+                    z = UnityEditor.Tools.handleRotation.eulerAngles.z
                 }
             };
         }

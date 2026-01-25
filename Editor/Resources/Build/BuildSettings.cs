@@ -57,7 +57,6 @@ namespace UnityMCP.Editor.Resources.Build
                     development = EditorUserBuildSettings.development,
                     allowDebugging = EditorUserBuildSettings.allowDebugging,
                     buildScriptsOnly = EditorUserBuildSettings.buildScriptsOnly,
-                    compressWithLz4 = EditorUserBuildSettings.GetCompressionType(buildTargetGroup).ToString(),
                     exportAsGoogleAndroidProject = buildTargetGroup == BuildTargetGroup.Android
                         ? EditorUserBuildSettings.exportAsGoogleAndroidProject
                         : (bool?)null

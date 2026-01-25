@@ -161,7 +161,6 @@ namespace UnityMCP.Editor.Resources.Project
                 scriptingRuntimeVersion = "Latest",
                 apiCompatibilityLevel = PlayerSettings.GetApiCompatibilityLevel(
                     UnityEditor.Build.NamedBuildTarget.Standalone).ToString(),
-                activeInputHandling = PlayerSettings.activeInputHandler.ToString(),
                 actionOnDotNetUnhandledException = PlayerSettings.actionOnDotNetUnhandledException.ToString(),
                 logObjCUncaughtExceptions = PlayerSettings.logObjCUncaughtExceptions,
                 enableCrashReportAPI = PlayerSettings.enableCrashReportAPI
@@ -172,8 +171,7 @@ namespace UnityMCP.Editor.Resources.Project
         {
             return new
             {
-                useMacAppStoreValidation = PlayerSettings.useMacAppStoreValidation,
-                macAppStoreCategory = PlayerSettings.macAppStoreCategory
+                useMacAppStoreValidation = PlayerSettings.useMacAppStoreValidation
             };
         }
 
@@ -196,12 +194,11 @@ namespace UnityMCP.Editor.Resources.Project
                 targetSdkVersion = PlayerSettings.Android.targetSdkVersion.ToString(),
                 targetArchitectures = PlayerSettings.Android.targetArchitectures.ToString(),
                 preferredInstallLocation = PlayerSettings.Android.preferredInstallLocation.ToString(),
-                useAPKExpansionFiles = PlayerSettings.Android.useAPKExpansionFiles,
+                useAPKExpansionFiles = PlayerSettings.Android.splitApplicationBinary,
                 useCustomKeystore = PlayerSettings.Android.useCustomKeystore,
                 keystoreName = PlayerSettings.Android.keystoreName,
-                splitApplicationBinary = PlayerSettings.Android.useAPKExpansionFiles,
-                buildAppBundle = EditorUserBuildSettings.buildAppBundle,
-                chromeOSInputEmulation = PlayerSettings.Android.chromeOSInputEmulation
+                splitApplicationBinary = PlayerSettings.Android.splitApplicationBinary,
+                buildAppBundle = EditorUserBuildSettings.buildAppBundle
             };
 
             // iOS settings
@@ -216,7 +213,6 @@ namespace UnityMCP.Editor.Resources.Project
                 appleDeveloperTeamID = PlayerSettings.iOS.appleDeveloperTeamID,
                 requiresPersistentWiFi = PlayerSettings.iOS.requiresPersistentWiFi,
                 requiresFullScreen = PlayerSettings.iOS.requiresFullScreen,
-                statusBarHidden = PlayerSettings.iOS.statusBarHidden,
                 allowHTTPDownload = PlayerSettings.iOS.allowHTTPDownload,
                 cameraUsageDescription = PlayerSettings.iOS.cameraUsageDescription,
                 microphoneUsageDescription = PlayerSettings.iOS.microphoneUsageDescription,

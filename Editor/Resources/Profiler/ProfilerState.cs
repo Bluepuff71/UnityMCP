@@ -1,6 +1,5 @@
 using UnityEditor;
 using UnityEditorInternal;
-using UnityEngine.Profiling;
 
 namespace UnityMCP.Editor.Resources.Profiler
 {
@@ -17,7 +16,6 @@ namespace UnityMCP.Editor.Resources.Profiler
         public static object GetProfilerState()
         {
             bool isRecording = ProfilerDriver.enabled;
-            bool isConnected = ProfilerDriver.IsConnectionEditor();
 
             // Get profiler connection info
             string connectionIdentifier = ProfilerDriver.GetConnectionIdentifier(
@@ -35,28 +33,26 @@ namespace UnityMCP.Editor.Resources.Profiler
                 },
                 connection = new
                 {
-                    isEditor = isConnected,
                     profileTarget = connectionIdentifier,
                     connectedProfiler = ProfilerDriver.connectedProfiler
                 },
                 memory = new
                 {
-                    usedHeapSize = Profiler.usedHeapSizeLong,
-                    usedHeapSizeMB = Profiler.usedHeapSizeLong / (1024.0 * 1024.0),
-                    monoHeapSize = Profiler.GetMonoHeapSizeLong(),
-                    monoHeapSizeMB = Profiler.GetMonoHeapSizeLong() / (1024.0 * 1024.0),
-                    monoUsedSize = Profiler.GetMonoUsedSizeLong(),
-                    monoUsedSizeMB = Profiler.GetMonoUsedSizeLong() / (1024.0 * 1024.0),
-                    totalAllocatedMemory = Profiler.GetTotalAllocatedMemoryLong(),
-                    totalAllocatedMemoryMB = Profiler.GetTotalAllocatedMemoryLong() / (1024.0 * 1024.0),
-                    totalReservedMemory = Profiler.GetTotalReservedMemoryLong(),
-                    totalReservedMemoryMB = Profiler.GetTotalReservedMemoryLong() / (1024.0 * 1024.0)
+                    usedHeapSize = UnityEngine.Profiling.Profiler.usedHeapSizeLong,
+                    usedHeapSizeMB = UnityEngine.Profiling.Profiler.usedHeapSizeLong / (1024.0 * 1024.0),
+                    monoHeapSize = UnityEngine.Profiling.Profiler.GetMonoHeapSizeLong(),
+                    monoHeapSizeMB = UnityEngine.Profiling.Profiler.GetMonoHeapSizeLong() / (1024.0 * 1024.0),
+                    monoUsedSize = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong(),
+                    monoUsedSizeMB = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() / (1024.0 * 1024.0),
+                    totalAllocatedMemory = UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong(),
+                    totalAllocatedMemoryMB = UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / (1024.0 * 1024.0),
+                    totalReservedMemory = UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong(),
+                    totalReservedMemoryMB = UnityEngine.Profiling.Profiler.GetTotalReservedMemoryLong() / (1024.0 * 1024.0)
                 },
                 data = new
                 {
                     firstFrameIndex = ProfilerDriver.firstFrameIndex,
-                    lastFrameIndex = ProfilerDriver.lastFrameIndex,
-                    maxHistoryLength = ProfilerDriver.maxHistoryLength
+                    lastFrameIndex = ProfilerDriver.lastFrameIndex
                 },
                 status = isRecording
                     ? "Profiler is recording"

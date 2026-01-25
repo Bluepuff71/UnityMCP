@@ -219,8 +219,8 @@ namespace UnityMCP.Editor.Tools
                 };
             }
 
-            Tool previousTool = Tools.current;
-            Tools.current = unityTool;
+            Tool previousTool = UnityEditor.Tools.current;
+            UnityEditor.Tools.current = unityTool;
 
             return new
             {

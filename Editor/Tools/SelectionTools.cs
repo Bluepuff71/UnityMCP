@@ -4,6 +4,8 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
+#pragma warning disable CS0618 // EditorUtility.InstanceIDToObject is deprecated but still functional
+
 namespace UnityMCP.Editor.Tools
 {
     /// <summary>
