@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityMCP.Editor.Core;
+using UnityMCP.Editor.Utilities;
 
 namespace UnityMCP.Editor.Tools
 {
@@ -100,7 +101,7 @@ namespace UnityMCP.Editor.Tools
                 throw MCPException.InvalidParams("The 'material_path' parameter is required for create action.");
             }
 
-            string normalizedPath = NormalizePath(materialPath);
+            string normalizedPath = PathUtilities.NormalizePath(materialPath);
 
             // Ensure .mat extension
             if (!normalizedPath.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
@@ -122,7 +123,7 @@ namespace UnityMCP.Editor.Tools
             string parentDirectory = Path.GetDirectoryName(normalizedPath)?.Replace('\\', '/');
             if (!string.IsNullOrEmpty(parentDirectory) && !AssetDatabase.IsValidFolder(parentDirectory))
             {
-                if (!EnsureFolderExists(parentDirectory, out string folderError))
+                if (!PathUtilities.EnsureFolderExists(parentDirectory, out string folderError))
                 {
                     return new { success = false, error = folderError };
                 }
@@ -172,7 +173,7 @@ namespace UnityMCP.Editor.Tools
                 throw MCPException.InvalidParams("The 'material_path' parameter is required for get_info action.");
             }
 
-            string normalizedPath = NormalizePath(materialPath);
+            string normalizedPath = PathUtilities.NormalizePath(materialPath);
             Material material = AssetDatabase.LoadAssetAtPath<Material>(normalizedPath);
 
             if (material == null)
@@ -211,7 +212,7 @@ namespace UnityMCP.Editor.Tools
                 throw MCPException.InvalidParams("The 'value' parameter is required for set_property action.");
             }
 
-            string normalizedPath = NormalizePath(materialPath);
+            string normalizedPath = PathUtilities.NormalizePath(materialPath);
             Material material = AssetDatabase.LoadAssetAtPath<Material>(normalizedPath);
 
             if (material == null)
@@ -332,7 +333,7 @@ namespace UnityMCP.Editor.Tools
                 propertyName = "_BaseColor"; // URP default
             }
 
-            string normalizedPath = NormalizePath(materialPath);
+            string normalizedPath = PathUtilities.NormalizePath(materialPath);
             Material material = AssetDatabase.LoadAssetAtPath<Material>(normalizedPath);
 
             if (material == null)
@@ -406,7 +407,7 @@ namespace UnityMCP.Editor.Tools
                 throw MCPException.InvalidParams("The 'target' parameter is required for assign_to_renderer action.");
             }
 
-            string normalizedPath = NormalizePath(materialPath);
+            string normalizedPath = PathUtilities.NormalizePath(materialPath);
             Material material = AssetDatabase.LoadAssetAtPath<Material>(normalizedPath);
 
             if (material == null)
@@ -831,12 +832,12 @@ namespace UnityMCP.Editor.Tools
             // Normalize if values are in 0-255 range
             if (r > 1f || g > 1f || b > 1f)
             {
-                r = r / 255f;
-                g = g / 255f;
-                b = b / 255f;
+                r = r / UnityConstants.ColorByteMax;
+                g = g / UnityConstants.ColorByteMax;
+                b = b / UnityConstants.ColorByteMax;
                 if (a > 1f)
                 {
-                    a = a / 255f;
+                    a = a / UnityConstants.ColorByteMax;
                 }
             }
 
@@ -954,7 +955,7 @@ namespace UnityMCP.Editor.Tools
                 return null;
             }
 
-            string normalizedPath = NormalizePath(texturePath);
+            string normalizedPath = PathUtilities.NormalizePath(texturePath);
             Texture texture = AssetDatabase.LoadAssetAtPath<Texture>(normalizedPath);
 
             if (texture == null)

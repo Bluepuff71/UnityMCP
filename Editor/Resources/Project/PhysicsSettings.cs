@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityMCP.Editor.Utilities;
 
 namespace UnityMCP.Editor.Resources.Project
 {
@@ -69,7 +70,7 @@ namespace UnityMCP.Editor.Resources.Project
             var enabledLayers = new List<int>();
 
             // Get all defined layer names
-            for (int layerIndex = 0; layerIndex < 32; layerIndex++)
+            for (int layerIndex = 0; layerIndex < UnityConstants.TotalLayerCount; layerIndex++)
             {
                 string layerName = LayerMask.LayerToName(layerIndex);
                 if (!string.IsNullOrEmpty(layerName))
@@ -83,9 +84,9 @@ namespace UnityMCP.Editor.Resources.Project
             var collisionPairs = new List<object>();
             var ignoredPairs = new List<object>();
 
-            for (int layerA = 0; layerA < 32; layerA++)
+            for (int layerA = 0; layerA < UnityConstants.TotalLayerCount; layerA++)
             {
-                for (int layerB = layerA; layerB < 32; layerB++)
+                for (int layerB = layerA; layerB < UnityConstants.TotalLayerCount; layerB++)
                 {
                     // Only include pairs where at least one layer is defined
                     bool layerADefined = layerNames.ContainsKey(layerA);

@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityMCP.Editor.Utilities;
 
 namespace UnityMCP.Editor.Tools.VFX
 {
@@ -238,10 +239,10 @@ namespace UnityMCP.Editor.Tools.VFX
                     // Normalize if values are in 0-255 range
                     if (red > 1f || green > 1f || blue > 1f)
                     {
-                        red /= 255f;
-                        green /= 255f;
-                        blue /= 255f;
-                        if (alpha > 1f) alpha /= 255f;
+                        red /= UnityConstants.ColorByteMax;
+                        green /= UnityConstants.ColorByteMax;
+                        blue /= UnityConstants.ColorByteMax;
+                        if (alpha > 1f) alpha /= UnityConstants.ColorByteMax;
                     }
 
                     return new Color(red, green, blue, alpha);
@@ -261,10 +262,10 @@ namespace UnityMCP.Editor.Tools.VFX
 
                         if (red > 1f || green > 1f || blue > 1f)
                         {
-                            red /= 255f;
-                            green /= 255f;
-                            blue /= 255f;
-                            if (alpha > 1f) alpha /= 255f;
+                            red /= UnityConstants.ColorByteMax;
+                            green /= UnityConstants.ColorByteMax;
+                            blue /= UnityConstants.ColorByteMax;
+                            if (alpha > 1f) alpha /= UnityConstants.ColorByteMax;
                         }
 
                         return new Color(red, green, blue, alpha);

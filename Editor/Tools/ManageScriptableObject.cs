@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 using UnityMCP.Editor.Core;
+using UnityMCP.Editor.Utilities;
 
 namespace UnityMCP.Editor.Tools
 {
@@ -890,10 +891,10 @@ namespace UnityMCP.Editor.Tools
                 // Normalize if values are in 0-255 range
                 if (r > 1f || g > 1f || b > 1f)
                 {
-                    r /= 255f;
-                    g /= 255f;
-                    b /= 255f;
-                    if (a > 1f) a /= 255f;
+                    r /= UnityConstants.ColorByteMax;
+                    g /= UnityConstants.ColorByteMax;
+                    b /= UnityConstants.ColorByteMax;
+                    if (a > 1f) a /= UnityConstants.ColorByteMax;
                 }
 
                 return new Color(r, g, b, a);
@@ -909,10 +910,10 @@ namespace UnityMCP.Editor.Tools
                 // Normalize if values are in 0-255 range
                 if (r > 1f || g > 1f || b > 1f)
                 {
-                    r /= 255f;
-                    g /= 255f;
-                    b /= 255f;
-                    if (a > 1f) a /= 255f;
+                    r /= UnityConstants.ColorByteMax;
+                    g /= UnityConstants.ColorByteMax;
+                    b /= UnityConstants.ColorByteMax;
+                    if (a > 1f) a /= UnityConstants.ColorByteMax;
                 }
 
                 return new Color(r, g, b, a);

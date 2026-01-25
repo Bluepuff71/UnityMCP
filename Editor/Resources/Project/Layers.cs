@@ -1,6 +1,7 @@
 using System.Linq;
 using UnityEditorInternal;
 using UnityEngine;
+using UnityMCP.Editor.Utilities;
 
 namespace UnityMCP.Editor.Resources.Project
 {
@@ -19,8 +20,8 @@ namespace UnityMCP.Editor.Resources.Project
             // Get all non-empty layers
             string[] definedLayers = InternalEditorUtility.layers;
 
-            // Build a complete list of all 32 layer slots with their names
-            var allLayers = Enumerable.Range(0, 32)
+            // Build a complete list of all layer slots with their names
+            var allLayers = Enumerable.Range(0, UnityConstants.TotalLayerCount)
                 .Select(layerIndex => new
                 {
                     index = layerIndex,
@@ -43,7 +44,7 @@ namespace UnityMCP.Editor.Resources.Project
 
             return new
             {
-                totalSlots = 32,
+                totalSlots = UnityConstants.TotalLayerCount,
                 definedCount = definedLayers.Length,
                 layers = definedLayersList,
                 allSlots = allLayers

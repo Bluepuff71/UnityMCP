@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityMCP.Editor.Utilities;
 
 namespace UnityMCP.Editor.Core
 {
@@ -151,7 +152,7 @@ namespace UnityMCP.Editor.Core
                 catch (HttpListenerException listenerException)
                 {
                     // Listener was stopped, exit gracefully
-                    if (listenerException.ErrorCode == 995) // ERROR_OPERATION_ABORTED
+                    if (listenerException.ErrorCode == UnityConstants.HttpOperationAborted)
                     {
                         break;
                     }
