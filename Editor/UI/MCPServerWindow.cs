@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -15,6 +16,7 @@ namespace UnityMCP.Editor.UI
         private Vector2 _toolListScrollPosition;
         private int _portInput;
         private string _lastError;
+        private Dictionary<string, bool> _categoryFoldouts = new Dictionary<string, bool>();
 
         private const string DocumentationUrl = "https://github.com/anthropics/anthropic-cookbook/tree/main/misc/model_context_protocol";
 
@@ -200,10 +202,10 @@ namespace UnityMCP.Editor.UI
 
             EditorGUILayout.Space(4);
 
-            // Tool list with scroll view
-            var toolDefinitions = ToolRegistry.GetDefinitions().ToList();
+            // Tool list with scroll view, grouped by category
+            var toolsByCategory = ToolRegistry.GetDefinitionsByCategory().ToList();
 
-            if (toolDefinitions.Count == 0)
+            if (toolsByCategory.Count == 0)
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField("No tools registered", EditorStyles.miniLabel);
@@ -221,12 +223,33 @@ namespace UnityMCP.Editor.UI
                     _toolListScrollPosition,
                     GUILayout.ExpandHeight(true));
 
-                foreach (var tool in toolDefinitions)
+                foreach (var group in toolsByCategory)
                 {
-                    DrawToolEntry(tool);
+                    DrawCategoryFoldout(group.Key, group.ToList());
                 }
 
                 EditorGUILayout.EndScrollView();
+            }
+        }
+
+        private void DrawCategoryFoldout(string category, List<ToolDefinition> tools)
+        {
+            // Initialize foldout state if needed (default to expanded)
+            if (!_categoryFoldouts.ContainsKey(category))
+                _categoryFoldouts[category] = true;
+
+            // Draw foldout header with tool count
+            string header = $"{category} ({tools.Count})";
+            _categoryFoldouts[category] = EditorGUILayout.Foldout(
+                _categoryFoldouts[category], header, true, EditorStyles.foldoutHeader);
+
+            // Draw tools if expanded
+            if (_categoryFoldouts[category])
+            {
+                EditorGUI.indentLevel++;
+                foreach (var tool in tools)
+                    DrawToolEntry(tool);
+                EditorGUI.indentLevel--;
             }
         }
 
