@@ -127,7 +127,7 @@ jobs:
             --exclude='NativeProxy~/*.dll' \
             --exclude='NativeProxy~/*.so' \
             --exclude='NativeProxy~/*.bundle' \
-            .
+            . || [[ $? -eq 1 ]]
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
