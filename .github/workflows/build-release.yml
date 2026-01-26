@@ -78,15 +78,18 @@ jobs:
       - name: Generate version
         id: version
         run: |
-          VERSION=$(date +'%Y.%m.%d')
-          # Add build number if tag already exists for today
-          if git ls-remote --tags origin | grep -q "refs/tags/$VERSION$"; then
-            BUILD=1
-            while git ls-remote --tags origin | grep -q "refs/tags/${VERSION}.${BUILD}$"; do
-              BUILD=$((BUILD + 1))
-            done
-            VERSION="${VERSION}.${BUILD}"
-          fi
+          # Read current version from package.json
+          CURRENT=$(grep -o '"version": "[^"]*"' Package/package.json | cut -d'"' -f4)
+
+          # Parse major.minor.patch
+          MAJOR=$(echo $CURRENT | cut -d. -f1)
+          MINOR=$(echo $CURRENT | cut -d. -f2)
+          PATCH=$(echo $CURRENT | cut -d. -f3)
+
+          # Increment patch
+          PATCH=$((PATCH + 1))
+
+          VERSION="${MAJOR}.${MINOR}.${PATCH}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download Windows artifact
