@@ -1,17 +1,17 @@
-# Unity MCP
+# Unity MCP - AI Assistant Integration for Unity Editor
 
-Model Context Protocol server for Unity Editor. Enables AI assistants like Claude to directly manipulate Unity projects.
+Model Context Protocol (MCP) server that enables AI assistants like Claude, Codex, and Cursor to automate Unity Editor tasks and game development workflows.
 
-## Why Use This?
+## Why Use This Unity AI Plugin?
 
-- **Zero telemetry** - Completely private. No data collection.
-- **40+ built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes.
-- **Simple extension API** - Add custom tools with a single attribute.
+- **Zero telemetry** - Completely private Unity automation. No data collection.
+- **40+ built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes through AI.
+- **Simple extension API** - Add custom AI tools with a single attribute.
 
 ## Requirements
 
 - Unity 6 or later
-- Any MCP client: Claude Code, Claude Desktop, Codex, Cursor, or others
+- Any MCP client: Claude Code, Claude Desktop, Codex, Cursor, or other AI assistants
 
 ## Installation
 
@@ -56,9 +56,9 @@ Unity MCP runs an HTTP server at `http://localhost:8080/`. Any MCP client with H
 
 *Note: Configurations for clients other than Claude Code have not been tested. Open a PR!*
 
-## How It Works
+## How Unity Editor Automation Works
 
-Unity MCP uses a native C plugin to maintain an HTTP server on a background thread, independent of Unity's C# scripting domain. This architecture ensures the MCP connection remains alive during script recompilation.
+Unity MCP uses a native C plugin to maintain an HTTP server on a background thread, independent of Unity's C# scripting domain. This architecture ensures the AI assistant connection remains active during script recompilation.
 
 ```
 ┌─────────────────┐
@@ -84,7 +84,7 @@ Unity MCP uses a native C plugin to maintain an HTTP server on a background thre
 
 When Unity recompiles scripts, the C# domain unloads temporarily. During this time, the native plugin continues accepting HTTP requests but returns a "Unity is recompiling" error instead of disconnecting. Once recompilation completes, requests are forwarded to Unity's main thread for execution.
 
-## Adding Custom Tools
+## Adding Custom AI Tools
 
 Create a static method and mark it with `[MCPTool]`:
 
