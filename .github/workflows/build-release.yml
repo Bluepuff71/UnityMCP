@@ -87,6 +87,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ steps.app-token.outputs.token }}
+          ref: main
 
       - name: Generate version
         id: version
