@@ -2,7 +2,7 @@
 
 Model Context Protocol (MCP) server that enables AI assistants like Claude, Codex, and Cursor to automate Unity Editor tasks and game development workflows.
 
-## Why Use This Unity AI Plugin?
+## Features
 
 - **Zero telemetry** - Completely private Unity automation. No data collection.
 - **40+ built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes through AI.
@@ -17,12 +17,9 @@ Model Context Protocol (MCP) server that enables AI assistants like Claude, Code
 
 1. Open Unity Package Manager (Window → Package Manager)
 2. Click `+` → "Add package from git URL"
-3. Enter:
-   ```
-   https://github.com/Bluepuff71/UnityMCP.git?path=/Package
-   ```
+3. Enter: ``` https://github.com/Bluepuff71/UnityMCP.git?path=/Package ```
 
-### Pinning a Version
+### Specific Version
 
 To install a specific version, append `#version`:
 ```
