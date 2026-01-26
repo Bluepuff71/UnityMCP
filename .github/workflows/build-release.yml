@@ -125,6 +125,11 @@ jobs:
         run: |
           sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.version }}"/' Package/package.json
 
+      - name: Copy README and LICENSE to Package
+        run: |
+          cp README.md Package/
+          cp LICENSE Package/
+
       - name: Commit and tag
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -132,7 +137,7 @@ jobs:
           git config user.name "Aloy the Cat[bot]"
           git config user.email "aloy-the-cat[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          git add Package/Plugins/ Package/package.json
+          git add Package/Plugins/ Package/package.json Package/README.md Package/LICENSE
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping release"
           else

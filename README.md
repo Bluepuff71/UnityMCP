@@ -30,7 +30,7 @@ https://github.com/Bluepuff71/UnityMCP.git?path=/Package
 
 To install a specific version, append `#version` tag:
 ```
-https://github.com/Bluepuff71/UnityMCP.git?path=/Package#2026.01.26
+https://github.com/Bluepuff71/UnityMCP.git?path=/Package#0.1.0
 ```
 
 See [Releases](https://github.com/Bluepuff71/UnityMCP/releases) for available versions.
