@@ -23,12 +23,12 @@ Model Context Protocol (MCP) server that enables AI assistants like Claude, Code
 
 To install the latest version:
 ```
-https://github.com/Bluepuff71/UnityMCP.git?path=/Package#2026.01.26
+https://github.com/Bluepuff71/UnityMCP.git?path=/Package
 ```
 
 ### Specific Version (If I messed something up)
 
-To install a specific version, append `#version`:
+To install a specific version, append `#version` tag:
 ```
 https://github.com/Bluepuff71/UnityMCP.git?path=/Package#2026.01.26
 ```
