@@ -1,9 +1,7 @@
 # Unity MCP - AI Assistant Integration for Unity Editor
 
 ![Unity 6+](https://img.shields.io/badge/Unity-6%2B-black?logo=unity)
-![License](https://img.shields.io/github/license/Bluepuff71/UnityMCP)
 ![Release](https://img.shields.io/github/v/tag/Bluepuff71/UnityMCP?label=version)
-![Build](https://img.shields.io/github/actions/workflow/status/Bluepuff71/UnityMCP/build-release.yml?branch=main)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 Model Context Protocol (MCP) server that enables AI assistants like Claude, Codex, and Cursor to automate Unity Editor tasks and game development workflows.
