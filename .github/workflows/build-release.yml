@@ -119,9 +119,12 @@ jobs:
           sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.version }}"/' Package/package.json
 
       - name: Commit and tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git add Package/Plugins/ Package/package.json
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping release"
