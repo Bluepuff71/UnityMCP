@@ -122,7 +122,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping release"
           else
-            git commit -m "Release ${{ steps.version.outputs.version }}"
+            git commit -m "Release ${{ steps.version.outputs.version }} [skip ci]"
             git tag "${{ steps.version.outputs.version }}"
             git push origin main --tags
           fi
