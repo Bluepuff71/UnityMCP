@@ -75,72 +75,43 @@ jobs:
         id: version
         run: |
           VERSION=$(date +'%Y.%m.%d')
-          # Add build number if release already exists for today
-          if gh release view "$VERSION" &>/dev/null; then
+          # Add build number if tag already exists for today
+          if git ls-remote --tags origin | grep -q "refs/tags/$VERSION$"; then
             BUILD=1
-            while gh release view "${VERSION}.${BUILD}" &>/dev/null; do
+            while git ls-remote --tags origin | grep -q "refs/tags/${VERSION}.${BUILD}$"; do
               BUILD=$((BUILD + 1))
             done
             VERSION="${VERSION}.${BUILD}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Plugins directories
-        run: |
-          mkdir -p Plugins/Windows/x86_64
-          mkdir -p Plugins/macOS
-          mkdir -p Plugins/Linux/x86_64
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: windows-plugin
-          path: Plugins/Windows/x86_64/
+          path: Package/Plugins/Windows/x86_64/
 
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
           name: macos-plugin
-          path: Plugins/macOS/
+          path: Package/Plugins/macOS/
 
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
           name: linux-plugin
-          path: Plugins/Linux/x86_64/
+          path: Package/Plugins/Linux/x86_64/
 
       - name: Update package.json version
         run: |
-          sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.version }}"/' package.json
+          sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.version }}"/' Package/package.json
 
-      - name: Create tarball
+      - name: Commit and tag
         run: |
-          tar -czvf UnityMCP-${{ steps.version.outputs.version }}.tgz \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='*.tgz' \
-            --exclude='docs' \
-            --exclude='docs.meta' \
-            --exclude='Tests~' \
-            --exclude='NativeProxy~/*.dll' \
-            --exclude='NativeProxy~/*.so' \
-            --exclude='NativeProxy~/*.bundle' \
-            . || [[ $? -eq 1 ]]
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          name: ${{ steps.version.outputs.version }}
-          body: |
-            ## Installation
-
-            Add via Unity Package Manager:
-            ```
-            https://github.com/Bluepuff71/UnityMCP/releases/download/${{ steps.version.outputs.version }}/UnityMCP-${{ steps.version.outputs.version }}.tgz
-            ```
-
-            Or download the `.tgz` file and install manually.
-          files: UnityMCP-${{ steps.version.outputs.version }}.tgz
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package/Plugins/ Package/package.json
+          git commit -m "Release ${{ steps.version.outputs.version }}"
+          git tag "${{ steps.version.outputs.version }}"
+          git push origin main --tags
