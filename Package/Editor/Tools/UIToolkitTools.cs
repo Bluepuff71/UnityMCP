@@ -232,6 +232,155 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
+        #region Click Tool
+
+        /// <summary>
+        /// Clicks a button, toggle, or clickable element in an EditorWindow.
+        /// </summary>
+        [MCPTool("uitoolkit_click", "Click a button, toggle, or clickable element in an EditorWindow", Category = "UIToolkit")]
+        public static object Click(
+            [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
+            [MCPParam("selector", "USS selector to find element")] string selector = null,
+            [MCPParam("name", "Element name to match")] string name = null,
+            [MCPParam("class_name", "USS class to filter by")] string className = null,
+            [MCPParam("button_text", "Find clickable by visible text")] string buttonText = null)
+        {
+            try
+            {
+                // Find the EditorWindow
+                var (window, windowError) = FindEditorWindow(windowType);
+                if (window == null)
+                {
+                    return windowError;
+                }
+
+                VisualElement rootElement = window.rootVisualElement;
+                if (rootElement == null)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = $"EditorWindow '{windowType}' has no rootVisualElement."
+                    };
+                }
+
+                // Find the target element
+                var (element, findError) = FindElement(rootElement, selector, name, className, buttonText);
+                if (element == null)
+                {
+                    return findError;
+                }
+
+                // Validate element state
+                if (!IsElementVisible(element))
+                {
+                    return new
+                    {
+                        success = false,
+                        error = "Element is not visible.",
+                        element = BuildBasicElementInfo(element)
+                    };
+                }
+
+                if (!IsElementEnabled(element))
+                {
+                    return new
+                    {
+                        success = false,
+                        error = "Element is disabled.",
+                        element = BuildBasicElementInfo(element)
+                    };
+                }
+
+                // Perform the click based on element type
+                bool clicked = PerformClick(element);
+
+                if (!clicked)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = "Element is not clickable.",
+                        element = BuildBasicElementInfo(element),
+                        suggestion = "This element type may not support click interactions."
+                    };
+                }
+
+                return new
+                {
+                    success = true,
+                    clicked = BuildBasicElementInfo(element)
+                };
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[UIToolkitTools] Error clicking element: {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error clicking element: {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Performs a click action on the element based on its type.
+        /// </summary>
+        private static bool PerformClick(VisualElement element)
+        {
+            if (element == null)
+            {
+                return false;
+            }
+
+            switch (element)
+            {
+                case Button button:
+                    // Use the clickable to simulate click
+                    using (var clickEvent = ClickEvent.GetPooled())
+                    {
+                        clickEvent.target = button;
+                        button.SendEvent(clickEvent);
+                    }
+                    return true;
+
+                case Toggle toggle:
+                    toggle.value = !toggle.value;
+                    return true;
+
+                case Foldout foldout:
+                    foldout.value = !foldout.value;
+                    return true;
+
+                default:
+                    // Try generic clickable
+                    if (element.clickable != null)
+                    {
+                        using (var clickEvent = ClickEvent.GetPooled())
+                        {
+                            clickEvent.target = element;
+                            element.SendEvent(clickEvent);
+                        }
+                        return true;
+                    }
+
+                    // Last resort: send click event anyway
+                    if (element.pickingMode == PickingMode.Position)
+                    {
+                        using (var clickEvent = ClickEvent.GetPooled())
+                        {
+                            clickEvent.target = element;
+                            element.SendEvent(clickEvent);
+                        }
+                        return true;
+                    }
+
+                    return false;
+            }
+        }
+
+        #endregion
+
         #region Helper Methods
 
         /// <summary>
