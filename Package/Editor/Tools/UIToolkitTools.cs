@@ -491,6 +491,125 @@ namespace UnityMCP.Editor.Tools
         }
 
         /// <summary>
+        /// Checks if an element is visible in the hierarchy.
+        /// </summary>
+        private static bool IsElementVisible(VisualElement element)
+        {
+            if (element == null)
+            {
+                return false;
+            }
+
+            var current = element;
+            while (current != null)
+            {
+                if (!current.visible || current.resolvedStyle.display == DisplayStyle.None)
+                {
+                    return false;
+                }
+                current = current.parent;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Checks if an element is enabled in the hierarchy.
+        /// </summary>
+        private static bool IsElementEnabled(VisualElement element)
+        {
+            if (element == null)
+            {
+                return false;
+            }
+
+            var current = element;
+            while (current != null)
+            {
+                if (!current.enabledSelf)
+                {
+                    return false;
+                }
+                current = current.parent;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Checks if an element can be clicked.
+        /// </summary>
+        private static bool IsClickable(VisualElement element)
+        {
+            if (element == null)
+            {
+                return false;
+            }
+
+            // Check for known clickable types
+            if (element is Button || element is Toggle || element is Foldout)
+            {
+                return true;
+            }
+
+            // Check if it has a clickable manipulator
+            if (element.clickable != null)
+            {
+                return true;
+            }
+
+            // Check picking mode
+            return element.pickingMode == PickingMode.Position;
+        }
+
+        /// <summary>
+        /// Checks if an element can have its value set.
+        /// </summary>
+        private static bool IsEditable(VisualElement element)
+        {
+            if (element == null)
+            {
+                return false;
+            }
+
+            return element is TextField ||
+                   element is IntegerField ||
+                   element is FloatField ||
+                   element is Toggle ||
+                   element is DropdownField ||
+                   element is EnumField ||
+                   element is Slider ||
+                   element is SliderInt ||
+                   element is MinMaxSlider ||
+                   element is ObjectField;
+        }
+
+        /// <summary>
+        /// Builds basic element info for response objects.
+        /// </summary>
+        private static object BuildBasicElementInfo(VisualElement element)
+        {
+            if (element == null)
+            {
+                return null;
+            }
+
+            string elementText = GetElementText(element);
+            var info = new Dictionary<string, object>
+            {
+                { "name", element.name },
+                { "typeName", element.GetType().Name }
+            };
+
+            if (elementText != null)
+            {
+                info["text"] = elementText;
+            }
+
+            return info;
+        }
+
+        /// <summary>
         /// Recursively collects elements matching the given name and/or class criteria.
         /// </summary>
         private static void CollectMatchingElements(
