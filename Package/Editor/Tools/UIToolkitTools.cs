@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -394,6 +395,74 @@ namespace UnityMCP.Editor.Tools
                 },
                 childCount = element.childCount
             };
+        }
+
+        /// <summary>
+        /// Extracts displayable text content from a VisualElement.
+        /// </summary>
+        /// <param name="element">The element to extract text from.</param>
+        /// <param name="maxLength">Maximum text length before truncation (default 500).</param>
+        /// <returns>The text content, or null if no text is available.</returns>
+        private static string GetElementText(VisualElement element, int maxLength = 500)
+        {
+            if (element == null)
+            {
+                return null;
+            }
+
+            string text = null;
+
+            // Try specific element types first
+            switch (element)
+            {
+                case Label label:
+                    text = label.text;
+                    break;
+                case Button button:
+                    text = button.text;
+                    break;
+                case TextField textField:
+                    text = textField.value;
+                    break;
+                case Foldout foldout:
+                    text = foldout.text;
+                    break;
+                case Toggle toggle:
+                    text = toggle.label;
+                    break;
+                case DropdownField dropdownField:
+                    text = dropdownField.value;
+                    break;
+                case EnumField enumField:
+                    text = enumField.value?.ToString();
+                    break;
+                case TextElement textElement:
+                    text = textElement.text;
+                    break;
+                default:
+                    // Try reflection for unknown types with a 'text' property
+                    try
+                    {
+                        var textProperty = element.GetType().GetProperty("text", BindingFlags.Public | BindingFlags.Instance);
+                        if (textProperty != null && textProperty.PropertyType == typeof(string))
+                        {
+                            text = textProperty.GetValue(element) as string;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore reflection errors
+                    }
+                    break;
+            }
+
+            // Truncate if needed
+            if (!string.IsNullOrEmpty(text) && text.Length > maxLength)
+            {
+                text = text.Substring(0, maxLength) + "...";
+            }
+
+            return string.IsNullOrEmpty(text) ? null : text;
         }
 
         /// <summary>
