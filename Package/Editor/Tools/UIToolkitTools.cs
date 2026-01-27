@@ -324,6 +324,173 @@ namespace UnityMCP.Editor.Tools
         }
 
         /// <summary>
+        /// Finds a single VisualElement using flexible search criteria.
+        /// </summary>
+        private static (VisualElement element, object error) FindElement(
+            VisualElement root,
+            string selector = null,
+            string name = null,
+            string className = null,
+            string text = null,
+            int maxDepth = 20)
+        {
+            if (root == null)
+            {
+                return (null, new
+                {
+                    success = false,
+                    error = "Root element is null."
+                });
+            }
+
+            bool hasSearchCriteria = !string.IsNullOrEmpty(selector) ||
+                                     !string.IsNullOrEmpty(name) ||
+                                     !string.IsNullOrEmpty(className) ||
+                                     !string.IsNullOrEmpty(text);
+
+            if (!hasSearchCriteria)
+            {
+                return (null, new
+                {
+                    success = false,
+                    error = "At least one search parameter (selector, name, class_name, or text) is required.",
+                    suggestion = "Use uitoolkit_query to explore available elements."
+                });
+            }
+
+            VisualElement foundElement = null;
+
+            // Strategy 1: USS selector query
+            if (!string.IsNullOrEmpty(selector))
+            {
+                var candidates = root.Query(selector).ToList();
+
+                // Apply additional filters if specified
+                foreach (var candidate in candidates)
+                {
+                    if (MatchesFilters(candidate, name, className, text))
+                    {
+                        foundElement = candidate;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Strategy 2: Recursive search
+                foundElement = FindElementRecursive(root, name, className, text, 0, maxDepth);
+            }
+
+            if (foundElement == null)
+            {
+                string searchDesc = BuildSearchDescription(selector, name, className, text);
+                return (null, new
+                {
+                    success = false,
+                    error = $"Could not find element matching {searchDesc}.",
+                    suggestion = "Use uitoolkit_query to explore available elements."
+                });
+            }
+
+            return (foundElement, null);
+        }
+
+        /// <summary>
+        /// Recursively searches for an element matching the given criteria.
+        /// </summary>
+        private static VisualElement FindElementRecursive(
+            VisualElement element,
+            string targetName,
+            string targetClassName,
+            string targetText,
+            int currentDepth,
+            int maxDepth)
+        {
+            if (element == null || currentDepth > maxDepth)
+            {
+                return null;
+            }
+
+            if (MatchesFilters(element, targetName, targetClassName, targetText))
+            {
+                return element;
+            }
+
+            foreach (var child in element.Children())
+            {
+                var found = FindElementRecursive(child, targetName, targetClassName, targetText, currentDepth + 1, maxDepth);
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Checks if an element matches the given filter criteria.
+        /// </summary>
+        private static bool MatchesFilters(VisualElement element, string name, string className, string text)
+        {
+            if (element == null)
+            {
+                return false;
+            }
+
+            // Name filter
+            if (!string.IsNullOrEmpty(name))
+            {
+                if (string.IsNullOrEmpty(element.name) ||
+                    !element.name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            // Class filter
+            if (!string.IsNullOrEmpty(className))
+            {
+                if (!element.ClassListContains(className))
+                {
+                    return false;
+                }
+            }
+
+            // Text filter
+            if (!string.IsNullOrEmpty(text))
+            {
+                string elementText = GetElementText(element);
+                if (string.IsNullOrEmpty(elementText) ||
+                    !elementText.Contains(text, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Builds a human-readable description of search criteria.
+        /// </summary>
+        private static string BuildSearchDescription(string selector, string name, string className, string text)
+        {
+            var parts = new List<string>();
+
+            if (!string.IsNullOrEmpty(selector))
+                parts.Add($"selector '{selector}'");
+            if (!string.IsNullOrEmpty(name))
+                parts.Add($"name '{name}'");
+            if (!string.IsNullOrEmpty(className))
+                parts.Add($"class '{className}'");
+            if (!string.IsNullOrEmpty(text))
+                parts.Add($"text containing '{text}'");
+
+            return string.Join(" and ", parts);
+        }
+
+        /// <summary>
         /// Recursively collects elements matching the given name and/or class criteria.
         /// </summary>
         private static void CollectMatchingElements(
