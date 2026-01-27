@@ -381,6 +381,247 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
+        #region Get Value Tool
+
+        /// <summary>
+        /// Gets the current value from an input field or control in an EditorWindow.
+        /// </summary>
+        [MCPTool("uitoolkit_get_value", "Get the current value from an input field or control", Category = "UIToolkit")]
+        public static object GetValue(
+            [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
+            [MCPParam("selector", "USS selector to find element")] string selector = null,
+            [MCPParam("name", "Element name to match")] string name = null,
+            [MCPParam("class_name", "USS class to filter by")] string className = null)
+        {
+            try
+            {
+                // Find the EditorWindow
+                var (window, windowError) = FindEditorWindow(windowType);
+                if (window == null)
+                {
+                    return windowError;
+                }
+
+                VisualElement rootElement = window.rootVisualElement;
+                if (rootElement == null)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = $"EditorWindow '{windowType}' has no rootVisualElement."
+                    };
+                }
+
+                // Find the target element
+                var (element, findError) = FindElement(rootElement, selector, name, className);
+                if (element == null)
+                {
+                    return findError;
+                }
+
+                // Extract value based on element type
+                return ExtractElementValue(element);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[UIToolkitTools] Error getting value: {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error getting value: {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Extracts the value from an element based on its type.
+        /// </summary>
+        private static object ExtractElementValue(VisualElement element)
+        {
+            var elementInfo = BuildBasicElementInfo(element);
+            bool isEditable = IsEditable(element);
+
+            switch (element)
+            {
+                case TextField textField:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = textField.value,
+                        editable = isEditable
+                    };
+
+                case IntegerField intField:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = intField.value,
+                        editable = isEditable
+                    };
+
+                case FloatField floatField:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = floatField.value,
+                        editable = isEditable
+                    };
+
+                case Toggle toggle:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = toggle.value,
+                        label = toggle.label,
+                        editable = isEditable
+                    };
+
+                case DropdownField dropdownField:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = dropdownField.value,
+                        index = dropdownField.index,
+                        choices = dropdownField.choices?.ToList(),
+                        editable = isEditable
+                    };
+
+                case EnumField enumField:
+                    var enumType = enumField.value?.GetType();
+                    string[] enumOptions = null;
+                    if (enumType != null && enumType.IsEnum)
+                    {
+                        enumOptions = Enum.GetNames(enumType);
+                    }
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = enumField.value?.ToString(),
+                        enumType = enumType?.Name,
+                        options = enumOptions,
+                        editable = isEditable
+                    };
+
+                case Slider slider:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = slider.value,
+                        min = slider.lowValue,
+                        max = slider.highValue,
+                        editable = isEditable
+                    };
+
+                case SliderInt sliderInt:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = sliderInt.value,
+                        min = sliderInt.lowValue,
+                        max = sliderInt.highValue,
+                        editable = isEditable
+                    };
+
+                case MinMaxSlider minMaxSlider:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        minValue = minMaxSlider.minValue,
+                        maxValue = minMaxSlider.maxValue,
+                        limitMin = minMaxSlider.lowLimit,
+                        limitMax = minMaxSlider.highLimit,
+                        editable = isEditable
+                    };
+
+                case ObjectField objectField:
+                    var obj = objectField.value;
+                    object valueInfo = null;
+                    if (obj != null)
+                    {
+                        string assetPath = AssetDatabase.GetAssetPath(obj);
+                        valueInfo = new
+                        {
+                            name = obj.name,
+                            type = obj.GetType().Name,
+                            assetPath = string.IsNullOrEmpty(assetPath) ? null : assetPath,
+                            instanceId = obj.GetInstanceID()
+                        };
+                    }
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = valueInfo,
+                        objectType = objectField.objectType?.FullName,
+                        allowSceneObjects = objectField.allowSceneObjects,
+                        editable = isEditable
+                    };
+
+                case RadioButtonGroup radioGroup:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = radioGroup.value,
+                        choices = radioGroup.choices?.ToList(),
+                        editable = isEditable
+                    };
+
+                case Label label:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = label.text,
+                        editable = false
+                    };
+
+                case Foldout foldout:
+                    return new
+                    {
+                        success = true,
+                        element = elementInfo,
+                        value = foldout.value,
+                        text = foldout.text,
+                        editable = false
+                    };
+
+                default:
+                    // Try to get a generic value property
+                    string textValue = GetElementText(element);
+                    if (textValue != null)
+                    {
+                        return new
+                        {
+                            success = true,
+                            element = elementInfo,
+                            value = textValue,
+                            editable = false,
+                            note = "Value extracted from text property; element type may not be fully supported."
+                        };
+                    }
+
+                    return new
+                    {
+                        success = false,
+                        element = elementInfo,
+                        error = $"Element type '{element.GetType().Name}' does not have a readable value.",
+                        suggestion = "This element type may not support value extraction."
+                    };
+            }
+        }
+
+        #endregion
+
         #region Helper Methods
 
         /// <summary>
