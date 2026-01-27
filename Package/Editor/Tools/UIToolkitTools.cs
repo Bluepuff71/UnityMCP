@@ -377,24 +377,27 @@ namespace UnityMCP.Editor.Tools
             }
 
             var boundingBox = element.worldBound;
+            string elementText = GetElementText(element);
 
-            return new
+            var result = new Dictionary<string, object>
             {
-                name = element.name,
-                typeName = element.GetType().Name,
-                ussClasses,
-                visible = element.visible,
-                enabled = element.enabledSelf,
-                pickable = element.pickingMode == PickingMode.Position,
-                bounds = new
-                {
-                    x = boundingBox.x,
-                    y = boundingBox.y,
-                    width = boundingBox.width,
-                    height = boundingBox.height
-                },
-                childCount = element.childCount
+                { "name", element.name },
+                { "typeName", element.GetType().Name },
+                { "ussClasses", ussClasses },
+                { "visible", element.visible },
+                { "enabled", element.enabledSelf },
+                { "pickable", element.pickingMode == PickingMode.Position },
+                { "bounds", new { x = boundingBox.x, y = boundingBox.y, width = boundingBox.width, height = boundingBox.height } },
+                { "childCount", element.childCount }
             };
+
+            // Only include text if present
+            if (elementText != null)
+            {
+                result["text"] = elementText;
+            }
+
+            return result;
         }
 
         /// <summary>
