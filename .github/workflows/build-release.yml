@@ -92,9 +92,22 @@ jobs:
       - name: Generate version
         id: version
         run: |
-          # One-time: Release 1.0.0
-          # TODO: Revert to auto-increment after this release
-          VERSION="1.0.0"
+          # Get latest semver tag (x.y.z format)
+          git fetch --tags
+          LATEST=$(git tag -l --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
+
+          if [ -z "$LATEST" ]; then
+            VERSION="1.0.1"
+          else
+            # Increment patch version
+            MAJOR=$(echo "$LATEST" | cut -d. -f1)
+            MINOR=$(echo "$LATEST" | cut -d. -f2)
+            PATCH=$(echo "$LATEST" | cut -d. -f3)
+            VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          fi
+
+          echo "Latest tag: $LATEST"
+          echo "New version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download Windows artifact
@@ -135,7 +148,15 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping release"
           else
-            git commit -m "Release ${{ steps.version.outputs.version }}"
-            git tag "${{ steps.version.outputs.version }}"
+            VERSION="${{ steps.version.outputs.version }}"
+
+            # Check if tag already exists
+            if git rev-parse "$VERSION" >/dev/null 2>&1; then
+              echo "::error::Tag $VERSION already exists. This should not happen with auto-increment."
+              exit 1
+            fi
+
+            git commit -m "Release $VERSION"
+            git tag "$VERSION"
             git push origin main --tags
           fi
