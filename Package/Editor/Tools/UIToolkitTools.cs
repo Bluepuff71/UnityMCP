@@ -1240,7 +1240,7 @@ namespace UnityMCP.Editor.Tools
                     // Scene objects typically have negative instance IDs
                     if (TryConvertToInt(value, out int instanceId))
                     {
-                        newObj = EditorUtility.InstanceIDToObject(instanceId);
+                        newObj = EditorUtility.EntityIdToObject(instanceId);
                         if (newObj != null)
                         {
                             resolvedSource = $"instanceId:{instanceId}";
