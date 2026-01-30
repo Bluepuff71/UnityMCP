@@ -1,6 +1,6 @@
 {
   "name": "com.emeryporter.unitymcp",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "displayName": "Unity MCP",
   "description": "Pure C# MCP server for Unity 6 with attribute-based tool extensions. Enables AI assistants like Claude to interact with the Unity Editor.",
   "unity": "6000.0",
