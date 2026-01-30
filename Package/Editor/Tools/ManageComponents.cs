@@ -18,6 +18,20 @@ namespace UnityMCP.Editor.Tools
     /// </summary>
     public static class ManageComponents
     {
+        #region Constants
+
+        /// <summary>
+        /// Maximum recursion depth for property serialization to prevent infinite loops.
+        /// </summary>
+        private const int MaxSerializationDepth = 10;
+
+        /// <summary>
+        /// Maximum number of array elements to serialize before truncation.
+        /// </summary>
+        private const int MaxSerializedArrayElements = 100;
+
+        #endregion
+
         #region Main Tool Entry Point
 
         /// <summary>
@@ -900,7 +914,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="depth">Current recursion depth.</param>
         /// <param name="maxDepth">Maximum recursion depth to prevent infinite loops.</param>
         /// <returns>A JSON-friendly object representation of the property value.</returns>
-        private static object SerializePropertyValue(SerializedProperty property, int depth = 0, int maxDepth = 10)
+        private static object SerializePropertyValue(SerializedProperty property, int depth = 0, int maxDepth = MaxSerializationDepth)
         {
             if (property == null)
             {
@@ -1171,34 +1185,29 @@ namespace UnityMCP.Editor.Tools
 
         /// <summary>
         /// Serializes a Unity Object reference to a JSON-friendly format.
+        /// Returns null for null references, or a reference dictionary for non-null objects.
+        /// The isObjectReference flag is added at the property level by the inspect handler.
         /// </summary>
         private static object SerializeObjectReference(SerializedProperty property)
         {
             var objectRef = property.objectReferenceValue;
             if (objectRef == null)
             {
-                return new Dictionary<string, object>
-                {
-                    { "value", null },
-                    { "isObjectReference", true }
-                };
+                return null;
             }
 
             return SerializeUnityObject(objectRef);
         }
 
         /// <summary>
-        /// Serializes a Unity Object to a reference format with $ref, $name, $path, and isObjectReference.
+        /// Serializes a Unity Object to a reference format with $ref, $name, $type, and $path.
+        /// The isObjectReference flag is added at the property level by the inspect handler.
         /// </summary>
         private static Dictionary<string, object> SerializeUnityObject(UnityEngine.Object unityObject)
         {
             if (unityObject == null)
             {
-                return new Dictionary<string, object>
-                {
-                    { "value", null },
-                    { "isObjectReference", true }
-                };
+                return null;
             }
 
             var result = new Dictionary<string, object>
@@ -1226,9 +1235,6 @@ namespace UnityMCP.Editor.Tools
                     result["$path"] = assetPath;
                 }
             }
-
-            // Add flag to indicate this is an object reference
-            result["isObjectReference"] = true;
 
             return result;
         }
@@ -1311,9 +1317,8 @@ namespace UnityMCP.Editor.Tools
             int arraySize = property.arraySize;
 
             // For very large arrays, truncate and indicate
-            const int maxArrayElements = 100;
-            bool truncated = arraySize > maxArrayElements;
-            int elementsToSerialize = truncated ? maxArrayElements : arraySize;
+            bool truncated = arraySize > MaxSerializedArrayElements;
+            int elementsToSerialize = truncated ? MaxSerializedArrayElements : arraySize;
 
             var elements = new List<object>();
             for (int i = 0; i < elementsToSerialize; i++)
@@ -1332,7 +1337,7 @@ namespace UnityMCP.Editor.Tools
             if (truncated)
             {
                 result["$truncated"] = true;
-                result["$truncatedAt"] = maxArrayElements;
+                result["$truncatedAt"] = MaxSerializedArrayElements;
             }
 
             return result;
