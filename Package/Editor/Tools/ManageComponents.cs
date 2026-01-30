@@ -890,6 +890,487 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
+        #region Helper Methods - Property Serialization
+
+        /// <summary>
+        /// Serializes a SerializedProperty value to a JSON-friendly object.
+        /// Handles primitives, Unity types, object references, and nested structures.
+        /// </summary>
+        /// <param name="property">The SerializedProperty to serialize.</param>
+        /// <param name="depth">Current recursion depth.</param>
+        /// <param name="maxDepth">Maximum recursion depth to prevent infinite loops.</param>
+        /// <returns>A JSON-friendly object representation of the property value.</returns>
+        private static object SerializePropertyValue(SerializedProperty property, int depth = 0, int maxDepth = 10)
+        {
+            if (property == null)
+            {
+                return null;
+            }
+
+            // Prevent infinite recursion
+            if (depth > maxDepth)
+            {
+                return new Dictionary<string, object>
+                {
+                    { "$truncated", true },
+                    { "$reason", "Max depth exceeded" }
+                };
+            }
+
+            switch (property.propertyType)
+            {
+                // Primitive types
+                case SerializedPropertyType.Integer:
+                    return property.intValue;
+
+                case SerializedPropertyType.Float:
+                    return property.floatValue;
+
+                case SerializedPropertyType.Boolean:
+                    return property.boolValue;
+
+                case SerializedPropertyType.String:
+                    return property.stringValue;
+
+                case SerializedPropertyType.Character:
+                    return property.intValue > 0 ? ((char)property.intValue).ToString() : "";
+
+                // Enum type
+                case SerializedPropertyType.Enum:
+                    return new Dictionary<string, object>
+                    {
+                        { "index", property.enumValueIndex },
+                        { "value", property.enumValueIndex >= 0 && property.enumValueIndex < property.enumNames.Length
+                            ? property.enumNames[property.enumValueIndex]
+                            : property.enumValueIndex.ToString() },
+                        { "options", property.enumNames }
+                    };
+
+                // Unity vector types
+                case SerializedPropertyType.Vector2:
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.vector2Value.x },
+                        { "y", property.vector2Value.y }
+                    };
+
+                case SerializedPropertyType.Vector3:
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.vector3Value.x },
+                        { "y", property.vector3Value.y },
+                        { "z", property.vector3Value.z }
+                    };
+
+                case SerializedPropertyType.Vector4:
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.vector4Value.x },
+                        { "y", property.vector4Value.y },
+                        { "z", property.vector4Value.z },
+                        { "w", property.vector4Value.w }
+                    };
+
+                case SerializedPropertyType.Vector2Int:
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.vector2IntValue.x },
+                        { "y", property.vector2IntValue.y }
+                    };
+
+                case SerializedPropertyType.Vector3Int:
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.vector3IntValue.x },
+                        { "y", property.vector3IntValue.y },
+                        { "z", property.vector3IntValue.z }
+                    };
+
+                // Quaternion - expose as euler angles for readability
+                case SerializedPropertyType.Quaternion:
+                    var euler = property.quaternionValue.eulerAngles;
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.quaternionValue.x },
+                        { "y", property.quaternionValue.y },
+                        { "z", property.quaternionValue.z },
+                        { "w", property.quaternionValue.w },
+                        { "eulerAngles", new Dictionary<string, object>
+                            {
+                                { "x", euler.x },
+                                { "y", euler.y },
+                                { "z", euler.z }
+                            }
+                        }
+                    };
+
+                // Color
+                case SerializedPropertyType.Color:
+                    return new Dictionary<string, object>
+                    {
+                        { "r", property.colorValue.r },
+                        { "g", property.colorValue.g },
+                        { "b", property.colorValue.b },
+                        { "a", property.colorValue.a },
+                        { "hex", ColorUtility.ToHtmlStringRGBA(property.colorValue) }
+                    };
+
+                // Rect types
+                case SerializedPropertyType.Rect:
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.rectValue.x },
+                        { "y", property.rectValue.y },
+                        { "width", property.rectValue.width },
+                        { "height", property.rectValue.height }
+                    };
+
+                case SerializedPropertyType.RectInt:
+                    return new Dictionary<string, object>
+                    {
+                        { "x", property.rectIntValue.x },
+                        { "y", property.rectIntValue.y },
+                        { "width", property.rectIntValue.width },
+                        { "height", property.rectIntValue.height }
+                    };
+
+                // Bounds types
+                case SerializedPropertyType.Bounds:
+                    return new Dictionary<string, object>
+                    {
+                        { "center", new Dictionary<string, object>
+                            {
+                                { "x", property.boundsValue.center.x },
+                                { "y", property.boundsValue.center.y },
+                                { "z", property.boundsValue.center.z }
+                            }
+                        },
+                        { "size", new Dictionary<string, object>
+                            {
+                                { "x", property.boundsValue.size.x },
+                                { "y", property.boundsValue.size.y },
+                                { "z", property.boundsValue.size.z }
+                            }
+                        }
+                    };
+
+                case SerializedPropertyType.BoundsInt:
+                    return new Dictionary<string, object>
+                    {
+                        { "position", new Dictionary<string, object>
+                            {
+                                { "x", property.boundsIntValue.position.x },
+                                { "y", property.boundsIntValue.position.y },
+                                { "z", property.boundsIntValue.position.z }
+                            }
+                        },
+                        { "size", new Dictionary<string, object>
+                            {
+                                { "x", property.boundsIntValue.size.x },
+                                { "y", property.boundsIntValue.size.y },
+                                { "z", property.boundsIntValue.size.z }
+                            }
+                        }
+                    };
+
+                // LayerMask
+                case SerializedPropertyType.LayerMask:
+                    int layerMaskValue = property.intValue;
+                    var layerNames = new List<string>();
+                    for (int i = 0; i < 32; i++)
+                    {
+                        if ((layerMaskValue & (1 << i)) != 0)
+                        {
+                            string layerName = LayerMask.LayerToName(i);
+                            if (!string.IsNullOrEmpty(layerName))
+                            {
+                                layerNames.Add(layerName);
+                            }
+                        }
+                    }
+                    return new Dictionary<string, object>
+                    {
+                        { "value", layerMaskValue },
+                        { "layers", layerNames }
+                    };
+
+                // AnimationCurve
+                case SerializedPropertyType.AnimationCurve:
+                    var curve = property.animationCurveValue;
+                    var keyframes = new List<Dictionary<string, object>>();
+                    if (curve != null)
+                    {
+                        foreach (var key in curve.keys)
+                        {
+                            keyframes.Add(new Dictionary<string, object>
+                            {
+                                { "time", key.time },
+                                { "value", key.value },
+                                { "inTangent", key.inTangent },
+                                { "outTangent", key.outTangent }
+                            });
+                        }
+                    }
+                    return new Dictionary<string, object>
+                    {
+                        { "keyCount", curve?.length ?? 0 },
+                        { "keys", keyframes }
+                    };
+
+                // Gradient (stored as generic, requires special handling)
+                case SerializedPropertyType.Gradient:
+                    // Gradients can't be directly accessed via SerializedProperty
+                    // Return a placeholder indicating the type
+                    return new Dictionary<string, object>
+                    {
+                        { "$type", "Gradient" },
+                        { "$note", "Gradient values require reflection to access" }
+                    };
+
+                // Object reference - the key type for this task
+                case SerializedPropertyType.ObjectReference:
+                    return SerializeObjectReference(property);
+
+                // Exposed reference (similar to object reference)
+                case SerializedPropertyType.ExposedReference:
+                    var exposedRef = property.exposedReferenceValue;
+                    if (exposedRef == null)
+                    {
+                        return null;
+                    }
+                    return SerializeUnityObject(exposedRef);
+
+                // Array size (special property for arrays)
+                case SerializedPropertyType.ArraySize:
+                    return property.intValue;
+
+                // Fixed buffer size
+                case SerializedPropertyType.FixedBufferSize:
+                    return property.fixedBufferSize;
+
+                // Generic - nested object/struct, need to iterate children
+                case SerializedPropertyType.Generic:
+                    return SerializeGenericProperty(property, depth, maxDepth);
+
+                // Managed reference (Unity 2019.3+)
+                case SerializedPropertyType.ManagedReference:
+                    return SerializeManagedReference(property, depth, maxDepth);
+
+                // Hash128
+                case SerializedPropertyType.Hash128:
+                    return property.hash128Value.ToString();
+
+                default:
+                    return new Dictionary<string, object>
+                    {
+                        { "$type", property.propertyType.ToString() },
+                        { "$unsupported", true }
+                    };
+            }
+        }
+
+        /// <summary>
+        /// Serializes a Unity Object reference to a JSON-friendly format.
+        /// </summary>
+        private static object SerializeObjectReference(SerializedProperty property)
+        {
+            var objectRef = property.objectReferenceValue;
+            if (objectRef == null)
+            {
+                return null;
+            }
+
+            return SerializeUnityObject(objectRef);
+        }
+
+        /// <summary>
+        /// Serializes a Unity Object to a reference format with $ref, $name, and $path.
+        /// </summary>
+        private static Dictionary<string, object> SerializeUnityObject(UnityEngine.Object unityObject)
+        {
+            if (unityObject == null)
+            {
+                return null;
+            }
+
+            var result = new Dictionary<string, object>
+            {
+                { "$ref", unityObject.GetInstanceID() },
+                { "$name", unityObject.name },
+                { "$type", unityObject.GetType().Name }
+            };
+
+            // Add hierarchy path for GameObjects and Components
+            if (unityObject is GameObject gameObject)
+            {
+                result["$path"] = GetGameObjectPath(gameObject);
+            }
+            else if (unityObject is Component component)
+            {
+                result["$path"] = GetGameObjectPath(component.gameObject);
+            }
+            else
+            {
+                // For assets, use the asset path
+                string assetPath = AssetDatabase.GetAssetPath(unityObject);
+                if (!string.IsNullOrEmpty(assetPath))
+                {
+                    result["$path"] = assetPath;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets the full hierarchy path of a GameObject.
+        /// </summary>
+        private static string GetGameObjectPath(GameObject gameObject)
+        {
+            if (gameObject == null)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var names = new Stack<string>();
+                Transform transform = gameObject.transform;
+                while (transform != null)
+                {
+                    names.Push(transform.name);
+                    transform = transform.parent;
+                }
+                return string.Join("/", names);
+            }
+            catch
+            {
+                return gameObject.name;
+            }
+        }
+
+        /// <summary>
+        /// Serializes a generic (nested) property by iterating its children.
+        /// </summary>
+        private static object SerializeGenericProperty(SerializedProperty property, int depth, int maxDepth)
+        {
+            // Handle arrays specially
+            if (property.isArray)
+            {
+                return SerializeArrayProperty(property, depth, maxDepth);
+            }
+
+            // For non-array generics (structs/nested objects), iterate children
+            var result = new Dictionary<string, object>
+            {
+                { "$type", property.type }
+            };
+
+            var iterator = property.Copy();
+            var endProperty = property.GetEndProperty();
+
+            // Enter the first child
+            if (!iterator.NextVisible(true))
+            {
+                return result;
+            }
+
+            // Iterate through all visible children
+            do
+            {
+                // Check if we've passed the end of this property's children
+                if (SerializedProperty.EqualContents(iterator, endProperty))
+                {
+                    break;
+                }
+
+                string childName = iterator.name;
+                result[childName] = SerializePropertyValue(iterator, depth + 1, maxDepth);
+            }
+            while (iterator.NextVisible(false));
+
+            return result;
+        }
+
+        /// <summary>
+        /// Serializes an array property.
+        /// </summary>
+        private static object SerializeArrayProperty(SerializedProperty property, int depth, int maxDepth)
+        {
+            int arraySize = property.arraySize;
+
+            // For very large arrays, truncate and indicate
+            const int maxArrayElements = 100;
+            bool truncated = arraySize > maxArrayElements;
+            int elementsToSerialize = truncated ? maxArrayElements : arraySize;
+
+            var elements = new List<object>();
+            for (int i = 0; i < elementsToSerialize; i++)
+            {
+                var element = property.GetArrayElementAtIndex(i);
+                elements.Add(SerializePropertyValue(element, depth + 1, maxDepth));
+            }
+
+            var result = new Dictionary<string, object>
+            {
+                { "$isArray", true },
+                { "length", arraySize },
+                { "elements", elements }
+            };
+
+            if (truncated)
+            {
+                result["$truncated"] = true;
+                result["$truncatedAt"] = maxArrayElements;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Serializes a managed reference property (Unity 2019.3+).
+        /// </summary>
+        private static object SerializeManagedReference(SerializedProperty property, int depth, int maxDepth)
+        {
+            // Get the managed reference type info
+            string typeName = property.managedReferenceFullTypename;
+
+            if (string.IsNullOrEmpty(typeName))
+            {
+                return null; // Null managed reference
+            }
+
+            var result = new Dictionary<string, object>
+            {
+                { "$managedReferenceType", typeName }
+            };
+
+            // Iterate children like a generic property
+            var iterator = property.Copy();
+            var endProperty = property.GetEndProperty();
+
+            if (!iterator.NextVisible(true))
+            {
+                return result;
+            }
+
+            do
+            {
+                if (SerializedProperty.EqualContents(iterator, endProperty))
+                {
+                    break;
+                }
+
+                string childName = iterator.name;
+                result[childName] = SerializePropertyValue(iterator, depth + 1, maxDepth);
+            }
+            while (iterator.NextVisible(false));
+
+            return result;
+        }
+
+        #endregion
+
         #region Helper Methods - Component Type Resolution
 
         /// <summary>
