@@ -35,11 +35,11 @@ namespace UnityMCP.Editor.Tools
         #region Main Tool Entry Point
 
         /// <summary>
-        /// Manages components on GameObjects with add, remove, and set_property actions.
+        /// Manages components on GameObjects with add, remove, set_property, and inspect actions.
         /// </summary>
-        [MCPTool("component_manage", "Manages components: add, remove, or set_property on GameObjects", Category = "Component")]
+        [MCPTool("component_manage", "Manages components: add, remove, set_property, or inspect on GameObjects", Category = "Component")]
         public static object Manage(
-            [MCPParam("action", "Action to perform: add, remove, set_property", required: true)] string action,
+            [MCPParam("action", "Action to perform: add, remove, set_property, inspect", required: true)] string action,
             [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target,
             [MCPParam("component_type", "The component type name (e.g., 'Rigidbody', 'BoxCollider')", required: true)] string componentType,
             [MCPParam("property", "Single property name to set (for set_property action)")] string property = null,
@@ -71,7 +71,8 @@ namespace UnityMCP.Editor.Tools
                     "add" => HandleAdd(target, componentType, properties, searchMethod),
                     "remove" => HandleRemove(target, componentType, searchMethod),
                     "set_property" => HandleSetProperty(target, componentType, property, value, properties, searchMethod),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: add, remove, set_property")
+                    "inspect" => HandleInspect(target, componentType, searchMethod),
+                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: add, remove, set_property, inspect")
                 };
             }
             catch (MCPException)
@@ -354,6 +355,104 @@ namespace UnityMCP.Editor.Tools
                 componentInstanceID = component.GetInstanceID(),
                 propertyResults = results
             };
+        }
+
+        /// <summary>
+        /// Handles the inspect action - lists all serialized properties on a component.
+        /// </summary>
+        private static object HandleInspect(string target, string componentTypeName, string searchMethod)
+        {
+            GameObject targetGameObject = FindGameObject(target, searchMethod);
+            if (targetGameObject == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Target GameObject '{target}' not found."
+                };
+            }
+
+            Type componentType = ResolveComponentType(componentTypeName);
+            if (componentType == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Component type '{componentTypeName}' not found."
+                };
+            }
+
+            Component component = targetGameObject.GetComponent(componentType);
+            if (component == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Component '{componentTypeName}' not found on '{targetGameObject.name}'."
+                };
+            }
+
+            try
+            {
+                var serializedObject = new SerializedObject(component);
+                var properties = new List<Dictionary<string, object>>();
+
+                // Iterate through all visible serialized properties
+                SerializedProperty iterator = serializedObject.GetIterator();
+                bool enterChildren = true;
+
+                while (iterator.NextVisible(enterChildren))
+                {
+                    // Skip the script reference property (m_Script)
+                    if (iterator.name == "m_Script")
+                    {
+                        enterChildren = false;
+                        continue;
+                    }
+
+                    var propertyInfo = new Dictionary<string, object>
+                    {
+                        { "path", iterator.propertyPath },
+                        { "type", iterator.type }
+                    };
+
+                    // Serialize the property value
+                    object serializedValue = SerializePropertyValue(iterator);
+                    propertyInfo["value"] = serializedValue;
+
+                    // Add isObjectReference flag for object reference properties
+                    if (iterator.propertyType == SerializedPropertyType.ObjectReference ||
+                        iterator.propertyType == SerializedPropertyType.ExposedReference)
+                    {
+                        propertyInfo["isObjectReference"] = true;
+                    }
+
+                    properties.Add(propertyInfo);
+
+                    // Don't enter children - we handle them via SerializePropertyValue for nested types
+                    enterChildren = false;
+                }
+
+                return new
+                {
+                    success = true,
+                    component = componentTypeName,
+                    gameObject = new
+                    {
+                        name = targetGameObject.name,
+                        instanceId = targetGameObject.GetInstanceID()
+                    },
+                    properties
+                };
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error inspecting component '{componentTypeName}': {exception.Message}"
+                };
+            }
         }
 
         #endregion
