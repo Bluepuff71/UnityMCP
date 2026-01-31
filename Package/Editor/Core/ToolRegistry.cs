@@ -70,7 +70,7 @@ namespace UnityMCP.Editor.Core
             }
 
             _isInitialized = true;
-            Debug.Log($"[ToolRegistry] Discovered {_tools.Count} MCP tools");
+            if (NativeProxy.VerboseLogging) Debug.Log($"[ToolRegistry] Discovered {_tools.Count} MCP tools");
         }
 
         private static void DiscoverToolsInAssembly(Assembly assembly)

@@ -75,7 +75,7 @@ namespace UnityMCP.Editor.Core
 
             _isInitialized = true;
             int totalResources = _resources.Count + _parameterizedResources.Count;
-            Debug.Log($"[ResourceRegistry] Discovered {totalResources} MCP resources ({_resources.Count} static, {_parameterizedResources.Count} parameterized)");
+            if (NativeProxy.VerboseLogging) Debug.Log($"[ResourceRegistry] Discovered {totalResources} MCP resources ({_resources.Count} static, {_parameterizedResources.Count} parameterized)");
         }
 
         private static void DiscoverResourcesInAssembly(Assembly assembly)
