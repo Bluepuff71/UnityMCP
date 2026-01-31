@@ -19,6 +19,7 @@ namespace UnityMCP.Editor.UI
         private Dictionary<string, bool> _categoryFoldouts = new Dictionary<string, bool>();
 
         private const string DocumentationUrl = "https://github.com/anthropics/anthropic-cookbook/tree/main/misc/model_context_protocol";
+        private const string VerboseLoggingPrefKey = "UnityMCP_VerboseLogging";
 
         [MenuItem("Window/Unity MCP")]
         public static void ShowWindow()
@@ -30,6 +31,7 @@ namespace UnityMCP.Editor.UI
         private void OnEnable()
         {
             _portInput = MCPServer.Instance.Port;
+            NativeProxy.VerboseLogging = EditorPrefs.GetBool(VerboseLoggingPrefKey, false);
         }
 
         /// <summary>
@@ -148,7 +150,7 @@ namespace UnityMCP.Editor.UI
             if (GUILayout.Button("Copy", GUILayout.Width(50)))
             {
                 EditorGUIUtility.systemCopyBuffer = endpoint;
-                Debug.Log($"[MCPServerWindow] Copied endpoint to clipboard: {endpoint}");
+                if (NativeProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Copied endpoint to clipboard: {endpoint}");
             }
             EditorGUILayout.EndHorizontal();
 
@@ -181,7 +183,7 @@ namespace UnityMCP.Editor.UI
                 if (_portInput > 0 && _portInput <= 65535)
                 {
                     MCPServer.Instance.Port = _portInput;
-                    Debug.Log($"[MCPServerWindow] Port changed to {_portInput}");
+                    if (NativeProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Port changed to {_portInput}");
                 }
                 else
                 {
@@ -197,6 +199,15 @@ namespace UnityMCP.Editor.UI
             }
 
             EditorGUI.EndDisabledGroup();
+
+            // Verbose logging toggle (always enabled)
+            EditorGUILayout.Space(4);
+            bool verboseLogging = EditorGUILayout.Toggle("Verbose Logging", NativeProxy.VerboseLogging);
+            if (verboseLogging != NativeProxy.VerboseLogging)
+            {
+                NativeProxy.VerboseLogging = verboseLogging;
+                EditorPrefs.SetBool(VerboseLoggingPrefKey, verboseLogging);
+            }
 
             EditorGUI.indentLevel--;
         }
@@ -312,7 +323,7 @@ namespace UnityMCP.Editor.UI
             try
             {
                 ToolRegistry.RefreshTools();
-                Debug.Log("[MCPServerWindow] Tools refreshed");
+                if (NativeProxy.VerboseLogging) Debug.Log("[MCPServerWindow] Tools refreshed");
             }
             catch (Exception exception)
             {

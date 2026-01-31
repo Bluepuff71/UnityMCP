@@ -118,7 +118,7 @@ namespace UnityMCP.Editor.Core
             // If native proxy is handling HTTP, don't start managed server
             if (NativeProxy.IsInitialized)
             {
-                Debug.Log("[MCPServer] Native proxy is active, skipping managed HTTP server.");
+                if (NativeProxy.VerboseLogging) Debug.Log("[MCPServer] Native proxy is active, skipping managed HTTP server.");
                 MCPServerDomainReload.SetShouldRun(true, _port);
                 return;
             }
@@ -137,7 +137,7 @@ namespace UnityMCP.Editor.Core
                 // Enable running in background so server responds when Unity is not focused
                 Application.runInBackground = true;
 
-                Debug.Log($"[MCPServer] Started on http://localhost:{_port}/");
+                if (NativeProxy.VerboseLogging) Debug.Log($"[MCPServer] Started on http://localhost:{_port}/");
 
                 ListenAsync(_cancellationTokenSource.Token);
             }
@@ -181,7 +181,7 @@ namespace UnityMCP.Editor.Core
                 MCPServerDomainReload.SetShouldRun(false, _port);
             }
 
-            Debug.Log("[MCPServer] Stopped.");
+            if (NativeProxy.VerboseLogging) Debug.Log("[MCPServer] Stopped.");
         }
 
         private async void ListenAsync(CancellationToken cancellationToken)

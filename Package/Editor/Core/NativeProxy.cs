@@ -63,6 +63,12 @@ namespace UnityMCP.Editor.Core
         public static bool IsInitialized => s_initialized;
 
         /// <summary>
+        /// Gets or sets whether verbose logging is enabled.
+        /// When false, only warnings and errors are logged.
+        /// </summary>
+        public static bool VerboseLogging { get; set; } = false;
+
+        /// <summary>
         /// Starts the native proxy server.
         /// </summary>
         public static void Start()
@@ -87,7 +93,7 @@ namespace UnityMCP.Editor.Core
             {
                 RegisterCallback(null);
                 StopServer();
-                Debug.Log("[NativeProxy] Native MCP proxy stopped");
+                if (VerboseLogging) Debug.Log("[NativeProxy] Native MCP proxy stopped");
             }
             catch (Exception exception)
             {
@@ -141,7 +147,7 @@ namespace UnityMCP.Editor.Core
                 Application.runInBackground = true;
 
                 s_initialized = true;
-                Debug.Log($"[NativeProxy] Native MCP proxy initialized on port {DEFAULT_PORT}");
+                if (VerboseLogging) Debug.Log($"[NativeProxy] Native MCP proxy initialized on port {DEFAULT_PORT}");
             }
             catch (DllNotFoundException dllException)
             {
