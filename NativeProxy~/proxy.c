@@ -37,6 +37,7 @@ static ThreadHandle s_server_thread;
 /* Response buffer for synchronous C# callback */
 static char s_response_buffer[PROXY_MAX_RESPONSE_SIZE];
 static volatile int s_has_response = 0;
+static volatile int s_call_in_progress = 0;
 
 /*
  * Buffer for building dynamic error responses with request ID
@@ -255,15 +256,18 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
         return;
     }
 
-    /* Clear response state and invoke C# callback */
+    /* Clear response state and mark call in progress */
     s_has_response = 0;
     s_response_buffer[0] = '\0';
+    s_call_in_progress = 1;
 
     /*
      * Call the C# callback synchronously from the server thread.
      * C# handles main thread dispatch internally and calls SendResponse() before returning.
      */
     s_csharp_callback(request_body);
+
+    s_call_in_progress = 0;
 
     free(request_body);
     request_body = NULL;
@@ -275,9 +279,9 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
     }
     else
     {
-        /* No response received - callback failed or was cleared */
+        /* No response - call was interrupted by domain reload */
         mg_http_reply(connection, 200, CORS_HEADERS, "%s",
-            BuildErrorResponse(-32603, "Internal error processing request.", request_id));
+            BuildErrorResponse(-32000, "Request interrupted by Unity domain reload. Please retry.", request_id));
     }
 }
 

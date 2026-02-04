@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEngine;
 
 namespace UnityMCP.Editor.Core
@@ -87,6 +88,7 @@ namespace UnityMCP.Editor.Core
             }
 
             AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeReload;
+            CompilationPipeline.compilationStarted -= OnCompilationStarted;
             EditorApplication.quitting -= OnQuit;
 
             try
@@ -141,6 +143,7 @@ namespace UnityMCP.Editor.Core
 
                 // Register for domain unload to safely unregister callback before C# code becomes invalid
                 AssemblyReloadEvents.beforeAssemblyReload += OnBeforeReload;
+                CompilationPipeline.compilationStarted += OnCompilationStarted;
                 EditorApplication.quitting += OnQuit;
 
                 // Enable running in background so server responds when Unity is not focused
@@ -182,6 +185,23 @@ namespace UnityMCP.Editor.Core
         }
 
         /// <summary>
+        /// Called when compilation starts, before domain reload.
+        /// Unregisters the callback early to prevent race conditions during domain reload.
+        /// </summary>
+        private static void OnCompilationStarted(object context)
+        {
+            try
+            {
+                RegisterCallback(null);
+                if (VerboseLogging) Debug.Log("[NativeProxy] Callback unregistered due to compilation start");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[NativeProxy] Error unregistering callback on compilation: {exception.Message}");
+            }
+        }
+
+        /// <summary>
         /// Called when the Unity Editor is quitting.
         /// Cleans up by unregistering the callback and stopping the native server.
         /// </summary>
@@ -189,6 +209,7 @@ namespace UnityMCP.Editor.Core
         {
             try
             {
+                CompilationPipeline.compilationStarted -= OnCompilationStarted;
                 RegisterCallback(null);
                 StopServer();
             }
@@ -203,40 +224,62 @@ namespace UnityMCP.Editor.Core
         /// <summary>
         /// Callback invoked by the native proxy when an HTTP request is received.
         /// Processes the JSON-RPC request through MCPServer and sends back the response.
+        /// Handles ThreadAbortException gracefully during domain reload.
         /// </summary>
         /// <param name="jsonRequest">The raw JSON-RPC request string from the client.</param>
         private static void OnRequest(string jsonRequest)
         {
-            // Extract request ID for use in error responses
             string requestId = ExtractRequestId(jsonRequest);
+            bool responseSent = false;
 
             try
             {
                 string response = MCPServer.Instance.HandleRequest(jsonRequest);
 
-                // Check response size before sending to native proxy.
-                // If too large, return a proper JSON-RPC error with the correct request ID.
                 if (response != null && response.Length >= MaxResponseSize)
                 {
-                    Debug.LogWarning($"[NativeProxy] Response size ({response.Length} bytes) exceeds maximum ({MaxResponseSize} bytes). " +
-                        "Returning error response. Consider reducing query depth or scope.");
-
+                    Debug.LogWarning($"[NativeProxy] Response size ({response.Length} bytes) exceeds maximum ({MaxResponseSize} bytes). Returning error response.");
                     string errorResponse = BuildErrorResponse(
                         -32603,
-                        $"Response too large ({response.Length} bytes). Maximum supported size is {MaxResponseSize - 1} bytes. " +
-                        "Try reducing max_depth or using more specific queries.",
+                        $"Response too large ({response.Length} bytes). Maximum supported size is {MaxResponseSize - 1} bytes. Try reducing max_depth or using more specific queries.",
                         requestId);
                     SendResponse(errorResponse);
+                    responseSent = true;
                     return;
                 }
 
                 SendResponse(response);
+                responseSent = true;
+            }
+            catch (System.Threading.ThreadAbortException)
+            {
+                // Domain reload is aborting this thread
+                // Response will be sent in finally block
+                // ThreadAbortException re-throws automatically after finally
             }
             catch (Exception exception)
             {
-                // Build error response manually to ensure valid JSON-RPC is always returned
                 string errorResponse = BuildErrorResponse(-32603, exception.Message, requestId);
                 SendResponse(errorResponse);
+                responseSent = true;
+            }
+            finally
+            {
+                if (!responseSent)
+                {
+                    try
+                    {
+                        string errorResponse = BuildErrorResponse(
+                            -32000,
+                            "Request interrupted by Unity domain reload. Please retry.",
+                            requestId);
+                        SendResponse(errorResponse);
+                    }
+                    catch
+                    {
+                        // Ignore - native fail-safe will handle this
+                    }
+                }
             }
         }
 
