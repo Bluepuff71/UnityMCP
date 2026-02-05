@@ -79,6 +79,14 @@ EXPORT int IsServerRunning(void);
  */
 EXPORT int IsCallbackValid(void);
 
+/*
+ * Get the process ID of this native library instance.
+ * Used to verify if an existing server belongs to the same process.
+ *
+ * @return The process ID as an unsigned long
+ */
+EXPORT unsigned long GetNativeProcessId(void);
+
 #ifdef __cplusplus
 }
 #endif

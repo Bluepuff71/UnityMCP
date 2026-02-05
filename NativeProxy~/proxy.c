@@ -19,9 +19,12 @@
 #ifdef _WIN32
     #include <windows.h>
     typedef HANDLE ThreadHandle;
+    #define GET_PROCESS_ID() ((unsigned long)GetCurrentProcessId())
 #else
     #include <pthread.h>
+    #include <unistd.h>
     typedef pthread_t ThreadHandle;
+    #define GET_PROCESS_ID() ((unsigned long)getpid())
 #endif
 
 /*
@@ -38,6 +41,9 @@ static ThreadHandle s_server_thread;
 static char s_response_buffer[PROXY_MAX_RESPONSE_SIZE];
 static volatile int s_has_response = 0;
 static volatile int s_call_in_progress = 0;
+
+/* Shutdown request flag - set by /__internal/shutdown endpoint */
+static volatile int s_shutdown_requested = 0;
 
 /*
  * Buffer for building dynamic error responses with request ID
@@ -171,15 +177,25 @@ static const char* CORS_HEADERS =
 
 /*
  * Server thread function.
- * Polls the Mongoose event manager in a loop until s_running is cleared.
+ * Polls the Mongoose event manager in a loop until s_running is cleared
+ * or a shutdown is requested via the internal endpoint.
  */
 #ifdef _WIN32
 static DWORD WINAPI ServerThreadFunc(LPVOID param)
 {
     (void)param;
-    while (s_running)
+    while (s_running && !s_shutdown_requested)
     {
         mg_mgr_poll(&s_mgr, 10);
+    }
+    /* If shutdown was requested, clean up */
+    if (s_shutdown_requested)
+    {
+        s_running = 0;
+        s_listener = NULL;
+        s_callback_valid = 0;
+        s_csharp_callback = NULL;
+        mg_mgr_free(&s_mgr);
     }
     return 0;
 }
@@ -187,25 +203,76 @@ static DWORD WINAPI ServerThreadFunc(LPVOID param)
 static void* ServerThreadFunc(void* param)
 {
     (void)param;
-    while (s_running)
+    while (s_running && !s_shutdown_requested)
     {
         mg_mgr_poll(&s_mgr, 10);
+    }
+    /* If shutdown was requested, clean up */
+    if (s_shutdown_requested)
+    {
+        s_running = 0;
+        s_listener = NULL;
+        s_callback_valid = 0;
+        s_csharp_callback = NULL;
+        mg_mgr_free(&s_mgr);
     }
     return NULL;
 }
 #endif
 
 /*
+ * Handle internal endpoints for server management.
+ * Returns 1 if handled, 0 if not an internal endpoint.
+ */
+static int HandleInternalEndpoint(struct mg_connection* connection, struct mg_http_message* http_message)
+{
+    /* Check for GET method */
+    if (mg_strcmp(http_message->method, mg_str("GET")) != 0)
+    {
+        return 0;
+    }
+
+    /* Handle /__internal/info - returns server info including process ID */
+    if (mg_match(http_message->uri, mg_str("/__internal/info"), NULL))
+    {
+        char info_response[256];
+        snprintf(info_response, sizeof(info_response),
+            "{\"server\":\"UnityMCPProxy\",\"pid\":%lu,\"running\":%d}",
+            GET_PROCESS_ID(), s_running);
+        mg_http_reply(connection, 200, CORS_HEADERS, "%s", info_response);
+        return 1;
+    }
+
+    /* Handle /__internal/shutdown - requests graceful server shutdown */
+    if (mg_match(http_message->uri, mg_str("/__internal/shutdown"), NULL))
+    {
+        s_shutdown_requested = 1;
+        mg_http_reply(connection, 200, CORS_HEADERS,
+            "{\"success\":true,\"message\":\"Shutdown requested\"}");
+        return 1;
+    }
+
+    return 0;
+}
+
+/*
  * Handle an incoming HTTP request.
  *
  * This function processes the HTTP request:
- * 1. CORS preflight (OPTIONS) -> 204 No Content
- * 2. Non-POST methods -> 405 Method Not Allowed
- * 3. If callback not valid -> Return "recompiling" response with request ID
- * 4. Otherwise -> Call C# callback and wait for response
+ * 1. Internal endpoints (/__internal/*) -> Handle specially
+ * 2. CORS preflight (OPTIONS) -> 204 No Content
+ * 3. Non-POST methods -> 405 Method Not Allowed
+ * 4. If callback not valid -> Return "recompiling" response with request ID
+ * 5. Otherwise -> Call C# callback and wait for response
  */
 static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_message* http_message)
 {
+    /* Check for internal endpoints first */
+    if (HandleInternalEndpoint(connection, http_message))
+    {
+        return;
+    }
+
     /* Handle CORS preflight request */
     if (mg_strcmp(http_message->method, mg_str("OPTIONS")) == 0)
     {
@@ -306,6 +373,9 @@ EXPORT int StartServer(int port)
     {
         return 1;  /* Already running */
     }
+
+    /* Reset shutdown flag */
+    s_shutdown_requested = 0;
 
     /* Initialize the event manager */
     mg_mgr_init(&s_mgr);
@@ -435,4 +505,12 @@ EXPORT int IsServerRunning(void)
 EXPORT int IsCallbackValid(void)
 {
     return s_callback_valid;
+}
+
+/*
+ * Get the process ID of this native library instance.
+ */
+EXPORT unsigned long GetNativeProcessId(void)
+{
+    return GET_PROCESS_ID();
 }
