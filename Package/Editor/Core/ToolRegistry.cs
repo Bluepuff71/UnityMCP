@@ -16,11 +16,12 @@ namespace UnityMCP.Editor.Core
     {
         private static Dictionary<string, ToolInfo> _tools = new Dictionary<string, ToolInfo>();
         private static bool _isInitialized = false;
+        private static readonly object _lock = new object();
 
         /// <summary>
         /// Gets the number of registered tools.
         /// </summary>
-        public static int Count => _tools.Count;
+        public static int Count { get { lock (_lock) { return _tools.Count; } } }
 
         /// <summary>
         /// Auto-discover tools when the editor loads.
@@ -36,41 +37,44 @@ namespace UnityMCP.Editor.Core
         /// </summary>
         public static void RefreshTools()
         {
-            _tools.Clear();
-            _isInitialized = false;
-
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            lock (_lock)
             {
-                // Skip system and Unity assemblies for performance
-                string assemblyName = assembly.FullName;
-                if (assemblyName.StartsWith("System", StringComparison.Ordinal) ||
-                    assemblyName.StartsWith("Unity.", StringComparison.Ordinal) ||
-                    assemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) ||
-                    assemblyName.StartsWith("UnityEditor", StringComparison.Ordinal) ||
-                    assemblyName.StartsWith("mscorlib", StringComparison.Ordinal) ||
-                    assemblyName.StartsWith("netstandard", StringComparison.Ordinal) ||
-                    assemblyName.StartsWith("Microsoft.", StringComparison.Ordinal) ||
-                    assemblyName.StartsWith("Mono.", StringComparison.Ordinal))
+                _tools.Clear();
+                _isInitialized = false;
+
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    continue;
+                    // Skip system and Unity assemblies for performance
+                    string assemblyName = assembly.FullName;
+                    if (assemblyName.StartsWith("System", StringComparison.Ordinal) ||
+                        assemblyName.StartsWith("Unity.", StringComparison.Ordinal) ||
+                        assemblyName.StartsWith("UnityEngine", StringComparison.Ordinal) ||
+                        assemblyName.StartsWith("UnityEditor", StringComparison.Ordinal) ||
+                        assemblyName.StartsWith("mscorlib", StringComparison.Ordinal) ||
+                        assemblyName.StartsWith("netstandard", StringComparison.Ordinal) ||
+                        assemblyName.StartsWith("Microsoft.", StringComparison.Ordinal) ||
+                        assemblyName.StartsWith("Mono.", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        DiscoverToolsInAssembly(assembly);
+                    }
+                    catch (ReflectionTypeLoadException reflectionException)
+                    {
+                        Debug.LogWarning($"[ToolRegistry] Failed to load types from assembly {assembly.GetName().Name}: {reflectionException.Message}");
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogWarning($"[ToolRegistry] Error scanning assembly {assembly.GetName().Name}: {exception.Message}");
+                    }
                 }
 
-                try
-                {
-                    DiscoverToolsInAssembly(assembly);
-                }
-                catch (ReflectionTypeLoadException reflectionException)
-                {
-                    Debug.LogWarning($"[ToolRegistry] Failed to load types from assembly {assembly.GetName().Name}: {reflectionException.Message}");
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogWarning($"[ToolRegistry] Error scanning assembly {assembly.GetName().Name}: {exception.Message}");
-                }
+                _isInitialized = true;
+                if (NativeProxy.VerboseLogging) Debug.Log($"[ToolRegistry] Discovered {_tools.Count} MCP tools");
             }
-
-            _isInitialized = true;
-            if (NativeProxy.VerboseLogging) Debug.Log($"[ToolRegistry] Discovered {_tools.Count} MCP tools");
         }
 
         private static void DiscoverToolsInAssembly(Assembly assembly)
@@ -108,7 +112,12 @@ namespace UnityMCP.Editor.Core
         public static IEnumerable<ToolDefinition> GetDefinitions()
         {
             EnsureInitialized();
-            return _tools.Values.Select(toolInfo => toolInfo.ToDefinition());
+            List<ToolInfo> snapshot;
+            lock (_lock)
+            {
+                snapshot = _tools.Values.ToList();
+            }
+            return snapshot.Select(toolInfo => toolInfo.ToDefinition());
         }
 
         /// <summary>
@@ -117,11 +126,14 @@ namespace UnityMCP.Editor.Core
         public static ToolDefinition GetDefinition(string name)
         {
             EnsureInitialized();
-            if (_tools.TryGetValue(name, out var toolInfo))
+            lock (_lock)
             {
-                return toolInfo.ToDefinition();
+                if (_tools.TryGetValue(name, out var toolInfo))
+                {
+                    return toolInfo.ToDefinition();
+                }
+                return null;
             }
-            return null;
         }
 
         /// <summary>
@@ -130,7 +142,12 @@ namespace UnityMCP.Editor.Core
         public static IEnumerable<IGrouping<string, ToolDefinition>> GetDefinitionsByCategory()
         {
             EnsureInitialized();
-            return _tools.Values
+            List<ToolInfo> snapshot;
+            lock (_lock)
+            {
+                snapshot = _tools.Values.ToList();
+            }
+            return snapshot
                 .Select(t => (Category: t.Category, Definition: t.ToDefinition()))
                 .GroupBy(t => t.Category, t => t.Definition)
                 .OrderBy(g => GetCategoryOrder(g.Key));
@@ -163,7 +180,10 @@ namespace UnityMCP.Editor.Core
         public static bool HasTool(string name)
         {
             EnsureInitialized();
-            return _tools.ContainsKey(name);
+            lock (_lock)
+            {
+                return _tools.ContainsKey(name);
+            }
         }
 
         /// <summary>
@@ -177,9 +197,13 @@ namespace UnityMCP.Editor.Core
         {
             EnsureInitialized();
 
-            if (!_tools.TryGetValue(name, out var toolInfo))
+            ToolInfo toolInfo;
+            lock (_lock)
             {
-                throw new MCPException($"Unknown tool: {name}", MCPErrorCodes.MethodNotFound);
+                if (!_tools.TryGetValue(name, out toolInfo))
+                {
+                    throw new MCPException($"Unknown tool: {name}", MCPErrorCodes.MethodNotFound);
+                }
             }
 
             return toolInfo.Invoke(arguments);
@@ -233,9 +257,12 @@ namespace UnityMCP.Editor.Core
 
         private static void EnsureInitialized()
         {
-            if (!_isInitialized)
+            lock (_lock)
             {
-                RefreshTools();
+                if (!_isInitialized)
+                {
+                    RefreshTools();
+                }
             }
         }
     }
