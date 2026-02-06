@@ -1,7 +1,4 @@
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Net;
 using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEditor;
@@ -27,8 +24,7 @@ namespace UnityMCP.Editor.Core
     {
         private const string DLL_NAME = "UnityMCPProxy";
         private const int DEFAULT_PORT = 8080;
-        private const int SHUTDOWN_TIMEOUT_MS = 2000;
-        private const int SHUTDOWN_RETRY_DELAY_MS = 200;
+        private const int STARTUP_RETRY_DELAY_MS = 200;
         private const int MAX_START_RETRIES = 5;
 
         /// <summary>
@@ -51,9 +47,6 @@ namespace UnityMCP.Editor.Core
 
         [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
         private static extern void SendResponse([MarshalAs(UnmanagedType.LPStr)] string json);
-
-        [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
-        private static extern uint GetNativeProcessId();
 
         #endregion
 
@@ -125,7 +118,7 @@ namespace UnityMCP.Editor.Core
 
         /// <summary>
         /// Initializes the native proxy by starting the server and registering the callback.
-        /// If port is in use by another instance of this DLL in the same process, requests shutdown first.
+        /// If the port is temporarily held (e.g. old DLL being unloaded), retries with delays.
         /// Falls back gracefully if the native plugin is not available.
         /// </summary>
         private static void Initialize()
@@ -139,21 +132,17 @@ namespace UnityMCP.Editor.Core
             {
                 int result = StartServer(DEFAULT_PORT);
 
-                // If failed to bind, check if it's our old DLL instance and try to shut it down
+                // If failed to bind, retry with delays. The old DLL's DllMain cleanup
+                // may need a moment to close the listen socket before we can bind.
                 if (result < 0)
                 {
-                    if (TryShutdownExistingServer())
+                    for (int retry = 0; retry < MAX_START_RETRIES; retry++)
                     {
-                        // Retry starting after shutdown
-                        for (int retry = 0; retry < MAX_START_RETRIES; retry++)
+                        Thread.Sleep(STARTUP_RETRY_DELAY_MS);
+                        result = StartServer(DEFAULT_PORT);
+                        if (result >= 0)
                         {
-                            Thread.Sleep(SHUTDOWN_RETRY_DELAY_MS);
-                            result = StartServer(DEFAULT_PORT);
-                            if (result >= 0)
-                            {
-                                if (VerboseLogging) Debug.Log($"[NativeProxy] Server started after shutting down old instance (retry {retry + 1})");
-                                break;
-                            }
+                            break;
                         }
                     }
 
@@ -190,82 +179,6 @@ namespace UnityMCP.Editor.Core
             {
                 Debug.LogWarning($"[NativeProxy] Failed to initialize native proxy: {exception.GetType().Name}: {exception.Message}. Falling back to managed server.");
                 Debug.LogException(exception);
-            }
-        }
-
-        /// <summary>
-        /// Attempts to shut down an existing server if it belongs to the same process.
-        /// This handles the case where a package update loads a new DLL while the old one is still running.
-        /// </summary>
-        /// <returns>True if shutdown was requested (server belonged to same process), false otherwise.</returns>
-        private static bool TryShutdownExistingServer()
-        {
-            try
-            {
-                int ourPid = Process.GetCurrentProcess().Id;
-
-                // Use HttpWebRequest (synchronous) instead of HttpClient (async)
-                // to avoid deadlock on Unity's main thread SynchronizationContext
-                var infoRequest = (HttpWebRequest)WebRequest.Create(
-                    $"http://localhost:{DEFAULT_PORT}/__internal/info");
-                infoRequest.Method = "GET";
-                infoRequest.Timeout = SHUTDOWN_TIMEOUT_MS;
-
-                string infoJson;
-                using (var infoResponse = (HttpWebResponse)infoRequest.GetResponse())
-                using (var reader = new StreamReader(infoResponse.GetResponseStream()))
-                {
-                    if (infoResponse.StatusCode != HttpStatusCode.OK)
-                        return false;
-                    infoJson = reader.ReadToEnd();
-                }
-
-                // Parse PID from response (simple parsing for {"server":"UnityMCPProxy","pid":12345,"running":1})
-                int pidIndex = infoJson.IndexOf("\"pid\":", StringComparison.Ordinal);
-                if (pidIndex < 0)
-                {
-                    return false;
-                }
-
-                int pidStart = pidIndex + 6;
-                int pidEnd = pidStart;
-                while (pidEnd < infoJson.Length && char.IsDigit(infoJson[pidEnd]))
-                {
-                    pidEnd++;
-                }
-
-                if (!int.TryParse(infoJson.Substring(pidStart, pidEnd - pidStart), out int serverPid))
-                {
-                    return false;
-                }
-
-                // Only shut down if it's our process (old DLL instance)
-                if (serverPid != ourPid)
-                {
-                    Debug.Log($"[NativeProxy] Existing server belongs to different process (PID {serverPid}), not shutting down");
-                    return false;
-                }
-
-                // Send shutdown request
-                Debug.Log($"[NativeProxy] Requesting shutdown of old server instance (PID {serverPid})");
-                var shutdownRequest = (HttpWebRequest)WebRequest.Create(
-                    $"http://localhost:{DEFAULT_PORT}/__internal/shutdown");
-                shutdownRequest.Method = "GET";
-                shutdownRequest.Timeout = SHUTDOWN_TIMEOUT_MS;
-
-                using (var shutdownResponse = (HttpWebResponse)shutdownRequest.GetResponse())
-                {
-                    bool success = shutdownResponse.StatusCode == HttpStatusCode.OK;
-                    if (success)
-                        Debug.Log("[NativeProxy] Old server shutdown request acknowledged");
-                    return success;
-                }
-            }
-            catch (Exception exception)
-            {
-                // Always log this — silent failures here cause permanent breakage
-                Debug.Log($"[NativeProxy] Could not connect to existing server: {exception.Message}");
-                return false;
             }
         }
 

@@ -44,8 +44,8 @@ static char s_response_buffer[PROXY_MAX_RESPONSE_SIZE];
 static volatile int s_has_response = 0;
 static volatile int s_call_in_progress = 0;
 
-/* Shutdown request flag - set by /__internal/shutdown endpoint */
-static volatile int s_shutdown_requested = 0;
+/* Flag set by DllMain/destructor to signal the server thread to exit and clean up */
+static volatile int s_unloading = 0;
 
 /*
  * Buffer for building dynamic error responses with request ID
@@ -179,21 +179,21 @@ static const char* CORS_HEADERS =
 
 /*
  * Server thread function.
- * Polls the Mongoose event manager in a loop until s_running is cleared
- * or a shutdown is requested via the internal endpoint.
+ * Polls the Mongoose event manager in a loop until s_running is cleared.
+ * When s_unloading is set (DLL being unloaded), the thread cleans up
+ * sockets itself since StopServer can't wait for the thread from DllMain.
  */
 #ifdef _WIN32
 static DWORD WINAPI ServerThreadFunc(LPVOID param)
 {
     (void)param;
-    while (s_running && !s_shutdown_requested)
+    while (s_running)
     {
         mg_mgr_poll(&s_mgr, 10);
     }
-    /* If shutdown was requested, clean up */
-    if (s_shutdown_requested)
+    /* If DLL is being unloaded, thread must clean up (StopServer can't wait from DllMain) */
+    if (s_unloading)
     {
-        s_running = 0;
         s_listener = NULL;
         s_callback_valid = 0;
         s_csharp_callback = NULL;
@@ -205,14 +205,13 @@ static DWORD WINAPI ServerThreadFunc(LPVOID param)
 static void* ServerThreadFunc(void* param)
 {
     (void)param;
-    while (s_running && !s_shutdown_requested)
+    while (s_running)
     {
         mg_mgr_poll(&s_mgr, 10);
     }
-    /* If shutdown was requested, clean up */
-    if (s_shutdown_requested)
+    /* If DLL is being unloaded, thread must clean up (StopServer can't wait from destructor) */
+    if (s_unloading)
     {
-        s_running = 0;
         s_listener = NULL;
         s_callback_valid = 0;
         s_csharp_callback = NULL;
@@ -223,58 +222,16 @@ static void* ServerThreadFunc(void* param)
 #endif
 
 /*
- * Handle internal endpoints for server management.
- * Returns 1 if handled, 0 if not an internal endpoint.
- */
-static int HandleInternalEndpoint(struct mg_connection* connection, struct mg_http_message* http_message)
-{
-    /* Check for GET method */
-    if (mg_strcmp(http_message->method, mg_str("GET")) != 0)
-    {
-        return 0;
-    }
-
-    /* Handle /__internal/info - returns server info including process ID */
-    if (mg_match(http_message->uri, mg_str("/__internal/info"), NULL))
-    {
-        char info_response[256];
-        snprintf(info_response, sizeof(info_response),
-            "{\"server\":\"UnityMCPProxy\",\"pid\":%lu,\"running\":%d}",
-            GET_PROCESS_ID(), s_running);
-        mg_http_reply(connection, 200, CORS_HEADERS, "%s", info_response);
-        return 1;
-    }
-
-    /* Handle /__internal/shutdown - requests graceful server shutdown */
-    if (mg_match(http_message->uri, mg_str("/__internal/shutdown"), NULL))
-    {
-        s_shutdown_requested = 1;
-        mg_http_reply(connection, 200, CORS_HEADERS,
-            "{\"success\":true,\"message\":\"Shutdown requested\"}");
-        return 1;
-    }
-
-    return 0;
-}
-
-/*
  * Handle an incoming HTTP request.
  *
  * This function processes the HTTP request:
- * 1. Internal endpoints (/__internal/*) -> Handle specially
- * 2. CORS preflight (OPTIONS) -> 204 No Content
- * 3. Non-POST methods -> 405 Method Not Allowed
- * 4. If callback not valid -> Block and poll until callback becomes valid
- * 5. Otherwise -> Call C# callback and wait for response
+ * 1. CORS preflight (OPTIONS) -> 204 No Content
+ * 2. Non-POST methods -> 405 Method Not Allowed
+ * 3. If callback not valid -> Block and poll until callback becomes valid
+ * 4. Otherwise -> Call C# callback and wait for response
  */
 static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_message* http_message)
 {
-    /* Check for internal endpoints first */
-    if (HandleInternalEndpoint(connection, http_message))
-    {
-        return;
-    }
-
     /* Handle CORS preflight request */
     if (mg_strcmp(http_message->method, mg_str("OPTIONS")) == 0)
     {
@@ -330,7 +287,7 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
                 free(request_body);
                 return;
             }
-            if (!s_running || s_shutdown_requested)
+            if (!s_running)
             {
                 mg_http_reply(connection, 200, CORS_HEADERS, "%s",
                     BuildErrorResponse(-32000, "Server is shutting down.", request_id));
@@ -400,8 +357,8 @@ EXPORT int StartServer(int port)
         return 1;  /* Already running */
     }
 
-    /* Reset shutdown flag */
-    s_shutdown_requested = 0;
+    /* Reset unload flag */
+    s_unloading = 0;
 
     /* Initialize the event manager */
     mg_mgr_init(&s_mgr);
@@ -540,3 +497,41 @@ EXPORT unsigned long GetNativeProcessId(void)
 {
     return GET_PROCESS_ID();
 }
+
+/*
+ * DLL/shared library unload cleanup.
+ *
+ * When Unity reloads the native plugin (e.g. package update), the old DLL is
+ * unloaded while its server thread may still be running. Without cleanup, the
+ * listen socket leaks and the new DLL can never bind to the same port.
+ *
+ * We signal the thread to stop and give it time to close sockets. We cannot
+ * call WaitForSingleObject/pthread_join here (loader lock on Windows), so a
+ * brief sleep lets the thread's 10ms poll loop notice and run cleanup.
+ */
+#ifdef _WIN32
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
+{
+    (void)hinstDLL;
+    (void)lpvReserved;
+
+    if (fdwReason == DLL_PROCESS_DETACH && s_running)
+    {
+        s_unloading = 1;
+        s_running = 0;
+        Sleep(100);
+    }
+    return TRUE;
+}
+#else
+__attribute__((destructor))
+static void OnDllUnload(void)
+{
+    if (s_running)
+    {
+        s_unloading = 1;
+        s_running = 0;
+        usleep(100000); /* 100ms */
+    }
+}
+#endif
