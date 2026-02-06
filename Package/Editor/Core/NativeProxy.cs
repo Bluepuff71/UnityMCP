@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
-using System.Net.Http;
+using System.IO;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEditor;
@@ -27,8 +28,8 @@ namespace UnityMCP.Editor.Core
         private const string DLL_NAME = "UnityMCPProxy";
         private const int DEFAULT_PORT = 8080;
         private const int SHUTDOWN_TIMEOUT_MS = 2000;
-        private const int SHUTDOWN_RETRY_DELAY_MS = 100;
-        private const int MAX_START_RETRIES = 3;
+        private const int SHUTDOWN_RETRY_DELAY_MS = 200;
+        private const int MAX_START_RETRIES = 5;
 
         /// <summary>
         /// Maximum response size supported by the native proxy buffer.
@@ -203,56 +204,67 @@ namespace UnityMCP.Editor.Core
             {
                 int ourPid = Process.GetCurrentProcess().Id;
 
-                using (var client = new HttpClient())
+                // Use HttpWebRequest (synchronous) instead of HttpClient (async)
+                // to avoid deadlock on Unity's main thread SynchronizationContext
+                var infoRequest = (HttpWebRequest)WebRequest.Create(
+                    $"http://localhost:{DEFAULT_PORT}/__internal/info");
+                infoRequest.Method = "GET";
+                infoRequest.Timeout = SHUTDOWN_TIMEOUT_MS;
+
+                string infoJson;
+                using (var infoResponse = (HttpWebResponse)infoRequest.GetResponse())
+                using (var reader = new StreamReader(infoResponse.GetResponseStream()))
                 {
-                    client.Timeout = TimeSpan.FromMilliseconds(SHUTDOWN_TIMEOUT_MS);
-
-                    // First, get info from existing server
-                    var infoResponse = client.GetAsync($"http://localhost:{DEFAULT_PORT}/__internal/info").Result;
-                    if (!infoResponse.IsSuccessStatusCode)
-                    {
+                    if (infoResponse.StatusCode != HttpStatusCode.OK)
                         return false;
-                    }
+                    infoJson = reader.ReadToEnd();
+                }
 
-                    string infoJson = infoResponse.Content.ReadAsStringAsync().Result;
+                // Parse PID from response (simple parsing for {"server":"UnityMCPProxy","pid":12345,"running":1})
+                int pidIndex = infoJson.IndexOf("\"pid\":", StringComparison.Ordinal);
+                if (pidIndex < 0)
+                {
+                    return false;
+                }
 
-                    // Parse PID from response (simple parsing for {"server":"UnityMCPProxy","pid":12345,"running":1})
-                    int pidIndex = infoJson.IndexOf("\"pid\":", StringComparison.Ordinal);
-                    if (pidIndex < 0)
-                    {
-                        return false;
-                    }
+                int pidStart = pidIndex + 6;
+                int pidEnd = pidStart;
+                while (pidEnd < infoJson.Length && char.IsDigit(infoJson[pidEnd]))
+                {
+                    pidEnd++;
+                }
 
-                    int pidStart = pidIndex + 6;
-                    int pidEnd = pidStart;
-                    while (pidEnd < infoJson.Length && char.IsDigit(infoJson[pidEnd]))
-                    {
-                        pidEnd++;
-                    }
+                if (!int.TryParse(infoJson.Substring(pidStart, pidEnd - pidStart), out int serverPid))
+                {
+                    return false;
+                }
 
-                    if (!int.TryParse(infoJson.Substring(pidStart, pidEnd - pidStart), out int serverPid))
-                    {
-                        return false;
-                    }
+                // Only shut down if it's our process (old DLL instance)
+                if (serverPid != ourPid)
+                {
+                    Debug.Log($"[NativeProxy] Existing server belongs to different process (PID {serverPid}), not shutting down");
+                    return false;
+                }
 
-                    // Only shut down if it's our process (old DLL instance)
-                    if (serverPid != ourPid)
-                    {
-                        if (VerboseLogging) Debug.Log($"[NativeProxy] Existing server belongs to different process (PID {serverPid}), not shutting down");
-                        return false;
-                    }
+                // Send shutdown request
+                Debug.Log($"[NativeProxy] Requesting shutdown of old server instance (PID {serverPid})");
+                var shutdownRequest = (HttpWebRequest)WebRequest.Create(
+                    $"http://localhost:{DEFAULT_PORT}/__internal/shutdown");
+                shutdownRequest.Method = "GET";
+                shutdownRequest.Timeout = SHUTDOWN_TIMEOUT_MS;
 
-                    // Send shutdown request
-                    if (VerboseLogging) Debug.Log($"[NativeProxy] Requesting shutdown of old server instance (same process, PID {serverPid})");
-                    var shutdownResponse = client.GetAsync($"http://localhost:{DEFAULT_PORT}/__internal/shutdown").Result;
-
-                    return shutdownResponse.IsSuccessStatusCode;
+                using (var shutdownResponse = (HttpWebResponse)shutdownRequest.GetResponse())
+                {
+                    bool success = shutdownResponse.StatusCode == HttpStatusCode.OK;
+                    if (success)
+                        Debug.Log("[NativeProxy] Old server shutdown request acknowledged");
+                    return success;
                 }
             }
             catch (Exception exception)
             {
-                // Connection refused or timeout means no server running, which is fine
-                if (VerboseLogging) Debug.Log($"[NativeProxy] Could not connect to existing server: {exception.Message}");
+                // Always log this — silent failures here cause permanent breakage
+                Debug.Log($"[NativeProxy] Could not connect to existing server: {exception.Message}");
                 return false;
             }
         }
