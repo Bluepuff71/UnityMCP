@@ -883,8 +883,18 @@ namespace UnityMCP.Editor.Tools
                 }
 
                 // Get dependencies
-                string[] dependencies = AssetDatabase.GetDependencies(path, false);
-                info["dependencies"] = dependencies.Where(d => d != path).ToArray();
+                string[] allDependencies = AssetDatabase.GetDependencies(path, false)
+                    .Where(d => d != path).ToArray();
+                info["dependencyCount"] = allDependencies.Length;
+                if (allDependencies.Length <= 20)
+                {
+                    info["dependencies"] = allDependencies;
+                }
+                else
+                {
+                    info["dependencies"] = allDependencies.Take(20).ToArray();
+                    info["truncatedDependencies"] = true;
+                }
 
                 // Get labels
                 string[] labels = AssetDatabase.GetLabels(asset);

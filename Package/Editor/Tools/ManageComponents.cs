@@ -433,6 +433,13 @@ namespace UnityMCP.Editor.Tools
                     enterChildren = false;
                 }
 
+                int totalProperties = properties.Count;
+                bool truncated = totalProperties > 50;
+                if (truncated)
+                {
+                    properties = properties.Take(50).ToList();
+                }
+
                 return new
                 {
                     success = true,
@@ -442,6 +449,9 @@ namespace UnityMCP.Editor.Tools
                         name = targetGameObject.name,
                         instanceId = targetGameObject.GetInstanceID()
                     },
+                    totalProperties,
+                    truncated,
+                    note = truncated ? $"Showing 50 of {totalProperties} properties. Use set_property to access specific properties." : null,
                     properties
                 };
             }
@@ -1462,7 +1472,7 @@ namespace UnityMCP.Editor.Tools
         }
 
         /// <summary>
-        /// Serializes a Unity Object to a reference format with $ref, $name, $type, and $path.
+        /// Serializes a Unity Object to a compact reference format with $ref (instance ID).
         /// The isObjectReference flag is added at the property level by the inspect handler.
         /// </summary>
         private static Dictionary<string, object> SerializeUnityObject(UnityEngine.Object unityObject)
@@ -1472,34 +1482,10 @@ namespace UnityMCP.Editor.Tools
                 return null;
             }
 
-            var result = new Dictionary<string, object>
+            return new Dictionary<string, object>
             {
-                { "$ref", unityObject.GetInstanceID() },
-                { "$name", unityObject.name },
-                { "$type", unityObject.GetType().Name }
+                { "$ref", unityObject.GetInstanceID() }
             };
-
-            // Add hierarchy path for GameObjects and Components
-            if (unityObject is GameObject gameObject)
-            {
-                result["$path"] = GetGameObjectPath(gameObject);
-            }
-            else if (unityObject is Component component)
-            {
-                result["$component"] = unityObject.GetType().Name;
-                result["$path"] = GetGameObjectPath(component.gameObject);
-            }
-            else
-            {
-                // For assets, use the asset path
-                string assetPath = AssetDatabase.GetAssetPath(unityObject);
-                if (!string.IsNullOrEmpty(assetPath))
-                {
-                    result["$path"] = assetPath;
-                }
-            }
-
-            return result;
         }
 
         /// <summary>

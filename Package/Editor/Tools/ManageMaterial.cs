@@ -1068,6 +1068,13 @@ namespace UnityMCP.Editor.Tools
                 properties.Add(propertyInfo);
             }
 
+            int totalPropertyCount = properties.Count;
+            bool propertiesTruncated = totalPropertyCount > 30;
+            if (propertiesTruncated)
+            {
+                properties = properties.Take(30).ToList();
+            }
+
             // Get render queue
             int renderQueue = material.renderQueue;
             string renderQueueName = renderQueue switch
@@ -1086,14 +1093,12 @@ namespace UnityMCP.Editor.Tools
             {
                 path,
                 name = material.name,
-                guid = AssetDatabase.AssetPathToGUID(path),
                 shader = shader.name,
                 renderQueue,
                 renderQueueName,
-                enableInstancing = material.enableInstancing,
-                doubleSidedGI = material.doubleSidedGI,
                 keywords = keywords.Length > 0 ? keywords : null,
-                propertyCount,
+                totalPropertyCount,
+                truncatedProperties = propertiesTruncated,
                 properties
             };
         }
