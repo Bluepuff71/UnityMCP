@@ -1472,8 +1472,8 @@ namespace UnityMCP.Editor.Tools
         }
 
         /// <summary>
-        /// Serializes a Unity Object to a compact reference format with $ref (instance ID).
-        /// The isObjectReference flag is added at the property level by the inspect handler.
+        /// Serializes a Unity Object to a compact reference format with $ref (instance ID),
+        /// $name, and $type for identification without additional lookups.
         /// </summary>
         private static Dictionary<string, object> SerializeUnityObject(UnityEngine.Object unityObject)
         {
@@ -1484,7 +1484,9 @@ namespace UnityMCP.Editor.Tools
 
             return new Dictionary<string, object>
             {
-                { "$ref", unityObject.GetInstanceID() }
+                { "$ref", unityObject.GetInstanceID() },
+                { "$name", unityObject.name },
+                { "$type", unityObject.GetType().Name }
             };
         }
 

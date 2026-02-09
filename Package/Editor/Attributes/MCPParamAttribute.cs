@@ -23,9 +23,20 @@ namespace UnityMCP.Editor
         /// </summary>
         public bool Required { get; }
 
+        /// <summary>
+        /// Valid enum values for string parameters. When set, these values are included in the JSON Schema.
+        /// </summary>
         public string[] Enum { get; set; }
-        public double Minimum { get; set; } = -1;
-        public double Maximum { get; set; } = -1;
+
+        /// <summary>
+        /// Minimum value for numeric parameters. Uses double.NaN to indicate no constraint.
+        /// </summary>
+        public double Minimum { get; set; } = double.NaN;
+
+        /// <summary>
+        /// Maximum value for numeric parameters. Uses double.NaN to indicate no constraint.
+        /// </summary>
+        public double Maximum { get; set; } = double.NaN;
 
         /// <summary>
         /// Creates a new MCP parameter attribute.

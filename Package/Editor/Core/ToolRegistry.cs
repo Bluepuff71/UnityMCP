@@ -369,11 +369,11 @@ namespace UnityMCP.Editor.Core
             // Check MCPParamAttribute for minimum/maximum
             if (metadata.McpParamAttribute != null)
             {
-                if (metadata.McpParamAttribute.Minimum >= 0)
+                if (!double.IsNaN(metadata.McpParamAttribute.Minimum))
                 {
                     schema.minimum = metadata.McpParamAttribute.Minimum;
                 }
-                if (metadata.McpParamAttribute.Maximum >= 0)
+                if (!double.IsNaN(metadata.McpParamAttribute.Maximum))
                 {
                     schema.maximum = metadata.McpParamAttribute.Maximum;
                 }
