@@ -29,7 +29,7 @@ namespace UnityMCP.Editor.Tools
         /// <returns>Result object indicating success or failure with appropriate message.</returns>
         [MCPTool("manage_editor", "Manage editor state, tags, layers, and tools", Category = "Editor")]
         public static object Execute(
-            [MCPParam("action", "Action: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer", required: true)] string action,
+            [MCPParam("action", "Action: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer", required: true, Enum = new[] { "play", "pause", "stop", "set_active_tool", "add_tag", "remove_tag", "add_layer", "remove_layer" })] string action,
             [MCPParam("tool_name", "Tool name for set_active_tool: View, Move, Rotate, Scale, Rect, Transform")] string toolName = null,
             [MCPParam("tag_name", "Tag name for add_tag/remove_tag")] string tagName = null,
             [MCPParam("layer_name", "Layer name for add_layer/remove_layer")] string layerName = null)

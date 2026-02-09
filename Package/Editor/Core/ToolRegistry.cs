@@ -307,7 +307,8 @@ namespace UnityMCP.Editor.Core
                     Description = parameterDescription,
                     Required = isRequired,
                     ParameterInfo = parameter,
-                    JsonType = GetJsonSchemaType(parameter.ParameterType)
+                    JsonType = GetJsonSchemaType(parameter.ParameterType),
+                    McpParamAttribute = mcpParamAttribute
                 };
             }
         }
@@ -327,6 +328,21 @@ namespace UnityMCP.Editor.Core
 
             var definition = new ToolDefinition(_attribute.Name, _attribute.Description, inputSchema);
             definition.category = _attribute.Category;
+
+            // Only include annotations if at least one hint was explicitly set
+            bool hasAnnotations = _attribute.ReadOnlyHint || _attribute.DestructiveHint ||
+                                  _attribute.IdempotentHint || _attribute.OpenWorldHint ||
+                                  _attribute.Title != null;
+            if (hasAnnotations)
+            {
+                definition.annotations = new ToolAnnotations();
+                if (_attribute.ReadOnlyHint) definition.annotations.readOnlyHint = true;
+                if (_attribute.DestructiveHint) definition.annotations.destructiveHint = true;
+                if (_attribute.IdempotentHint) definition.annotations.idempotentHint = true;
+                if (_attribute.OpenWorldHint) definition.annotations.openWorldHint = true;
+                if (_attribute.Title != null) definition.annotations.title = _attribute.Title;
+            }
+
             return definition;
         }
 
@@ -342,6 +358,25 @@ namespace UnityMCP.Editor.Core
             if (metadata.ParameterInfo.HasDefaultValue && metadata.ParameterInfo.DefaultValue != null)
             {
                 schema.@default = metadata.ParameterInfo.DefaultValue;
+            }
+
+            // Check MCPParamAttribute for enum values
+            if (metadata.McpParamAttribute?.Enum != null && metadata.McpParamAttribute.Enum.Length > 0)
+            {
+                schema.@enum = new List<string>(metadata.McpParamAttribute.Enum);
+            }
+
+            // Check MCPParamAttribute for minimum/maximum
+            if (metadata.McpParamAttribute != null)
+            {
+                if (!double.IsNaN(metadata.McpParamAttribute.Minimum))
+                {
+                    schema.minimum = metadata.McpParamAttribute.Minimum;
+                }
+                if (!double.IsNaN(metadata.McpParamAttribute.Maximum))
+                {
+                    schema.maximum = metadata.McpParamAttribute.Maximum;
+                }
             }
 
             // Handle array item types
@@ -648,5 +683,6 @@ namespace UnityMCP.Editor.Core
         public bool Required { get; set; }
         public string JsonType { get; set; }
         public ParameterInfo ParameterInfo { get; set; }
+        public MCPParamAttribute McpParamAttribute { get; set; }
     }
 }

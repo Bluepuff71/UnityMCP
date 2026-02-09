@@ -31,7 +31,7 @@ namespace UnityMCP.Editor.Tools
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
         [MCPTool("manage_vfx", "Manage VFX: particles (play/pause/stop/restart/get/set), lines (create/get/set), trails (get/set/clear)", Category = "VFX")]
         public static object Execute(
-            [MCPParam("action", "Action: particle_play, particle_pause, particle_stop, particle_restart, particle_get, particle_set, line_create, line_get, line_set, trail_get, trail_set, trail_clear", required: true)] string action,
+            [MCPParam("action", "Action: particle_play, particle_pause, particle_stop, particle_restart, particle_get, particle_set, line_create, line_get, line_set, trail_get, trail_set, trail_clear", required: true, Enum = new[] { "particle_play", "particle_pause", "particle_stop", "particle_restart", "particle_get", "particle_set", "line_create", "line_get", "line_set", "trail_get", "trail_set", "trail_clear" })] string action,
             [MCPParam("target", "GameObject path or instance ID")] string target = null,
             [MCPParam("particle_settings", "Dict of main module settings for particle_set")] object particleSettings = null,
             [MCPParam("positions", "Array of Vector3 positions for line_set/line_create")] List<object> positions = null,

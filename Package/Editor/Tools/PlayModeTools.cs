@@ -13,7 +13,7 @@ namespace UnityMCP.Editor.Tools
         /// Enters play mode.
         /// </summary>
         /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_enter", "Enter play mode", Category = "Editor")]
+        [MCPTool("playmode_enter", "Enter play mode", Category = "Editor", IdempotentHint = true)]
         public static object Enter()
         {
             try
@@ -76,7 +76,7 @@ namespace UnityMCP.Editor.Tools
         /// Exits play mode.
         /// </summary>
         /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_exit", "Exit play mode", Category = "Editor")]
+        [MCPTool("playmode_exit", "Exit play mode", Category = "Editor", IdempotentHint = true)]
         public static object Exit()
         {
             try

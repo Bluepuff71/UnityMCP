@@ -13,7 +13,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets the status and results of a test job by ID.
         /// </summary>
-        [MCPTool("tests_get_job", "Gets the status and results of a test job started by tests_run", Category = "Tests")]
+        [MCPTool("tests_get_job", "Gets the status and results of a test job started by tests_run", Category = "Tests", ReadOnlyHint = true)]
         public static object Get(
             [MCPParam("job_id", "The job ID returned by tests_run", required: true)] string jobId,
             [MCPParam("include_details", "Include full test result details")] bool includeDetails = true,

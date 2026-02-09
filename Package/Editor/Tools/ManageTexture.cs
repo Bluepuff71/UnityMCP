@@ -38,7 +38,7 @@ namespace UnityMCP.Editor.Tools
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
         [MCPTool("manage_texture", "Manage textures: get info, list, find, modify import settings", Category = "Asset")]
         public static object Execute(
-            [MCPParam("action", "Action: get, list, find, set_import_settings", required: true)] string action,
+            [MCPParam("action", "Action: get, list, find, set_import_settings", required: true, Enum = new[] { "get", "list", "find", "set_import_settings" })] string action,
             [MCPParam("texture_path", "Asset path to texture file")] string texturePath = null,
             [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null,
             [MCPParam("search_pattern", "Pattern for find action")] string searchPattern = null,

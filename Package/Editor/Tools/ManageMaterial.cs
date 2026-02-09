@@ -44,7 +44,7 @@ namespace UnityMCP.Editor.Tools
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
         [MCPTool("manage_material", "Manage materials: create, modify properties, assign to renderers", Category = "Asset")]
         public static object Execute(
-            [MCPParam("action", "Action: create, get_info, set_property, set_color, assign_to_renderer, set_renderer_color", required: true)] string action,
+            [MCPParam("action", "Action: create, get_info, set_property, set_color, assign_to_renderer, set_renderer_color", required: true, Enum = new[] { "create", "get_info", "set_property", "set_color", "assign_to_renderer", "set_renderer_color" })] string action,
             [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)")] string materialPath = null,
             [MCPParam("shader", "Shader name for create (e.g., Standard, URP/Lit, Universal Render Pipeline/Lit)")] string shader = null,
             [MCPParam("property", "Property name (e.g., _Color, _BaseColor, _MainTex)")] string property = null,
@@ -1068,6 +1068,13 @@ namespace UnityMCP.Editor.Tools
                 properties.Add(propertyInfo);
             }
 
+            int totalPropertyCount = properties.Count;
+            bool propertiesTruncated = totalPropertyCount > 30;
+            if (propertiesTruncated)
+            {
+                properties = properties.Take(30).ToList();
+            }
+
             // Get render queue
             int renderQueue = material.renderQueue;
             string renderQueueName = renderQueue switch
@@ -1086,14 +1093,12 @@ namespace UnityMCP.Editor.Tools
             {
                 path,
                 name = material.name,
-                guid = AssetDatabase.AssetPathToGUID(path),
                 shader = shader.name,
                 renderQueue,
                 renderQueueName,
-                enableInstancing = material.enableInstancing,
-                doubleSidedGI = material.doubleSidedGI,
                 keywords = keywords.Length > 0 ? keywords : null,
-                propertyCount,
+                totalPropertyCount,
+                truncatedProperties = propertiesTruncated,
                 properties
             };
         }

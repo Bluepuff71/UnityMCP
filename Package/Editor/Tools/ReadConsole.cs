@@ -17,6 +17,8 @@ namespace UnityMCP.Editor.Tools
 
         private const int DefaultPageSize = 50;
         private const int MaxPageSize = 500;
+        private const int DefaultMaxMessageLength = 500;
+        private const int MaxStacktraceLength = 2000;
 
         // Mode bit flags for log entry types (based on Unity's internal ConsoleFlags)
         // These values are determined by Unity's internal LogEntry.mode field
@@ -134,14 +136,16 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         [MCPTool("console_read", "Reads Unity Console log entries with filtering and pagination", Category = "Console")]
         public static object Read(
-            [MCPParam("action", "Action to perform: 'get' to read entries, 'clear' to clear console (default: get)")] string action = "get",
+            [MCPParam("action", "Action to perform: 'get' to read entries, 'clear' to clear console (default: get)", Enum = new[] { "get", "clear" })] string action = "get",
             [MCPParam("types", "Comma-separated log types to include: error, warning, log, all (default: error,warning)")] string types = "error,warning",
             [MCPParam("count", "Maximum entries to return (non-paging mode, overrides page_size if set)")] int? count = null,
-            [MCPParam("page_size", "Entries per page (default: 50, max: 500)")] int pageSize = DefaultPageSize,
-            [MCPParam("cursor", "Starting index for pagination (default: 0)")] int cursor = 0,
+            [MCPParam("page_size", "Entries per page (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
+            [MCPParam("cursor", "Starting index for pagination (default: 0)", Minimum = 0)] int cursor = 0,
             [MCPParam("filter_text", "Text filter for messages (case-insensitive substring match)")] string filterText = null,
-            [MCPParam("format", "Output format: 'plain' or 'detailed' (default: plain)")] string format = "plain",
-            [MCPParam("include_stacktrace", "Include stack traces in output (default: false)")] bool includeStacktrace = false)
+            [MCPParam("format", "Output format: 'plain' or 'detailed' (default: plain)", Enum = new[] { "plain", "detailed" })] string format = "plain",
+            [MCPParam("include_stacktrace", "Include stack traces in output (default: false)")] bool includeStacktrace = false,
+            [MCPParam("deduplicate", "Collapse consecutive identical messages into one with a count (default: true)")] bool deduplicate = true,
+            [MCPParam("max_message_length", "Maximum message length before truncation (default: 500, 0 for unlimited)", Minimum = 0)] int maxMessageLength = DefaultMaxMessageLength)
         {
             // Check if reflection is available
             if (!isReflectionInitialized)
@@ -157,7 +161,7 @@ namespace UnityMCP.Editor.Tools
 
             return normalizedAction switch
             {
-                "get" => GetEntries(types, count, pageSize, cursor, filterText, format, includeStacktrace),
+                "get" => GetEntries(types, count, pageSize, cursor, filterText, format, includeStacktrace, deduplicate, maxMessageLength),
                 "clear" => ClearConsole(),
                 _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: get, clear")
             };
@@ -168,9 +172,9 @@ namespace UnityMCP.Editor.Tools
         #region Actions
 
         /// <summary>
-        /// Gets console log entries with filtering and pagination.
+        /// Gets console log entries with filtering, pagination, deduplication, and message truncation.
         /// </summary>
-        private static object GetEntries(string types, int? count, int pageSize, int cursor, string filterText, string format, bool includeStacktrace)
+        private static object GetEntries(string types, int? count, int pageSize, int cursor, string filterText, string format, bool includeStacktrace, bool deduplicate, int maxMessageLength)
         {
             try
             {
@@ -183,6 +187,7 @@ namespace UnityMCP.Editor.Tools
                     : Mathf.Clamp(pageSize, 1, MaxPageSize);
 
                 int resolvedCursor = Mathf.Max(0, cursor);
+                int resolvedMaxMessageLength = maxMessageLength <= 0 ? int.MaxValue : maxMessageLength;
 
                 bool isDetailedFormat = (format ?? "plain").Equals("detailed", StringComparison.OrdinalIgnoreCase);
 
@@ -191,6 +196,11 @@ namespace UnityMCP.Editor.Tools
                 int totalFilteredCount = 0;
                 int skippedCount = 0;
                 int totalConsoleCount = 0;
+                int deduplicatedCount = 0;
+
+                // For deduplication tracking
+                string previousMessageKey = null;
+                Dictionary<string, object> previousEntry = null;
 
                 // Start getting entries
                 startGettingEntriesMethod.Invoke(null, null);
@@ -235,6 +245,20 @@ namespace UnityMCP.Editor.Tools
                             continue;
                         }
 
+                        // Extract the first line as the dedup key
+                        string messageFirstLine = ExtractFirstLine(message);
+                        string logType = GetLogType(mode);
+                        string deduplicationKey = deduplicate ? $"{logType}:{messageFirstLine}" : null;
+
+                        // Deduplication: if same message as previous, increment count instead of adding new entry
+                        if (deduplicate && previousEntry != null && deduplicationKey == previousMessageKey)
+                        {
+                            int currentCount = previousEntry.ContainsKey("count") ? (int)previousEntry["count"] : 1;
+                            previousEntry["count"] = currentCount + 1;
+                            deduplicatedCount++;
+                            continue;
+                        }
+
                         // Check if we have enough entries
                         if (entries.Count >= resolvedPageSize)
                         {
@@ -242,7 +266,15 @@ namespace UnityMCP.Editor.Tools
                         }
 
                         // Build entry object
-                        entries.Add(BuildEntryObject(logEntry, mode, message, i, isDetailedFormat, includeStacktrace));
+                        var entryObject = BuildEntryObject(logEntry, mode, message, i, isDetailedFormat, includeStacktrace, resolvedMaxMessageLength);
+                        entries.Add(entryObject);
+
+                        // Track for deduplication
+                        if (deduplicate)
+                        {
+                            previousMessageKey = deduplicationKey;
+                            previousEntry = entryObject;
+                        }
                     }
                 }
                 finally
@@ -252,8 +284,8 @@ namespace UnityMCP.Editor.Tools
                 }
 
                 // Calculate pagination info
-                bool hasMore = (resolvedCursor + entries.Count) < totalFilteredCount;
-                int? nextCursor = hasMore ? resolvedCursor + entries.Count : (int?)null;
+                bool hasMore = (resolvedCursor + entries.Count + deduplicatedCount) < totalFilteredCount;
+                int? nextCursor = hasMore ? resolvedCursor + entries.Count + deduplicatedCount : (int?)null;
 
                 return new
                 {
@@ -264,7 +296,8 @@ namespace UnityMCP.Editor.Tools
                     nextCursor,
                     totalCount = totalFilteredCount,
                     totalConsoleCount,
-                    hasMore
+                    hasMore,
+                    deduplicated = deduplicatedCount > 0 ? deduplicatedCount : (int?)null
                 };
             }
             catch (Exception exception)
@@ -394,9 +427,9 @@ namespace UnityMCP.Editor.Tools
         }
 
         /// <summary>
-        /// Builds an entry object for the response.
+        /// Builds an entry object for the response with message truncation support.
         /// </summary>
-        private static object BuildEntryObject(object logEntry, int mode, string message, int index, bool detailed, bool includeStacktrace)
+        private static Dictionary<string, object> BuildEntryObject(object logEntry, int mode, string message, int index, bool detailed, bool includeStacktrace, int maxMessageLength)
         {
             string logType = GetLogType(mode);
 
@@ -412,14 +445,26 @@ namespace UnityMCP.Editor.Tools
                 messageText = messageText.Substring(0, newlineIndex);
             }
 
+            // Truncate message if needed
+            bool messageTruncated = messageText.Length > maxMessageLength;
+            if (messageTruncated)
+            {
+                messageText = messageText.Substring(0, maxMessageLength) + "...";
+            }
+
+            // Truncate stacktrace if needed
+            if (includeStacktrace && stacktrace != null && stacktrace.Length > MaxStacktraceLength)
+            {
+                stacktrace = stacktrace.Substring(0, MaxStacktraceLength) + "\n... (truncated)";
+            }
+
             if (detailed)
             {
                 var entryObject = new Dictionary<string, object>
                 {
                     { "index", index },
                     { "type", logType },
-                    { "message", messageText },
-                    { "mode", mode }
+                    { "message", messageText }
                 };
 
                 // Add optional fields if available
@@ -438,15 +483,6 @@ namespace UnityMCP.Editor.Tools
                     if (line > 0)
                     {
                         entryObject["line"] = line;
-                    }
-                }
-
-                if (instanceIdField != null)
-                {
-                    int instanceId = (int)instanceIdField.GetValue(logEntry);
-                    if (instanceId != 0)
-                    {
-                        entryObject["instanceID"] = instanceId;
                     }
                 }
 
@@ -473,6 +509,20 @@ namespace UnityMCP.Editor.Tools
 
                 return entryObject;
             }
+        }
+
+        /// <summary>
+        /// Extracts the first line from a message string for deduplication.
+        /// </summary>
+        private static string ExtractFirstLine(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return string.Empty;
+            }
+
+            int newlineIndex = message.IndexOf('\n');
+            return newlineIndex >= 0 ? message.Substring(0, newlineIndex) : message;
         }
 
         #endregion

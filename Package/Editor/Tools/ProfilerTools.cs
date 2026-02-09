@@ -148,7 +148,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="jobId">The job ID to query.</param>
         /// <param name="includeDetails">Whether to include detailed frame data if available.</param>
         /// <returns>Result object with job status and optional data.</returns>
-        [MCPTool("profiler_get_job", "Poll job status and get captured data", Category = "Profiler")]
+        [MCPTool("profiler_get_job", "Poll job status and get captured data", Category = "Profiler", ReadOnlyHint = true)]
         public static object GetJob(
             [MCPParam("job_id", "Job ID to query", required: true)] string jobId,
             [MCPParam("include_details", "Include detailed frame data if available")] bool includeDetails = true)

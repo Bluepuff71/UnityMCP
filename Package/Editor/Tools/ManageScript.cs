@@ -29,9 +29,9 @@ namespace UnityMCP.Editor.Tools
         /// <param name="scriptType">Template type for create: MonoBehaviour, ScriptableObject, Editor, Plain</param>
         /// <param name="namespaceName">Namespace for the script</param>
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_script", "Manage C# scripts: create, read, update, delete, validate", Category = "Asset")]
+        [MCPTool("manage_script", "Manage C# scripts: create, read, update, delete, validate", Category = "Asset", DestructiveHint = true)]
         public static object Execute(
-            [MCPParam("action", "Action: create, read, update, delete, validate", required: true)] string action,
+            [MCPParam("action", "Action: create, read, update, delete, validate", required: true, Enum = new[] { "create", "read", "update", "delete", "validate" })] string action,
             [MCPParam("name", "Script name without .cs extension", required: true)] string name,
             [MCPParam("path", "Directory path relative to Assets (default: Scripts)")] string path = "Scripts",
             [MCPParam("contents", "Script contents for create/update")] string contents = null,

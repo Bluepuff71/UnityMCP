@@ -23,17 +23,17 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Manages assets in the Unity project with various operations.
         /// </summary>
-        [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset")]
+        [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset", DestructiveHint = true)]
         public static object Manage(
-            [MCPParam("action", "Action to perform: create, delete, move, rename, duplicate, import, search, get_info, create_folder", required: true)] string action,
+            [MCPParam("action", "Action to perform: create, delete, move, rename, duplicate, import, search, get_info, create_folder", required: true, Enum = new[] { "create", "delete", "move", "rename", "duplicate", "import", "search", "get_info", "create_folder" })] string action,
             [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')")] string path = null,
             [MCPParam("destination", "Destination path for move/duplicate operations")] string destination = null,
             [MCPParam("asset_type", "Asset type for create: folder, material, physicsmaterial")] string assetType = null,
             [MCPParam("properties", "Properties for create/modify operations (e.g., shader, friction, bounciness)")] Dictionary<string, object> properties = null,
             [MCPParam("search_pattern", "Search pattern for search operation")] string searchPattern = null,
             [MCPParam("filter_type", "Filter by asset type for search (e.g., 'Material', 'Prefab', 'Texture2D')")] string filterType = null,
-            [MCPParam("page_size", "Number of results per page for search (default: 50, max: 500)")] int pageSize = DefaultPageSize,
-            [MCPParam("page_number", "Page number for search results (1-based, default: 1)")] int pageNumber = 1)
+            [MCPParam("page_size", "Number of results per page for search (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
+            [MCPParam("page_number", "Page number for search results (1-based, default: 1)", Minimum = 1)] int pageNumber = 1)
         {
             if (string.IsNullOrEmpty(action))
             {
@@ -883,8 +883,18 @@ namespace UnityMCP.Editor.Tools
                 }
 
                 // Get dependencies
-                string[] dependencies = AssetDatabase.GetDependencies(path, false);
-                info["dependencies"] = dependencies.Where(d => d != path).ToArray();
+                string[] allDependencies = AssetDatabase.GetDependencies(path, false)
+                    .Where(d => d != path).ToArray();
+                info["dependencyCount"] = allDependencies.Length;
+                if (allDependencies.Length <= 20)
+                {
+                    info["dependencies"] = allDependencies;
+                }
+                else
+                {
+                    info["dependencies"] = allDependencies.Take(20).ToArray();
+                    info["truncatedDependencies"] = true;
+                }
 
                 // Get labels
                 string[] labels = AssetDatabase.GetLabels(asset);

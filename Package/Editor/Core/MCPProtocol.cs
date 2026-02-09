@@ -298,6 +298,8 @@ namespace UnityMCP.Editor.Core
         public List<string> @enum;
         public PropertySchema items;
         public object @default;
+        public double? minimum;
+        public double? maximum;
 
         /// <summary>
         /// Creates a string property schema
@@ -392,6 +394,19 @@ namespace UnityMCP.Editor.Core
     }
 
     /// <summary>
+    /// Annotations providing hints about a tool's behavior for MCP clients.
+    /// </summary>
+    [Serializable]
+    public class ToolAnnotations
+    {
+        public bool? readOnlyHint;
+        public bool? destructiveHint;
+        public bool? idempotentHint;
+        public bool? openWorldHint;
+        public string title;
+    }
+
+    /// <summary>
     /// MCP tool definition for tools/list response
     /// </summary>
     [Serializable]
@@ -400,6 +415,7 @@ namespace UnityMCP.Editor.Core
         public string name;
         public string description;
         public string category;
+        public ToolAnnotations annotations;
         public InputSchema inputSchema;
 
         public ToolDefinition() { }
@@ -588,5 +604,57 @@ namespace UnityMCP.Editor.Core
                 isError = true
             };
         }
+    }
+
+    /// <summary>
+    /// MCP prompt argument definition
+    /// </summary>
+    [Serializable]
+    public class PromptArgument
+    {
+        public string name;
+        public string description;
+        public bool required;
+    }
+
+    /// <summary>
+    /// MCP prompt definition for prompts/list response
+    /// </summary>
+    [Serializable]
+    public class PromptDefinition
+    {
+        public string name;
+        public string description;
+        public List<PromptArgument> arguments;
+    }
+
+    /// <summary>
+    /// MCP prompt message returned from prompts/get
+    /// </summary>
+    [Serializable]
+    public class PromptMessage
+    {
+        public string role;
+        public PromptMessageContent content;
+    }
+
+    /// <summary>
+    /// Content of a prompt message
+    /// </summary>
+    [Serializable]
+    public class PromptMessageContent
+    {
+        public string type;
+        public string text;
+    }
+
+    /// <summary>
+    /// MCP prompt result returned from prompts/get
+    /// </summary>
+    [Serializable]
+    public class PromptResult
+    {
+        public string description;
+        public List<PromptMessage> messages;
     }
 }
