@@ -26,7 +26,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Manages GameObjects in the scene with create, modify, delete, duplicate, and move_relative actions.
         /// </summary>
-        [MCPTool("gameobject_manage", "Manages GameObjects: create, modify, delete, duplicate, or move_relative", Category = "GameObject")]
+        [MCPTool("gameobject_manage", "Manages GameObjects: create, modify, delete, duplicate, or move_relative", Category = "GameObject", DestructiveHint = true)]
         public static object Manage(
             [MCPParam("action", "Action to perform: create, modify, delete, duplicate, move_relative", required: true)] string action,
             [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject")] string target = null,

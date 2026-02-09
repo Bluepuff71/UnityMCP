@@ -64,7 +64,7 @@ namespace UnityMCP.Editor.Tools
         /// Queries VisualElements in an EditorWindow. Returns compact overview by default.
         /// Use ref_id to drill into specific elements, or text/selector to search.
         /// </summary>
-        [MCPTool("uitoolkit_query", "Query VisualElements in an EditorWindow. Returns compact overview by default (depth 2). Use ref_id to drill into elements, or text/selector/name to search.", Category = "UIToolkit")]
+        [MCPTool("uitoolkit_query", "Query VisualElements in an EditorWindow. Returns compact overview by default (depth 2). Use ref_id to drill into elements, or text/selector/name to search.", Category = "UIToolkit", ReadOnlyHint = true)]
         public static object Query(
             [MCPParam("window_type", "EditorWindow type name (e.g., 'SceneView', 'InspectorWindow')")] string windowType = null,
             [MCPParam("ref_id", "Element reference ID to focus on (from previous query). Returns that element's subtree.")] string refId = null,
@@ -356,7 +356,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="elementName">The name of the element to get styles for.</param>
         /// <param name="selector">USS selector to find the element (alternative to elementName).</param>
         /// <returns>Computed style properties of the element.</returns>
-        [MCPTool("uitoolkit_get_styles", "Get computed USS styles for a VisualElement", Category = "UIToolkit")]
+        [MCPTool("uitoolkit_get_styles", "Get computed USS styles for a VisualElement", Category = "UIToolkit", ReadOnlyHint = true)]
         public static object GetStyles(
             [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
             [MCPParam("element_name", "Element name to get styles for")] string elementName = null,
@@ -646,7 +646,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets the current value from an input field or control in an EditorWindow.
         /// </summary>
-        [MCPTool("uitoolkit_get_value", "Get the current value from an input field or control", Category = "UIToolkit")]
+        [MCPTool("uitoolkit_get_value", "Get the current value from an input field or control", Category = "UIToolkit", ReadOnlyHint = true)]
         public static object GetValue(
             [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
             [MCPParam("selector", "USS selector to find element")] string selector = null,

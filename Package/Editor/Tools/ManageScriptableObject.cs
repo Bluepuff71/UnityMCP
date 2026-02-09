@@ -27,7 +27,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="overwrite">Whether to overwrite existing asset (default: false)</param>
         /// <param name="patches">Array of property patches for create/modify</param>
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_scriptable_object", "Manage ScriptableObjects: create, modify, get, list", Category = "Asset")]
+        [MCPTool("manage_scriptable_object", "Manage ScriptableObjects: create, modify, get, list", Category = "Asset", DestructiveHint = true)]
         public static object Execute(
             [MCPParam("action", "Action: create, modify, get, list", required: true)] string action,
             [MCPParam("type_name", "ScriptableObject type name (full or short)")] string typeName = null,

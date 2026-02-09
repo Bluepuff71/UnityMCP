@@ -23,7 +23,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Manages assets in the Unity project with various operations.
         /// </summary>
-        [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset")]
+        [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset", DestructiveHint = true)]
         public static object Manage(
             [MCPParam("action", "Action to perform: create, delete, move, rename, duplicate, import, search, get_info, create_folder", required: true)] string action,
             [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')")] string path = null,

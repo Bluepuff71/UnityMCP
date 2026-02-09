@@ -394,6 +394,19 @@ namespace UnityMCP.Editor.Core
     }
 
     /// <summary>
+    /// Annotations providing hints about a tool's behavior for MCP clients.
+    /// </summary>
+    [Serializable]
+    public class ToolAnnotations
+    {
+        public bool? readOnlyHint;
+        public bool? destructiveHint;
+        public bool? idempotentHint;
+        public bool? openWorldHint;
+        public string title;
+    }
+
+    /// <summary>
     /// MCP tool definition for tools/list response
     /// </summary>
     [Serializable]
@@ -402,6 +415,7 @@ namespace UnityMCP.Editor.Core
         public string name;
         public string description;
         public string category;
+        public ToolAnnotations annotations;
         public InputSchema inputSchema;
 
         public ToolDefinition() { }

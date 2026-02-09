@@ -24,6 +24,31 @@ namespace UnityMCP.Editor
         public string Category { get; set; } = "Uncategorized";
 
         /// <summary>
+        /// If true, the tool does not modify any state (read-only operation).
+        /// </summary>
+        public bool ReadOnlyHint { get; set; } = false;
+
+        /// <summary>
+        /// If true, the tool may perform irreversible or destructive operations.
+        /// </summary>
+        public bool DestructiveHint { get; set; } = false;
+
+        /// <summary>
+        /// If true, calling the tool with the same arguments yields the same result.
+        /// </summary>
+        public bool IdempotentHint { get; set; } = false;
+
+        /// <summary>
+        /// If true, the tool interacts with external systems beyond the local environment.
+        /// </summary>
+        public bool OpenWorldHint { get; set; } = false;
+
+        /// <summary>
+        /// An optional human-readable display title for the tool.
+        /// </summary>
+        public string Title { get; set; } = null;
+
+        /// <summary>
         /// Creates a new MCP tool attribute.
         /// </summary>
         /// <param name="name">The unique name of the tool used for invocation.</param>

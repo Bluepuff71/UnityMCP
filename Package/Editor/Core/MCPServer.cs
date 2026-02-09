@@ -477,6 +477,24 @@ namespace UnityMCP.Editor.Core
                     ["description"] = tool.description,
                     ["inputSchema"] = SerializeInputSchema(tool.inputSchema)
                 };
+
+                if (tool.annotations != null)
+                {
+                    var annotationsObject = new JObject();
+                    if (tool.annotations.readOnlyHint.HasValue)
+                        annotationsObject["readOnlyHint"] = tool.annotations.readOnlyHint.Value;
+                    if (tool.annotations.destructiveHint.HasValue)
+                        annotationsObject["destructiveHint"] = tool.annotations.destructiveHint.Value;
+                    if (tool.annotations.idempotentHint.HasValue)
+                        annotationsObject["idempotentHint"] = tool.annotations.idempotentHint.Value;
+                    if (tool.annotations.openWorldHint.HasValue)
+                        annotationsObject["openWorldHint"] = tool.annotations.openWorldHint.Value;
+                    if (tool.annotations.title != null)
+                        annotationsObject["title"] = tool.annotations.title;
+                    if (annotationsObject.Count > 0)
+                        toolObject["annotations"] = annotationsObject;
+                }
+
                 toolsArray.Add(toolObject);
             }
 

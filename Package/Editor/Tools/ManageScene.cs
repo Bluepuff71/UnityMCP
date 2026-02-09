@@ -238,7 +238,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Saves the current scene, optionally to a new path.
         /// </summary>
-        [MCPTool("scene_save", "Saves the current scene, optionally to a new path", Category = "Scene")]
+        [MCPTool("scene_save", "Saves the current scene, optionally to a new path", Category = "Scene", IdempotentHint = true)]
         public static object SaveScene(
             [MCPParam("name", "Name for Save As (without .unity extension)")] string name = null,
             [MCPParam("path", "Directory path for Save As (relative to Assets)")] string path = null)
@@ -331,7 +331,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets information about the currently active scene.
         /// </summary>
-        [MCPTool("scene_get_active", "Gets information about the currently active scene", Category = "Scene")]
+        [MCPTool("scene_get_active", "Gets information about the currently active scene", Category = "Scene", ReadOnlyHint = true)]
         public static object GetActiveScene()
         {
             try
@@ -389,7 +389,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets the hierarchy of GameObjects in the current scene.
         /// </summary>
-        [MCPTool("scene_get_hierarchy", "Gets the hierarchy of GameObjects in the current scene", Category = "Scene")]
+        [MCPTool("scene_get_hierarchy", "Gets the hierarchy of GameObjects in the current scene", Category = "Scene", ReadOnlyHint = true)]
         public static object GetHierarchy(
             [MCPParam("parent", "Instance ID or name of parent GameObject to list children of (null for roots)")] string parent = null,
             [MCPParam("max_depth", "Maximum depth to traverse (default: 1, just immediate children)")] int maxDepth = 1,
@@ -515,7 +515,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Captures a screenshot of the Game View.
         /// </summary>
-        [MCPTool("scene_screenshot", "Captures a screenshot of the Game View", Category = "Scene")]
+        [MCPTool("scene_screenshot", "Captures a screenshot of the Game View", Category = "Scene", ReadOnlyHint = true)]
         public static object CaptureScreenshot(
             [MCPParam("filename", "Filename for the screenshot (without extension)")] string filename = null,
             [MCPParam("super_size", "Multiplier for resolution (1-4, default: 1)")] int superSize = 1)

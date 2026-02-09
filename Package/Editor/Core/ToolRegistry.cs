@@ -328,6 +328,21 @@ namespace UnityMCP.Editor.Core
 
             var definition = new ToolDefinition(_attribute.Name, _attribute.Description, inputSchema);
             definition.category = _attribute.Category;
+
+            // Only include annotations if at least one hint was explicitly set
+            bool hasAnnotations = _attribute.ReadOnlyHint || _attribute.DestructiveHint ||
+                                  _attribute.IdempotentHint || _attribute.OpenWorldHint ||
+                                  _attribute.Title != null;
+            if (hasAnnotations)
+            {
+                definition.annotations = new ToolAnnotations();
+                if (_attribute.ReadOnlyHint) definition.annotations.readOnlyHint = true;
+                if (_attribute.DestructiveHint) definition.annotations.destructiveHint = true;
+                if (_attribute.IdempotentHint) definition.annotations.idempotentHint = true;
+                if (_attribute.OpenWorldHint) definition.annotations.openWorldHint = true;
+                if (_attribute.Title != null) definition.annotations.title = _attribute.Title;
+            }
+
             return definition;
         }
 

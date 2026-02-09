@@ -41,7 +41,7 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         /// <param name="menuPath">The menu item path (e.g., "File/Save", "GameObject/Create Empty").</param>
         /// <returns>Result object indicating success or failure with appropriate message.</returns>
-        [MCPTool("execute_menu_item", "Execute a Unity Editor menu item by path", Category = "Editor")]
+        [MCPTool("execute_menu_item", "Execute a Unity Editor menu item by path", Category = "Editor", DestructiveHint = true)]
         public static object Execute(
             [MCPParam("menu_path", "The menu item path (e.g., 'File/Save', 'GameObject/Create Empty')", required: true)] string menuPath)
         {

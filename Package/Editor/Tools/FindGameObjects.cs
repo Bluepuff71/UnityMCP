@@ -26,7 +26,7 @@ namespace UnityMCP.Editor.Tools
         /// Finds GameObjects in the current scene using various search methods.
         /// Returns paginated instance IDs for lightweight results.
         /// </summary>
-        [MCPTool("gameobject_find", "Finds GameObjects by name, tag, layer, component, path, or instance ID", Category = "GameObject")]
+        [MCPTool("gameobject_find", "Finds GameObjects by name, tag, layer, component, path, or instance ID", Category = "GameObject", ReadOnlyHint = true)]
         public static object Find(
             [MCPParam("search_method", "Search method: by_name, by_tag, by_layer, by_component, by_path, by_id (default: by_name)")] string searchMethod = "by_name",
             [MCPParam("search_term", "The term to search for (name, tag, layer name, component type, path, or instance ID)", required: true)] string searchTerm = null,

@@ -164,7 +164,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="jobId">The job ID to query.</param>
         /// <param name="includeDetails">Whether to include detailed build steps and messages.</param>
         /// <returns>Result object with job status and optional data.</returns>
-        [MCPTool("build_get_job", "Get build job status and result", Category = "Build")]
+        [MCPTool("build_get_job", "Get build job status and result", Category = "Build", ReadOnlyHint = true)]
         public static object GetJob(
             [MCPParam("job_id", "Job ID from build_start", required: true)] string jobId,
             [MCPParam("include_details", "Include detailed build steps and messages")] bool includeDetails = true)
