@@ -605,4 +605,56 @@ namespace UnityMCP.Editor.Core
             };
         }
     }
+
+    /// <summary>
+    /// MCP prompt argument definition
+    /// </summary>
+    [Serializable]
+    public class PromptArgument
+    {
+        public string name;
+        public string description;
+        public bool required;
+    }
+
+    /// <summary>
+    /// MCP prompt definition for prompts/list response
+    /// </summary>
+    [Serializable]
+    public class PromptDefinition
+    {
+        public string name;
+        public string description;
+        public List<PromptArgument> arguments;
+    }
+
+    /// <summary>
+    /// MCP prompt message returned from prompts/get
+    /// </summary>
+    [Serializable]
+    public class PromptMessage
+    {
+        public string role;
+        public PromptMessageContent content;
+    }
+
+    /// <summary>
+    /// Content of a prompt message
+    /// </summary>
+    [Serializable]
+    public class PromptMessageContent
+    {
+        public string type;
+        public string text;
+    }
+
+    /// <summary>
+    /// MCP prompt result returned from prompts/get
+    /// </summary>
+    [Serializable]
+    public class PromptResult
+    {
+        public string description;
+        public List<PromptMessage> messages;
+    }
 }

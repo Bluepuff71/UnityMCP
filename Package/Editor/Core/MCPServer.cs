@@ -282,6 +282,8 @@ namespace UnityMCP.Editor.Core
                     "tools/call" => await HandleToolsCall(paramsToken, requestId),
                     "resources/list" => HandleResourcesList(requestId),
                     "resources/read" => HandleResourcesRead(paramsToken, requestId),
+                    "prompts/list" => HandlePromptsList(requestId),
+                    "prompts/get" => HandlePromptsGet(paramsToken, requestId),
                     _ => CreateErrorResponse(MCPErrorCodes.MethodNotFound, $"Method not found: {method}", requestId)
                 };
 
@@ -422,6 +424,8 @@ namespace UnityMCP.Editor.Core
                     "tools/call" => HandleToolsCallSync(paramsToken, requestId),
                     "resources/list" => HandleResourcesList(requestId),
                     "resources/read" => HandleResourcesRead(paramsToken, requestId),
+                    "prompts/list" => HandlePromptsList(requestId),
+                    "prompts/get" => HandlePromptsGet(paramsToken, requestId),
                     _ => CreateErrorResponse(MCPErrorCodes.MethodNotFound, $"Method not found: {method}", requestId)
                 };
 
@@ -452,7 +456,8 @@ namespace UnityMCP.Editor.Core
                 ["capabilities"] = new JObject
                 {
                     ["tools"] = new JObject(),
-                    ["resources"] = new JObject()
+                    ["resources"] = new JObject(),
+                    ["prompts"] = new JObject()
                 },
                 ["serverInfo"] = new JObject
                 {
@@ -950,6 +955,132 @@ namespace UnityMCP.Editor.Core
             return MainThreadDispatcher.DispatchAndWait(() =>
             {
                 return ResourceRegistry.Invoke(resourceUri);
+            }, timeoutMilliseconds);
+        }
+
+        private JObject HandlePromptsList(string requestId)
+        {
+            var promptDefinitions = PromptRegistry.GetDefinitions().ToList();
+            var promptsArray = new JArray();
+
+            foreach (var prompt in promptDefinitions)
+            {
+                var promptObject = new JObject
+                {
+                    ["name"] = prompt.name,
+                    ["description"] = prompt.description
+                };
+
+                if (prompt.arguments != null && prompt.arguments.Count > 0)
+                {
+                    var argumentsArray = new JArray();
+                    foreach (var argument in prompt.arguments)
+                    {
+                        var argumentObject = new JObject
+                        {
+                            ["name"] = argument.name
+                        };
+                        if (!string.IsNullOrEmpty(argument.description))
+                        {
+                            argumentObject["description"] = argument.description;
+                        }
+                        argumentObject["required"] = argument.required;
+                        argumentsArray.Add(argumentObject);
+                    }
+                    promptObject["arguments"] = argumentsArray;
+                }
+
+                promptsArray.Add(promptObject);
+            }
+
+            var result = new JObject
+            {
+                ["prompts"] = promptsArray
+            };
+
+            return CreateSuccessResponse(result, requestId);
+        }
+
+        private JObject HandlePromptsGet(JToken paramsToken, string requestId)
+        {
+            if (paramsToken == null)
+            {
+                return CreateErrorResponse(MCPErrorCodes.InvalidParams, "Missing params", requestId);
+            }
+
+            string promptName = paramsToken["name"]?.ToString();
+            if (string.IsNullOrEmpty(promptName))
+            {
+                return CreateErrorResponse(MCPErrorCodes.InvalidParams, "Missing 'name' in params", requestId);
+            }
+
+            if (!PromptRegistry.HasPrompt(promptName))
+            {
+                return CreateErrorResponse(MCPErrorCodes.MethodNotFound, $"Unknown prompt: {promptName}", requestId);
+            }
+
+            // Extract arguments
+            var arguments = new Dictionary<string, string>();
+            var argumentsToken = paramsToken["arguments"] as JObject;
+            if (argumentsToken != null)
+            {
+                foreach (var property in argumentsToken.Properties())
+                {
+                    arguments[property.Name] = property.Value?.ToString();
+                }
+            }
+
+            try
+            {
+                PromptResult promptResult = InvokePromptOnMainThread(promptName, arguments);
+
+                var messagesArray = new JArray();
+                if (promptResult.messages != null)
+                {
+                    foreach (var message in promptResult.messages)
+                    {
+                        var messageObject = new JObject
+                        {
+                            ["role"] = message.role,
+                            ["content"] = new JObject
+                            {
+                                ["type"] = message.content.type,
+                                ["text"] = message.content.text
+                            }
+                        };
+                        messagesArray.Add(messageObject);
+                    }
+                }
+
+                var resultObject = new JObject
+                {
+                    ["messages"] = messagesArray
+                };
+
+                if (!string.IsNullOrEmpty(promptResult.description))
+                {
+                    resultObject["description"] = promptResult.description;
+                }
+
+                return CreateSuccessResponse(resultObject, requestId);
+            }
+            catch (MCPException mcpException)
+            {
+                return CreateErrorResponse(mcpException.ErrorCode, mcpException.Message, requestId);
+            }
+            catch (Exception exception)
+            {
+                return CreateErrorResponse(MCPErrorCodes.InternalError, $"Prompt execution failed: {exception.Message}", requestId);
+            }
+        }
+
+        private PromptResult InvokePromptOnMainThread(string promptName, Dictionary<string, string> arguments)
+        {
+            int timeoutMilliseconds = MainThreadTimeoutSeconds * 1000;
+
+            return MainThreadDispatcher.DispatchAndWait(() =>
+            {
+                return PromptRegistry.Invoke(promptName, arguments);
             }, timeoutMilliseconds);
         }
 
