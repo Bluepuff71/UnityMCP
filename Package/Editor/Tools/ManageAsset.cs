@@ -25,15 +25,15 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset", DestructiveHint = true)]
         public static object Manage(
-            [MCPParam("action", "Action to perform: create, delete, move, rename, duplicate, import, search, get_info, create_folder", required: true)] string action,
+            [MCPParam("action", "Action to perform: create, delete, move, rename, duplicate, import, search, get_info, create_folder", required: true, Enum = new[] { "create", "delete", "move", "rename", "duplicate", "import", "search", "get_info", "create_folder" })] string action,
             [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')")] string path = null,
             [MCPParam("destination", "Destination path for move/duplicate operations")] string destination = null,
             [MCPParam("asset_type", "Asset type for create: folder, material, physicsmaterial")] string assetType = null,
             [MCPParam("properties", "Properties for create/modify operations (e.g., shader, friction, bounciness)")] Dictionary<string, object> properties = null,
             [MCPParam("search_pattern", "Search pattern for search operation")] string searchPattern = null,
             [MCPParam("filter_type", "Filter by asset type for search (e.g., 'Material', 'Prefab', 'Texture2D')")] string filterType = null,
-            [MCPParam("page_size", "Number of results per page for search (default: 50, max: 500)")] int pageSize = DefaultPageSize,
-            [MCPParam("page_number", "Page number for search results (1-based, default: 1)")] int pageNumber = 1)
+            [MCPParam("page_size", "Number of results per page for search (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
+            [MCPParam("page_number", "Page number for search results (1-based, default: 1)", Minimum = 1)] int pageNumber = 1)
         {
             if (string.IsNullOrEmpty(action))
             {

@@ -39,7 +39,7 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         [MCPTool("component_manage", "Manages components: add, remove, set_property, or inspect on GameObjects", Category = "Component")]
         public static object Manage(
-            [MCPParam("action", "Action to perform: add, remove, set_property, inspect", required: true)] string action,
+            [MCPParam("action", "Action to perform: add, remove, set_property, inspect", required: true, Enum = new[] { "add", "remove", "set_property", "inspect" })] string action,
             [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target,
             [MCPParam("component_type", "The component type name (e.g., 'Rigidbody', 'BoxCollider')", required: true)] string componentType,
             [MCPParam("property", "Single property name to set (for set_property action)")] string property = null,

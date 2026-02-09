@@ -30,7 +30,7 @@ namespace UnityMCP.Editor.Tools
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
         [MCPTool("manage_shader", "Manage shaders: get info, list, find, manage keywords", Category = "Asset")]
         public static object Execute(
-            [MCPParam("action", "Action: get, list, find, get_keywords, set_keywords", required: true)] string action,
+            [MCPParam("action", "Action: get, list, find, get_keywords, set_keywords", required: true, Enum = new[] { "get", "list", "find", "get_keywords", "set_keywords" })] string action,
             [MCPParam("shader_path", "Asset path to shader file")] string shaderPath = null,
             [MCPParam("shader_name", "Shader name (e.g., Standard, URP/Lit)")] string shaderName = null,
             [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null,

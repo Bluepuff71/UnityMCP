@@ -134,11 +134,11 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         [MCPTool("console_read", "Reads Unity Console log entries with filtering and pagination", Category = "Console", ReadOnlyHint = true)]
         public static object Read(
-            [MCPParam("action", "Action to perform: 'get' to read entries, 'clear' to clear console (default: get)")] string action = "get",
+            [MCPParam("action", "Action to perform: 'get' to read entries, 'clear' to clear console (default: get)", Enum = new[] { "get", "clear" })] string action = "get",
             [MCPParam("types", "Comma-separated log types to include: error, warning, log, all (default: error,warning)")] string types = "error,warning",
             [MCPParam("count", "Maximum entries to return (non-paging mode, overrides page_size if set)")] int? count = null,
-            [MCPParam("page_size", "Entries per page (default: 50, max: 500)")] int pageSize = DefaultPageSize,
-            [MCPParam("cursor", "Starting index for pagination (default: 0)")] int cursor = 0,
+            [MCPParam("page_size", "Entries per page (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
+            [MCPParam("cursor", "Starting index for pagination (default: 0)", Minimum = 0)] int cursor = 0,
             [MCPParam("filter_text", "Text filter for messages (case-insensitive substring match)")] string filterText = null,
             [MCPParam("format", "Output format: 'plain' or 'detailed' (default: plain)")] string format = "plain",
             [MCPParam("include_stacktrace", "Include stack traces in output (default: false)")] bool includeStacktrace = false)

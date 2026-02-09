@@ -31,8 +31,8 @@ namespace UnityMCP.Editor.Tools
             [MCPParam("search_method", "Search method: by_name, by_tag, by_layer, by_component, by_path, by_id (default: by_name)")] string searchMethod = "by_name",
             [MCPParam("search_term", "The term to search for (name, tag, layer name, component type, path, or instance ID)", required: true)] string searchTerm = null,
             [MCPParam("include_inactive", "Whether to include inactive GameObjects (default: false)")] bool includeInactive = false,
-            [MCPParam("page_size", "Number of results per page (default: 50, max: 500)")] int pageSize = DefaultPageSize,
-            [MCPParam("cursor", "Starting index for pagination (default: 0)")] int cursor = 0)
+            [MCPParam("page_size", "Number of results per page (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
+            [MCPParam("cursor", "Starting index for pagination (default: 0)", Minimum = 0)] int cursor = 0)
         {
             if (string.IsNullOrEmpty(searchTerm))
             {

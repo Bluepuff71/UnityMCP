@@ -392,10 +392,10 @@ namespace UnityMCP.Editor.Tools
         [MCPTool("scene_get_hierarchy", "Gets the hierarchy of GameObjects in the current scene", Category = "Scene", ReadOnlyHint = true)]
         public static object GetHierarchy(
             [MCPParam("parent", "Instance ID or name of parent GameObject to list children of (null for roots)")] string parent = null,
-            [MCPParam("max_depth", "Maximum depth to traverse (default: 1, just immediate children)")] int maxDepth = 1,
+            [MCPParam("max_depth", "Maximum depth to traverse (default: 1, just immediate children)", Minimum = 1)] int maxDepth = 1,
             [MCPParam("include_transform", "Include transform data in results")] bool includeTransform = false,
-            [MCPParam("page_size", "Maximum number of items to return (default: 50, max: 500)")] int pageSize = 50,
-            [MCPParam("cursor", "Starting index for pagination (default: 0)")] int cursor = 0)
+            [MCPParam("page_size", "Maximum number of items to return (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = 50,
+            [MCPParam("cursor", "Starting index for pagination (default: 0)", Minimum = 0)] int cursor = 0)
         {
             try
             {
@@ -518,7 +518,7 @@ namespace UnityMCP.Editor.Tools
         [MCPTool("scene_screenshot", "Captures a screenshot of the Game View", Category = "Scene", ReadOnlyHint = true)]
         public static object CaptureScreenshot(
             [MCPParam("filename", "Filename for the screenshot (without extension)")] string filename = null,
-            [MCPParam("super_size", "Multiplier for resolution (1-4, default: 1)")] int superSize = 1)
+            [MCPParam("super_size", "Multiplier for resolution (1-4, default: 1)", Minimum = 1, Maximum = 4)] int superSize = 1)
         {
             try
             {

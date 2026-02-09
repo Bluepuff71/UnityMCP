@@ -24,7 +24,7 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         [MCPTool("prefab_manage", "Manages prefab operations: open_stage, close_stage, save_open_stage, create_from_gameobject", Category = "Asset")]
         public static object Manage(
-            [MCPParam("action", "Action to perform: open_stage, close_stage, save_open_stage, create_from_gameobject", required: true)] string action,
+            [MCPParam("action", "Action to perform: open_stage, close_stage, save_open_stage, create_from_gameobject", required: true, Enum = new[] { "open_stage", "close_stage", "save_open_stage", "create_from_gameobject" })] string action,
             [MCPParam("prefab_path", "Path to the prefab asset (for open_stage and create_from_gameobject)")] string prefabPath = null,
             [MCPParam("save_before_close", "Whether to save before closing the prefab stage (default: false)")] bool saveBeforeClose = false,
             [MCPParam("target", "Name or instance ID of the GameObject to create prefab from")] string target = null,
