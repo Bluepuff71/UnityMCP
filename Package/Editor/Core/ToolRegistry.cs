@@ -307,7 +307,8 @@ namespace UnityMCP.Editor.Core
                     Description = parameterDescription,
                     Required = isRequired,
                     ParameterInfo = parameter,
-                    JsonType = GetJsonSchemaType(parameter.ParameterType)
+                    JsonType = GetJsonSchemaType(parameter.ParameterType),
+                    McpParamAttribute = mcpParamAttribute
                 };
             }
         }
@@ -342,6 +343,25 @@ namespace UnityMCP.Editor.Core
             if (metadata.ParameterInfo.HasDefaultValue && metadata.ParameterInfo.DefaultValue != null)
             {
                 schema.@default = metadata.ParameterInfo.DefaultValue;
+            }
+
+            // Check MCPParamAttribute for enum values
+            if (metadata.McpParamAttribute?.Enum != null && metadata.McpParamAttribute.Enum.Length > 0)
+            {
+                schema.@enum = new List<string>(metadata.McpParamAttribute.Enum);
+            }
+
+            // Check MCPParamAttribute for minimum/maximum
+            if (metadata.McpParamAttribute != null)
+            {
+                if (metadata.McpParamAttribute.Minimum >= 0)
+                {
+                    schema.minimum = metadata.McpParamAttribute.Minimum;
+                }
+                if (metadata.McpParamAttribute.Maximum >= 0)
+                {
+                    schema.maximum = metadata.McpParamAttribute.Maximum;
+                }
             }
 
             // Handle array item types
@@ -648,5 +668,6 @@ namespace UnityMCP.Editor.Core
         public bool Required { get; set; }
         public string JsonType { get; set; }
         public ParameterInfo ParameterInfo { get; set; }
+        public MCPParamAttribute McpParamAttribute { get; set; }
     }
 }

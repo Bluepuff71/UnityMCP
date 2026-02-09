@@ -298,6 +298,8 @@ namespace UnityMCP.Editor.Core
         public List<string> @enum;
         public PropertySchema items;
         public object @default;
+        public double? minimum;
+        public double? maximum;
 
         /// <summary>
         /// Creates a string property schema

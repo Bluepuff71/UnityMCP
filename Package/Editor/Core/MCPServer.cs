@@ -552,6 +552,16 @@ namespace UnityMCP.Editor.Core
                 schemaObject["default"] = JToken.FromObject(propertySchema.@default);
             }
 
+            if (propertySchema.minimum.HasValue)
+            {
+                schemaObject["minimum"] = propertySchema.minimum.Value;
+            }
+
+            if (propertySchema.maximum.HasValue)
+            {
+                schemaObject["maximum"] = propertySchema.maximum.Value;
+            }
+
             return schemaObject;
         }
 

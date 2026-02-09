@@ -23,6 +23,10 @@ namespace UnityMCP.Editor
         /// </summary>
         public bool Required { get; }
 
+        public string[] Enum { get; set; }
+        public double Minimum { get; set; } = -1;
+        public double Maximum { get; set; } = -1;
+
         /// <summary>
         /// Creates a new MCP parameter attribute.
         /// </summary>
