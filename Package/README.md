@@ -1,6 +1,7 @@
 # Unity MCP - AI Assistant Integration for Unity Editor
 
-![Unity 6+](https://img.shields.io/badge/Unity-6%2B-black?logo=unity)
+![Unity 2022.3+](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)
+![Unity 6 Compatible](https://img.shields.io/badge/Unity%206-Compatible-brightgreen?logo=unity)
 ![Release](https://img.shields.io/github/v/tag/Bluepuff71/UnityMCP?label=version)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
@@ -14,7 +15,7 @@ Model Context Protocol (MCP) server that enables AI assistants like Claude, Code
 
 ## Requirements
 
-- Unity 6 or later
+- Unity 2022.3 or later
 - Any MCP client: Claude Code, Claude Desktop, Codex, Cursor, or other AI assistants
 
 ## Installation
