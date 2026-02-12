@@ -1,16 +1,16 @@
-# UnityMCP Native Proxy
+# UnityMCP Proxy Plugin
 
-This folder contains the native C plugin source code for UnityMCP's domain-reload-resistant HTTP server.
+C source code for UnityMCP's domain-reload-resistant HTTP server.
 
 ## Purpose
 
-Unity's managed C# code is unloaded during domain reloads (entering/exiting Play mode, script recompilation). This native plugin provides an HTTP server that persists across these reloads, allowing continuous communication with the MCP server.
+Unity's managed C# code is unloaded during domain reloads (entering/exiting Play mode, script recompilation). This plugin provides an HTTP server that persists across these reloads, allowing continuous communication with MCP clients.
 
 ## Folder Naming
 
-The `~` suffix in `NativeProxy~` tells Unity to ignore this folder entirely. Unity will not attempt to import or process any files within it. This is intentional because:
+The `~` suffix in `Proxy~` tells Unity to ignore this folder entirely. Unity will not attempt to import or process any files within it. This is intentional because:
 - Unity cannot compile C source files
-- We need to build these into platform-specific native libraries externally
+- We need to build these into platform-specific libraries externally
 
 ## Contents
 

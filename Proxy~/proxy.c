@@ -1,8 +1,8 @@
 /*
- * UnityMCP Native Proxy - Implementation
+ * UnityMCP Proxy - Implementation
  *
- * This native plugin provides an HTTP server that survives Unity domain reloads.
- * It acts as a proxy between the external MCP server and Unity's managed code.
+ * HTTP server plugin that survives Unity domain reloads.
+ * Acts as a proxy between external MCP clients and Unity's C# code.
  *
  * When C# is unavailable (during recompile), it blocks until polling is re-activated.
  * When C# is available, it stores the request in a buffer and poll-waits for the response.
@@ -511,7 +511,7 @@ EXPORT int IsPollerActive(void)
 }
 
 /*
- * Get the process ID of this native library instance.
+ * Get the process ID of this library instance.
  */
 EXPORT unsigned long GetNativeProcessId(void)
 {
@@ -521,7 +521,7 @@ EXPORT unsigned long GetNativeProcessId(void)
 /*
  * DLL/shared library unload cleanup.
  *
- * When Unity reloads the native plugin (e.g. package update), the old DLL is
+ * When Unity reloads the plugin (e.g. package update), the old DLL is
  * unloaded while its server thread may still be running. Without cleanup, the
  * listen socket leaks and the new DLL can never bind to the same port.
  *

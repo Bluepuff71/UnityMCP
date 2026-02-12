@@ -70,7 +70,7 @@ namespace UnityMCP.Editor.Core
                 }
 
                 _isInitialized = true;
-                if (NativeProxy.VerboseLogging) Debug.Log($"[PromptRegistry] Discovered {_prompts.Count} MCP prompts");
+                if (MCPProxy.VerboseLogging) Debug.Log($"[PromptRegistry] Discovered {_prompts.Count} MCP prompts");
             }
         }
 

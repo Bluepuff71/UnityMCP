@@ -102,7 +102,7 @@ namespace UnityMCP.Editor.Core
         #region Public API for Native Proxy
 
         /// <summary>
-        /// Handles a raw JSON-RPC request. Called from NativeProxy.
+        /// Handles a raw JSON-RPC request. Called from MCPProxy.
         /// This method is synchronous and runs on Unity's main thread.
         /// </summary>
         /// <param name="jsonRequest">The raw JSON-RPC request string.</param>

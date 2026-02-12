@@ -73,7 +73,7 @@ namespace UnityMCP.Editor.Core
                 }
 
                 _isInitialized = true;
-                if (NativeProxy.VerboseLogging) Debug.Log($"[ToolRegistry] Discovered {_tools.Count} MCP tools");
+                if (MCPProxy.VerboseLogging) Debug.Log($"[ToolRegistry] Discovered {_tools.Count} MCP tools");
             }
         }
 

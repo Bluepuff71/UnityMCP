@@ -31,7 +31,7 @@ namespace UnityMCP.Editor.UI
         private void OnEnable()
         {
             _portInput = MCPServer.Instance.Port;
-            NativeProxy.VerboseLogging = EditorPrefs.GetBool(VerboseLoggingPrefKey, false);
+            MCPProxy.VerboseLogging = EditorPrefs.GetBool(VerboseLoggingPrefKey, false);
         }
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace UnityMCP.Editor.UI
 
         private void DrawToolbar()
         {
-            bool isRunning = NativeProxy.IsInitialized;
+            bool isRunning = MCPProxy.IsInitialized;
 
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
@@ -103,11 +103,11 @@ namespace UnityMCP.Editor.UI
             {
                 if (isCurrentlyRunning)
                 {
-                    NativeProxy.Stop();
+                    MCPProxy.Stop();
                 }
                 else
                 {
-                    NativeProxy.Start();
+                    MCPProxy.Start();
                 }
             }
             catch (Exception exception)
@@ -119,7 +119,7 @@ namespace UnityMCP.Editor.UI
 
         private void DrawServerInfo()
         {
-            bool isRunning = NativeProxy.IsInitialized;
+            bool isRunning = MCPProxy.IsInitialized;
             int port = MCPServer.Instance?.Port ?? 8080;
             string endpoint = $"http://localhost:{port}/";
 
@@ -133,7 +133,7 @@ namespace UnityMCP.Editor.UI
             if (GUILayout.Button("Copy", GUILayout.Width(50)))
             {
                 EditorGUIUtility.systemCopyBuffer = endpoint;
-                if (NativeProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Copied endpoint to clipboard: {endpoint}");
+                if (MCPProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Copied endpoint to clipboard: {endpoint}");
             }
             EditorGUILayout.EndHorizontal();
 
@@ -148,7 +148,7 @@ namespace UnityMCP.Editor.UI
 
         private void DrawPortConfiguration()
         {
-            bool isRunning = NativeProxy.IsInitialized;
+            bool isRunning = MCPProxy.IsInitialized;
 
             EditorGUILayout.LabelField("Configuration", EditorStyles.boldLabel);
 
@@ -166,7 +166,7 @@ namespace UnityMCP.Editor.UI
                 if (_portInput > 0 && _portInput <= 65535)
                 {
                     MCPServer.Instance.Port = _portInput;
-                    if (NativeProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Port changed to {_portInput}");
+                    if (MCPProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Port changed to {_portInput}");
                 }
                 else
                 {
@@ -185,10 +185,10 @@ namespace UnityMCP.Editor.UI
 
             // Verbose logging toggle (always enabled)
             EditorGUILayout.Space(4);
-            bool verboseLogging = EditorGUILayout.Toggle("Verbose Logging", NativeProxy.VerboseLogging);
-            if (verboseLogging != NativeProxy.VerboseLogging)
+            bool verboseLogging = EditorGUILayout.Toggle("Verbose Logging", MCPProxy.VerboseLogging);
+            if (verboseLogging != MCPProxy.VerboseLogging)
             {
-                NativeProxy.VerboseLogging = verboseLogging;
+                MCPProxy.VerboseLogging = verboseLogging;
                 EditorPrefs.SetBool(VerboseLoggingPrefKey, verboseLogging);
             }
 
@@ -306,7 +306,7 @@ namespace UnityMCP.Editor.UI
             try
             {
                 ToolRegistry.RefreshTools();
-                if (NativeProxy.VerboseLogging) Debug.Log("[MCPServerWindow] Tools refreshed");
+                if (MCPProxy.VerboseLogging) Debug.Log("[MCPServerWindow] Tools refreshed");
             }
             catch (Exception exception)
             {

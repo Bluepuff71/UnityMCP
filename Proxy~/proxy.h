@@ -1,11 +1,11 @@
 /*
- * UnityMCP Native Proxy - Header
+ * UnityMCP Proxy - Header
  *
- * This native plugin provides an HTTP server that survives Unity domain reloads.
- * It acts as a proxy between the external MCP server and Unity's managed code.
+ * HTTP server plugin that survives Unity domain reloads.
+ * Acts as a proxy between external MCP clients and Unity's C# code.
  *
  * C# polls for pending requests via GetPendingRequest() on EditorApplication.update,
- * eliminating ThreadAbortException by never calling managed code from native threads.
+ * eliminating ThreadAbortException by keeping all managed code on the main thread.
  *
  * License: GPLv2 (compatible with Mongoose library)
  */
@@ -90,7 +90,7 @@ EXPORT int IsServerRunning(void);
 EXPORT int IsPollerActive(void);
 
 /*
- * Get the process ID of this native library instance.
+ * Get the process ID of this library instance.
  * Used to verify if an existing server belongs to the same process.
  *
  * @return The process ID as an unsigned long

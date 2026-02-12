@@ -23,7 +23,7 @@ jobs:
       - name: Build Windows DLL
         shell: bash
         run: |
-          cd NativeProxy~
+          cd Proxy~
           gcc -shared -O2 -DNDEBUG -DMG_ENABLE_LINES=0 \
             proxy.c mongoose.c \
             -o UnityMCPProxy.dll \
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-plugin
-          path: NativeProxy~/UnityMCPProxy.dll
+          path: Proxy~/UnityMCPProxy.dll
 
   build-macos:
     runs-on: macos-latest
@@ -42,7 +42,7 @@ jobs:
 
       - name: Build macOS Bundle (Universal)
         run: |
-          cd NativeProxy~
+          cd Proxy~
           clang -shared -O2 -DNDEBUG -DMG_ENABLE_LINES=0 \
             proxy.c mongoose.c \
             -o UnityMCPProxy.bundle \
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos-plugin
-          path: NativeProxy~/UnityMCPProxy.bundle
+          path: Proxy~/UnityMCPProxy.bundle
 
   build-linux:
     runs-on: ubuntu-latest
@@ -62,7 +62,7 @@ jobs:
 
       - name: Build Linux Shared Library
         run: |
-          cd NativeProxy~
+          cd Proxy~
           gcc -shared -fPIC -O2 -DNDEBUG -DMG_ENABLE_LINES=0 \
             proxy.c mongoose.c \
             -o libUnityMCPProxy.so \
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-plugin
-          path: NativeProxy~/libUnityMCPProxy.so
+          path: Proxy~/libUnityMCPProxy.so
 
   release:
     needs: [build-windows, build-macos, build-linux]
