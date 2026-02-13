@@ -178,16 +178,16 @@ namespace UnityMCP.Editor.Tools
                         throw MCPException.InvalidParams($"Invalid primitive type: '{primitiveType}'. Valid types: {validTypes}");
                     }
 
-                    newGameObject = GameObject.CreatePrimitive(parsedType);
+                    newGameObject = ObjectFactory.CreatePrimitive(parsedType);
                     newGameObject.name = name;
                 }
                 else
                 {
                     newGameObject = new GameObject(name);
+                    Undo.RegisterCreatedObjectUndo(newGameObject, $"Create GameObject '{name}'");
                 }
 
                 createdNewObject = true;
-                Undo.RegisterCreatedObjectUndo(newGameObject, $"Create GameObject '{name}'");
             }
 
             Undo.RecordObject(newGameObject.transform, "Set GameObject Transform");
@@ -268,6 +268,8 @@ namespace UnityMCP.Editor.Tools
                 }
             }
 
+            EditorUtility.SetDirty(newGameObject);
+            EditorUtility.SetDirty(newGameObject.transform);
             Selection.activeGameObject = newGameObject;
 
             string successMessage = createdNewObject
@@ -459,6 +461,7 @@ namespace UnityMCP.Editor.Tools
             }
 
             EditorUtility.SetDirty(targetGameObject);
+            EditorUtility.SetDirty(targetGameObject.transform);
 
             return new
             {
@@ -790,6 +793,37 @@ namespace UnityMCP.Editor.Tools
                 return results;
             }
 
+            // Try path-based lookup (single result)
+            if (target.Contains("/"))
+            {
+                Scene activeScene = GetActiveScene();
+                var roots = activeScene.GetRootGameObjects();
+                foreach (var root in roots)
+                {
+                    if (root == null)
+                    {
+                        continue;
+                    }
+
+                    string rootPath = root.name;
+                    if (target.Equals(rootPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        results.Add(root);
+                        return results;
+                    }
+
+                    if (target.StartsWith(rootPath + "/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var found = root.transform.Find(target.Substring(rootPath.Length + 1));
+                        if (found != null)
+                        {
+                            results.Add(found.gameObject);
+                            return results;
+                        }
+                    }
+                }
+            }
+
             // Find all matching by name
             var allObjects = GetAllSceneObjects(searchInactive);
             foreach (var gameObject in allObjects)
@@ -939,9 +973,16 @@ namespace UnityMCP.Editor.Tools
                 return typeName;
             }
 
-            if (componentSpec is Dictionary<string, object> dict && dict.TryGetValue("typeName", out object typeNameValue))
+            if (componentSpec is Dictionary<string, object> dict)
             {
-                return typeNameValue?.ToString();
+                if (dict.TryGetValue("typeName", out object typeNameValue))
+                {
+                    return typeNameValue?.ToString();
+                }
+                if (dict.TryGetValue("type", out object typeValue))
+                {
+                    return typeValue?.ToString();
+                }
             }
 
             return null;
