@@ -29,7 +29,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="minVertexDistance">Min distance between trail vertices</param>
         /// <param name="emitting">Whether trail is emitting</param>
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_vfx", "Manage VFX: particles (play/pause/stop/restart/get/set), lines (create/get/set), trails (get/set/clear)", Category = "VFX")]
+        [MCPTool("manage_vfx", "Manage VFX: particles (play/pause/stop/restart/get/set), lines (create/get/set), trails (get/set/clear)", Category = "VFX", DestructiveHint = true)]
         public static object Execute(
             [MCPParam("action", "Action: particle_play, particle_pause, particle_stop, particle_restart, particle_get, particle_set, line_create, line_get, line_set, trail_get, trail_set, trail_clear", required: true, Enum = new[] { "particle_play", "particle_pause", "particle_stop", "particle_restart", "particle_get", "particle_set", "line_create", "line_get", "line_set", "trail_get", "trail_set", "trail_clear" })] string action,
             [MCPParam("target", "GameObject path or instance ID")] string target = null,

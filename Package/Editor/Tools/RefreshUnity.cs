@@ -19,7 +19,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Refreshes the Unity asset database and optionally requests script compilation.
         /// </summary>
-        [MCPTool("unity_refresh", "Refreshes Unity asset database and optionally requests script compilation", Category = "Editor", IdempotentHint = true)]
+        [MCPTool("unity_refresh", "Refreshes Unity asset database and optionally requests script compilation", Category = "Editor", DestructiveHint = true)]
         public static object Refresh(
             [MCPParam("mode", "Refresh mode: force or if_dirty (default: if_dirty)")] string mode = "if_dirty",
             [MCPParam("scope", "What to refresh: all or scripts (default: all)")] string scope = "all",

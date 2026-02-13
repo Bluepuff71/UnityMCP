@@ -36,7 +36,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="filterMode">Set filter mode (Point, Bilinear, Trilinear)</param>
         /// <param name="wrapMode">Set wrap mode (Repeat, Clamp, Mirror, MirrorOnce)</param>
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_texture", "Manage textures: get info, list, find, modify import settings", Category = "Asset")]
+        [MCPTool("manage_texture", "Manage textures: get info, list, find, modify import settings", Category = "Asset", DestructiveHint = true)]
         public static object Execute(
             [MCPParam("action", "Action: get, list, find, set_import_settings", required: true, Enum = new[] { "get", "list", "find", "set_import_settings" })] string action,
             [MCPParam("texture_path", "Asset path to texture file")] string texturePath = null,

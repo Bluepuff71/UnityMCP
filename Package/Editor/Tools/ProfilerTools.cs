@@ -16,7 +16,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="durationSeconds">Maximum recording duration in seconds (1-60).</param>
         /// <param name="includeFrameDetails">Whether to include per-frame data in results.</param>
         /// <returns>Result object with job_id and initial status.</returns>
-        [MCPTool("profiler_start", "Start profiler recording, returns job_id for polling", Category = "Profiler")]
+        [MCPTool("profiler_start", "Start profiler recording, returns job_id for polling", Category = "Profiler", DestructiveHint = true)]
         public static object Start(
             [MCPParam("duration_seconds", "Maximum recording duration in seconds (1-60)")] int durationSeconds = 10,
             [MCPParam("include_frame_details", "Include per-frame data in results")] bool includeFrameDetails = false)
@@ -83,7 +83,7 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         /// <param name="jobId">Optional job_id to verify correct recording is stopped.</param>
         /// <returns>Result object with final job status and statistics.</returns>
-        [MCPTool("profiler_stop", "Stop profiler recording and finalize job", Category = "Profiler")]
+        [MCPTool("profiler_stop", "Stop profiler recording and finalize job", Category = "Profiler", DestructiveHint = true)]
         public static object Stop(
             [MCPParam("job_id", "Job ID to stop (optional, verifies correct recording)")] string jobId = null)
         {

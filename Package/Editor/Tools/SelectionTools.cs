@@ -73,7 +73,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="instanceIds">Array of instance IDs to select.</param>
         /// <param name="paths">Array of asset paths to select.</param>
         /// <returns>Result indicating success or failure with selection details.</returns>
-        [MCPTool("selection_set", "Set selection by instance IDs or asset paths", Category = "Editor", IdempotentHint = true)]
+        [MCPTool("selection_set", "Set selection by instance IDs or asset paths", Category = "Editor", DestructiveHint = true)]
         public static object Set(
             [MCPParam("instance_ids", "Array of instance IDs to select")] List<object> instanceIds = null,
             [MCPParam("paths", "Array of asset paths to select")] List<object> paths = null)

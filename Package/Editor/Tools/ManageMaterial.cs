@@ -42,7 +42,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="slot">Material slot index (default: 0)</param>
         /// <param name="mode">For set_renderer_color: "property_block", "shared", or "instance"</param>
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_material", "Manage materials: create, modify properties, assign to renderers", Category = "Asset")]
+        [MCPTool("manage_material", "Manage materials: create, modify properties, assign to renderers", Category = "Asset", DestructiveHint = true)]
         public static object Execute(
             [MCPParam("action", "Action: create, get_info, set_property, set_color, assign_to_renderer, set_renderer_color", required: true, Enum = new[] { "create", "get_info", "set_property", "set_color", "assign_to_renderer", "set_renderer_color" })] string action,
             [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)")] string materialPath = null,

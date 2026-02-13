@@ -28,7 +28,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="enable">Whether to enable (true) or disable (false) keywords</param>
         /// <param name="materialPath">Material path for per-material keywords</param>
         /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_shader", "Manage shaders: get info, list, find, manage keywords", Category = "Asset")]
+        [MCPTool("manage_shader", "Manage shaders: get info, list, find, manage keywords", Category = "Asset", DestructiveHint = true)]
         public static object Execute(
             [MCPParam("action", "Action: get, list, find, get_keywords, set_keywords", required: true, Enum = new[] { "get", "list", "find", "get_keywords", "set_keywords" })] string action,
             [MCPParam("shader_path", "Asset path to shader file")] string shaderPath = null,

@@ -22,7 +22,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Manages prefab stage operations: open_stage, close_stage, save_open_stage, create_from_gameobject.
         /// </summary>
-        [MCPTool("prefab_manage", "Manages prefab operations: open_stage, close_stage, save_open_stage, create_from_gameobject", Category = "Asset")]
+        [MCPTool("prefab_manage", "Manages prefab operations: open_stage, close_stage, save_open_stage, create_from_gameobject", Category = "Asset", DestructiveHint = true)]
         public static object Manage(
             [MCPParam("action", "Action to perform: open_stage, close_stage, save_open_stage, create_from_gameobject", required: true, Enum = new[] { "open_stage", "close_stage", "save_open_stage", "create_from_gameobject" })] string action,
             [MCPParam("prefab_path", "Path to the prefab asset (for open_stage and create_from_gameobject)")] string prefabPath = null,

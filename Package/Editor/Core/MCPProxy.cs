@@ -323,6 +323,7 @@ namespace UnityMCP.Editor.Core
 
             string jsonRequest = Marshal.PtrToStringAnsi(ptr);
             string requestId = ExtractRequestId(jsonRequest);
+            string toolName = ExtractToolName(jsonRequest);
 
             try
             {
@@ -336,15 +337,21 @@ namespace UnityMCP.Editor.Core
                         $"Response too large ({response.Length} bytes). Maximum supported size is {MaxResponseSize - 1} bytes. Try reducing max_depth or using more specific queries.",
                         requestId);
                     SendResponse(errorResponse);
+                    if (toolName != null)
+                        ActivityLog.Record(toolName, false, "Response too large");
                     return;
                 }
 
                 SendResponse(response);
+                if (toolName != null)
+                    ActivityLog.Record(toolName, true);
             }
             catch (Exception exception)
             {
                 string errorResponse = BuildErrorResponse(-32603, exception.Message, requestId);
                 SendResponse(errorResponse);
+                if (toolName != null)
+                    ActivityLog.Record(toolName, false, exception.Message);
             }
         }
 
@@ -490,6 +497,52 @@ namespace UnityMCP.Editor.Core
             }
 
             return "null";
+        }
+
+        /// <summary>
+        /// Extracts the tool name from a JSON-RPC tools/call request.
+        /// Looks for "method":"tools/call" then finds "name" inside "params".
+        /// Returns null for non-tool-call requests (e.g., initialize, resources/list).
+        /// </summary>
+        /// <param name="json">The JSON-RPC request string.</param>
+        /// <returns>The tool name, or null if this is not a tools/call request.</returns>
+        private static string ExtractToolName(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return null;
+
+            // Only extract tool name from tools/call requests
+            if (json.IndexOf("\"tools/call\"", StringComparison.Ordinal) < 0)
+                return null;
+
+            // Find "params" object, then "name" inside it
+            int paramsIndex = json.IndexOf("\"params\"", StringComparison.Ordinal);
+            if (paramsIndex < 0)
+                return null;
+
+            // Find "name" after params
+            int nameKeyIndex = json.IndexOf("\"name\"", paramsIndex, StringComparison.Ordinal);
+            if (nameKeyIndex < 0)
+                return null;
+
+            // Find colon after "name"
+            int colonIndex = json.IndexOf(':', nameKeyIndex + 6);
+            if (colonIndex < 0)
+                return null;
+
+            // Skip whitespace
+            int valueStart = colonIndex + 1;
+            while (valueStart < json.Length && char.IsWhiteSpace(json[valueStart]))
+                valueStart++;
+
+            if (valueStart >= json.Length || json[valueStart] != '"')
+                return null;
+
+            int endQuote = json.IndexOf('"', valueStart + 1);
+            if (endQuote <= valueStart)
+                return null;
+
+            return json.Substring(valueStart + 1, endQuote - valueStart - 1);
         }
 
         /// <summary>

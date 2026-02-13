@@ -17,7 +17,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Starts an asynchronous Unity Test Runner job and returns immediately with a job ID for polling.
         /// </summary>
-        [MCPTool("tests_run", "Starts Unity Test Runner asynchronously, returns job_id for polling with tests_get_job", Category = "Tests")]
+        [MCPTool("tests_run", "Starts Unity Test Runner asynchronously, returns job_id for polling with tests_get_job", Category = "Tests", DestructiveHint = true)]
         public static object Run(
             [MCPParam("mode", "Test mode: EditMode or PlayMode (default: EditMode)")] string mode = "EditMode",
             [MCPParam("test_names", "Comma-separated list of specific test names to run")] string testNames = null,

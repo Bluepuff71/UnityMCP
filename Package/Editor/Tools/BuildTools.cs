@@ -23,7 +23,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="scenes">Scenes to include (paths). If null, uses scenes from build settings.</param>
         /// <param name="development">Whether to create a development build.</param>
         /// <returns>Result object with job_id and initial status.</returns>
-        [MCPTool("build_start", "Start a player build, returns job_id for polling", Category = "Build")]
+        [MCPTool("build_start", "Start a player build, returns job_id for polling", Category = "Build", DestructiveHint = true)]
         public static object Start(
             [MCPParam("target", "Build target (StandaloneWindows64, Android, iOS, WebGL, etc.)", required: true)] string target,
             [MCPParam("output_path", "Output path for the build", required: true)] string outputPath,

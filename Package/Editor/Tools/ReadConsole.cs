@@ -134,7 +134,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Reads Unity Console log entries with filtering and pagination support.
         /// </summary>
-        [MCPTool("console_read", "Reads Unity Console log entries with filtering and pagination", Category = "Console")]
+        [MCPTool("console_read", "Reads Unity Console log entries with filtering and pagination", Category = "Console", DestructiveHint = true)]
         public static object Read(
             [MCPParam("action", "Action to perform: 'get' to read entries, 'clear' to clear console (default: get)", Enum = new[] { "get", "clear" })] string action = "get",
             [MCPParam("types", "Comma-separated log types to include: error, warning, log, all (default: error,warning)")] string types = "error,warning",

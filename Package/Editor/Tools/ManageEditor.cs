@@ -27,7 +27,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="tagName">Tag name for add_tag/remove_tag</param>
         /// <param name="layerName">Layer name for add_layer/remove_layer</param>
         /// <returns>Result object indicating success or failure with appropriate message.</returns>
-        [MCPTool("manage_editor", "Manage editor state, tags, layers, and tools", Category = "Editor")]
+        [MCPTool("manage_editor", "Manage editor state, tags, layers, and tools", Category = "Editor", DestructiveHint = true)]
         public static object Execute(
             [MCPParam("action", "Action: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer", required: true, Enum = new[] { "play", "pause", "stop", "set_active_tool", "add_tag", "remove_tag", "add_layer", "remove_layer" })] string action,
             [MCPParam("tool_name", "Tool name for set_active_tool: View, Move, Rotate, Scale, Rect, Transform")] string toolName = null,

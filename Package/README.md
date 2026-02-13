@@ -165,9 +165,6 @@ Unity MCP provides over 40 built-in tools organized by category:
 - **uitoolkit_set_value** - Set the value of an input field or control
 - **uitoolkit_navigate** - Expand/collapse foldouts or select tabs in an EditorWindow
 
-### Batch Operations
-- **batch_execute** - Execute multiple MCP commands in a single operation with fail-fast support
-
 ### Debug & Testing
 - **test_echo** - Echo back input message (connectivity test)
 - **test_add** - Add two numbers (parameter handling test)

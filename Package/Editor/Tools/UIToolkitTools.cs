@@ -464,7 +464,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Clicks a button, toggle, or clickable element in an EditorWindow.
         /// </summary>
-        [MCPTool("uitoolkit_click", "Click a button, toggle, or clickable element in an EditorWindow", Category = "UIToolkit")]
+        [MCPTool("uitoolkit_click", "Click a button, toggle, or clickable element in an EditorWindow", Category = "UIToolkit", DestructiveHint = true)]
         public static object Click(
             [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
             [MCPParam("selector", "USS selector to find element")] string selector = null,
@@ -887,7 +887,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Sets the value of an input field or control in an EditorWindow.
         /// </summary>
-        [MCPTool("uitoolkit_set_value", "Set the value of an input field or control", Category = "UIToolkit")]
+        [MCPTool("uitoolkit_set_value", "Set the value of an input field or control", Category = "UIToolkit", DestructiveHint = true)]
         public static object SetValue(
             [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
             [MCPParam("value", "Value to set (string, number, bool, or asset path)", required: true)] object value,
@@ -1532,7 +1532,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Navigates UI elements like foldouts and tabs in an EditorWindow.
         /// </summary>
-        [MCPTool("uitoolkit_navigate", "Expand/collapse foldouts or select tabs in an EditorWindow", Category = "UIToolkit")]
+        [MCPTool("uitoolkit_navigate", "Expand/collapse foldouts or select tabs in an EditorWindow", Category = "UIToolkit", DestructiveHint = true)]
         public static object Navigate(
             [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
             [MCPParam("selector", "USS selector to find element")] string selector = null,

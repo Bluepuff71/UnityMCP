@@ -13,7 +13,7 @@ namespace UnityMCP.Editor.Tools
         /// Enters play mode.
         /// </summary>
         /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_enter", "Enter play mode", Category = "Editor", IdempotentHint = true)]
+        [MCPTool("playmode_enter", "Enter play mode", Category = "Editor", DestructiveHint = true)]
         public static object Enter()
         {
             try
@@ -76,7 +76,7 @@ namespace UnityMCP.Editor.Tools
         /// Exits play mode.
         /// </summary>
         /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_exit", "Exit play mode", Category = "Editor", IdempotentHint = true)]
+        [MCPTool("playmode_exit", "Exit play mode", Category = "Editor", DestructiveHint = true)]
         public static object Exit()
         {
             try
@@ -118,7 +118,7 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         /// <param name="paused">Optional explicit pause state. If omitted, toggles current state.</param>
         /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_pause", "Toggle or set pause state", Category = "Editor")]
+        [MCPTool("playmode_pause", "Toggle or set pause state", Category = "Editor", DestructiveHint = true)]
         public static object Pause(
             [MCPParam("paused", "Set pause state (true/false), omit to toggle")] bool? paused = null)
         {
@@ -181,7 +181,7 @@ namespace UnityMCP.Editor.Tools
         /// Advances a single frame while in play mode (paused).
         /// </summary>
         /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_step", "Advance single frame", Category = "Editor")]
+        [MCPTool("playmode_step", "Advance single frame", Category = "Editor", DestructiveHint = true)]
         public static object Step()
         {
             try

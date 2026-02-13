@@ -14,13 +14,16 @@ namespace UnityMCP.Editor.UI
     public class MCPServerWindow : EditorWindow
     {
         private Vector2 _toolListScrollPosition;
+        private Vector2 _activityScrollPosition;
         private int _portInput;
         private string _lastError;
         private Dictionary<string, bool> _categoryFoldouts = new Dictionary<string, bool>();
         private bool _remoteAccessFoldout = false;
+        private bool _activityFoldout = true;
 
         private const string DocumentationUrl = "https://github.com/anthropics/anthropic-cookbook/tree/main/misc/model_context_protocol";
         private const string VerboseLoggingPrefKey = "UnityMCP_VerboseLogging";
+        private const string ActivityDetailPrefKey = "UnityMCP_ActivityDetail";
 
         [MenuItem("Window/Unity MCP")]
         public static void ShowWindow()
@@ -33,6 +36,17 @@ namespace UnityMCP.Editor.UI
         {
             _portInput = MCPServer.Instance.Port;
             MCPProxy.VerboseLogging = EditorPrefs.GetBool(VerboseLoggingPrefKey, false);
+            ActivityLog.OnEntryAdded += OnActivityEntryAdded;
+        }
+
+        private void OnDisable()
+        {
+            ActivityLog.OnEntryAdded -= OnActivityEntryAdded;
+        }
+
+        private void OnActivityEntryAdded()
+        {
+            Repaint();
         }
 
         /// <summary>
@@ -69,6 +83,10 @@ namespace UnityMCP.Editor.UI
             EditorGUILayout.Space(12);
 
             DrawRemoteAccessSection();
+
+            EditorGUILayout.Space(12);
+
+            DrawActivitySection();
 
             EditorGUILayout.Space(12);
 
@@ -308,6 +326,62 @@ namespace UnityMCP.Editor.UI
             }
 
             EditorGUI.indentLevel--;
+        }
+
+        private void DrawActivitySection()
+        {
+            EditorGUILayout.BeginHorizontal();
+            _activityFoldout = EditorGUILayout.Foldout(_activityFoldout, "Recent Activity", true, EditorStyles.foldoutHeader);
+
+            GUILayout.FlexibleSpace();
+
+            // Detail toggle
+            bool showDetail = EditorPrefs.GetBool(ActivityDetailPrefKey, false);
+            bool newShowDetail = GUILayout.Toggle(showDetail, "Detail", EditorStyles.miniButton, GUILayout.Width(50));
+            if (newShowDetail != showDetail)
+                EditorPrefs.SetBool(ActivityDetailPrefKey, newShowDetail);
+
+            if (GUILayout.Button("Clear", EditorStyles.miniButton, GUILayout.Width(40)))
+                ActivityLog.Clear();
+
+            EditorGUILayout.EndHorizontal();
+
+            if (!_activityFoldout)
+                return;
+
+            var entries = ActivityLog.Entries;
+            if (entries.Count == 0)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField("No activity recorded yet.", EditorStyles.miniLabel);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            _activityScrollPosition = EditorGUILayout.BeginScrollView(
+                _activityScrollPosition, GUILayout.MaxHeight(160));
+
+            // Show newest first
+            for (int i = entries.Count - 1; i >= 0; i--)
+            {
+                var entry = entries[i];
+                string time = entry.timestamp.ToString("HH:mm:ss");
+                string status = entry.success ? "OK" : "FAIL";
+                string line;
+
+                if (newShowDetail && !string.IsNullOrEmpty(entry.detail))
+                    line = $"[{time}] {entry.toolName} ({entry.detail}) \u2192 {status}";
+                else
+                    line = $"[{time}] {entry.toolName} \u2192 {status}";
+
+                if (!entry.success)
+                    GUI.color = new Color(1f, 0.6f, 0.6f);
+
+                EditorGUILayout.LabelField(line, EditorStyles.miniLabel);
+                GUI.color = Color.white;
+            }
+
+            EditorGUILayout.EndScrollView();
         }
 
         private void DrawToolsSection()
