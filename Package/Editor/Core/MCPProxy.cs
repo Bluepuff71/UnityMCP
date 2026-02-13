@@ -266,6 +266,15 @@ namespace UnityMCP.Editor.Core
 
             try
             {
+                // Check for version mismatch before starting the server.
+                // During a package update the old native DLL still holds the port,
+                // so StartServer would fail with a confusing bind error.
+                CheckVersionMismatch();
+                if (NeedsRestart)
+                {
+                    return;
+                }
+
                 // Configure remote access before starting the server
                 ApplyRemoteAccessConfig();
 
@@ -288,9 +297,6 @@ namespace UnityMCP.Editor.Core
                 Application.runInBackground = true;
 
                 s_initialized = true;
-
-                // Check for version mismatch (stale DLL after package update)
-                CheckVersionMismatch();
 
                 if (VerboseLogging) Debug.Log($"[MCPProxy] MCP proxy initialized on port {DEFAULT_PORT}");
             }
