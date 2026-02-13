@@ -10,9 +10,11 @@ Model Context Protocol (MCP) server that enables AI assistants like Claude, Code
 ## Features
 
 - **Zero telemetry** - Completely private Unity automation. No data collection.
-- **46 built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes through AI.
+- **45 built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes through AI.
 - **28 built-in resources** - Read-only access to project settings, scene state, console output, and more.
 - **4 workflow prompts** - Pre-built prompt templates for common Unity workflows.
+- **Remote access** - Connect from other devices on your network with TLS encryption and API key authentication.
+- **Activity log** - Monitor MCP requests and responses in real time from the editor window.
 - **Progressive discovery** - Use `search_tools` to explore available tools by category or keyword.
 - **Tool annotations** - Safety hints (readOnlyHint, destructiveHint) help AI assistants make better decisions.
 - **Simple extension API** - Add custom tools, resources, and prompts with a single attribute.
@@ -127,12 +129,12 @@ Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity m
 
 ## Available MCP Tools
 
-46 built-in tools organized by category:
+45 built-in tools organized by category:
 
 > **Tip:** Use `search_tools` with no arguments for a quick category overview, or pass a `query` or `category` to explore further.
 
 <details>
-<summary>View all 46 built-in tools (click to expand)</summary>
+<summary>View all 45 built-in tools (click to expand)</summary>
 
 ### GameObject Management
 - **gameobject_manage** - Create, modify, delete, duplicate GameObjects, or move them relative to other objects
@@ -190,9 +192,6 @@ Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity m
 - **uitoolkit_get_value** - Get the current value from an input field or control
 - **uitoolkit_set_value** - Set the value of an input field or control
 - **uitoolkit_navigate** - Expand/collapse foldouts or select tabs in an EditorWindow
-
-### Batch Operations
-- **batch_execute** - Execute multiple MCP commands in a single operation with fail-fast support
 
 ### Debug & Testing
 - **test_echo** - Echo back input message (connectivity test)
