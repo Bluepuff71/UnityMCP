@@ -79,41 +79,60 @@ Unity MCP runs an HTTP server at `http://localhost:8080/`. Any MCP client with H
 
 *Note: Configurations for clients other than Claude Code have not been tested. Open a PR!*
 
-## Architecture
+## Configuration
 
-Unity MCP runs an HTTP server on a background thread using a C plugin that persists across Unity domain reloads. This ensures the AI assistant connection stays active even while Unity recompiles scripts.
+### Editor Window
 
+Open the Unity MCP control panel from **Window > Unity MCP**:
+
+- **Start/Stop** the MCP server
+- **View registered tools** organized by category with foldout groups
+- **Copy endpoint URL** to clipboard for easy client configuration
+- **View activity log** showing recent MCP requests and responses
+
+### Port
+
+The default port is `8080`. To change it:
+
+1. Stop the server
+2. Enter a new port number in the editor window
+3. Click **Apply**
+4. Start the server
+
+### Verbose Logging
+
+Toggle **Verbose Logging** in the editor window to enable detailed debug output in the Unity Console. Useful for troubleshooting connection or tool execution issues.
+
+### Remote Access
+
+Enable remote access to allow AI assistants to connect to Unity MCP from other devices on your network:
+
+- **Toggle remote access** in the editor window to enable binding to all network interfaces (0.0.0.0)
+- **Requires TLS** - Unity MCP automatically generates a self-signed certificate for secure connections
+- **API key authentication** - An API key (prefix `umcp_`) is auto-generated on first enable and required for all requests
+- **Copy or regenerate** the API key directly from the editor window
+- **Endpoint changes** to `https://<LAN_IP>:<port>/` when remote access is enabled
+- **Certificate storage** - Certificate is stored in `LocalApplicationData/UnityMCP/` and auto-regenerates if your LAN IP changes
+- **Firewall configuration** is the user's responsibility - you may need to allow incoming connections on the configured port
+
+#### Claude Code Remote Setup
+
+When remote access is enabled, configure Claude Code on another device using:
+
+```bash
+claude mcp add unity-mcp --transport http --header "Authorization: Bearer <API_KEY>" https://<LAN_IP>:8080/
 ```
-┌─────────────────┐
-│  MCP Client     │
-│  (Claude, etc.) │
-└────────┬────────┘
-         │ HTTP POST (JSON-RPC)
-         ▼
-┌─────────────────────────────────────┐
-│  Proxy Plugin (C)                   │
-│  - HTTP server on background thread │
-│  - Persists across domain reloads   │
-│  - Buffers request, waits for       │
-│    response from C#                 │
-└────────┬────────────────────────────┘
-         │ Polling (EditorApplication.update)
-         ▼
-┌─────────────────────────────────────┐
-│  Unity C# (main thread)            │
-│  - Polls for pending requests       │
-│  - Routes to MCPServer handlers     │
-│  - Executes tools, reads resources  │
-└─────────────────────────────────────┘
-```
 
-**During script recompilation**, the C# polling stops and the plugin holds incoming requests until the domain reload completes. The AI assistant sees a brief delay rather than a disconnection.
+Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity machine's IP address.
 
 ## Available MCP Tools
 
 46 built-in tools organized by category:
 
 > **Tip:** Use `search_tools` with no arguments for a quick category overview, or pass a `query` or `category` to explore further.
+
+<details>
+<summary>View all 46 built-in tools (click to expand)</summary>
 
 ### GameObject Management
 - **gameobject_manage** - Create, modify, delete, duplicate GameObjects, or move them relative to other objects
@@ -181,9 +200,14 @@ Unity MCP runs an HTTP server on a background thread using a C plugin that persi
 - **test_unity_info** - Get basic Unity editor information
 - **test_list_scenes** - List all scenes in build settings
 
+</details>
+
 ## Available MCP Resources
 
 28 built-in resources provide read-only access to Unity Editor state via URI patterns:
+
+<details>
+<summary>View all 28 built-in resources (click to expand)</summary>
 
 ### Scene Resources
 - **scene://gameobject/{id}** - GameObject details by instance ID
@@ -227,9 +251,14 @@ Unity MCP runs an HTTP server on a background thread using a C plugin that persi
 ### Asset Resources
 - **assets://dependencies/{path}** - Asset dependencies - what an asset uses and what uses it
 
+</details>
+
 ## Available MCP Prompts
 
 4 built-in prompt templates for common Unity workflows:
+
+<details>
+<summary>View all 4 built-in prompts (click to expand)</summary>
 
 - **read_gameobject** - Inspect a GameObject's transform, components, and optionally its children hierarchy
   - `name` (required) - Name of the GameObject to inspect
@@ -246,7 +275,44 @@ Unity MCP runs an HTTP server on a background thread using a C plugin that persi
 - **setup_scene** - Set up a new scene with appropriate defaults for 3D, 2D, or UI
   - `scene_type` - Type of scene: 3d, 2d, or ui (default: 3d)
 
-## Adding Custom Tools
+</details>
+
+## Architecture
+
+Unity MCP runs an HTTP server on a background thread using a C plugin that persists across Unity domain reloads. This ensures the AI assistant connection stays active even while Unity recompiles scripts.
+
+```
+┌─────────────────┐
+│  MCP Client     │
+│  (Claude, etc.) │
+└────────┬────────┘
+         │ HTTP POST (JSON-RPC)
+         ▼
+┌─────────────────────────────────────┐
+│  Proxy Plugin (C)                   │
+│  - HTTP server on background thread │
+│  - Persists across domain reloads   │
+│  - Buffers request, waits for       │
+│    response from C#                 │
+└────────┬────────────────────────────┘
+         │ Polling (EditorApplication.update)
+         ▼
+┌─────────────────────────────────────┐
+│  Unity C# (main thread)            │
+│  - Polls for pending requests       │
+│  - Routes to MCPServer handlers     │
+│  - Executes tools, reads resources  │
+└─────────────────────────────────────┘
+```
+
+**During script recompilation**, the C# polling stops and the plugin holds incoming requests until the domain reload completes. The AI assistant sees a brief delay rather than a disconnection.
+
+## Extending Unity MCP
+
+### Adding Custom Tools
+
+<details>
+<summary>Click to expand</summary>
 
 Create a static method and mark it with `[MCPTool]`:
 
@@ -289,7 +355,7 @@ public static class MyCustomTools
 
 Tools are automatically discovered on domain reload. No registration needed.
 
-### Tool Annotations
+#### Tool Annotations
 
 Annotations provide hints to AI assistants about tool behavior:
 
@@ -302,7 +368,7 @@ Annotations provide hints to AI assistants about tool behavior:
 | `OpenWorldHint` | bool | `false` | Tool interacts with systems beyond Unity |
 | `Title` | string | `null` | Human-readable display title |
 
-### Parameter Constraints
+#### Parameter Constraints
 
 Constraints are included in the JSON Schema sent to AI assistants:
 
@@ -312,7 +378,12 @@ Constraints are included in the JSON Schema sent to AI assistants:
 | `Minimum` | double | Minimum value for numeric parameters |
 | `Maximum` | double | Maximum value for numeric parameters |
 
-## Adding Custom Resources
+</details>
+
+### Adding Custom Resources
+
+<details>
+<summary>Click to expand</summary>
 
 Resources expose read-only data to AI assistants. Use `[MCPResource]`:
 
@@ -341,7 +412,12 @@ public static class MyCustomResources
 
 Resources use URI patterns (e.g., `unity://player/stats`) and are read via `resources/read`.
 
-## Adding Custom Prompts
+</details>
+
+### Adding Custom Prompts
+
+<details>
+<summary>Click to expand</summary>
 
 Prompts provide reusable workflow templates for AI assistants. Use `[MCPPrompt]`:
 
@@ -392,28 +468,7 @@ public static class MyCustomPrompts
 
 Prompts are automatically discovered on domain reload, just like tools and resources.
 
-## Configuration
-
-### Editor Window
-
-Open the Unity MCP control panel from **Window > Unity MCP**:
-
-- **Start/Stop** the MCP server
-- **View registered tools** organized by category with foldout groups
-- **Copy endpoint URL** to clipboard for easy client configuration
-
-### Port
-
-The default port is `8080`. To change it:
-
-1. Stop the server
-2. Enter a new port number in the editor window
-3. Click **Apply**
-4. Start the server
-
-### Verbose Logging
-
-Toggle **Verbose Logging** in the editor window to enable detailed debug output in the Unity Console. Useful for troubleshooting connection or tool execution issues.
+</details>
 
 ## License
 
