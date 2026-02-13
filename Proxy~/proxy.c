@@ -581,14 +581,6 @@ EXPORT unsigned long GetNativeProcessId(void)
 }
 
 /*
- * Get the version string embedded at compile time.
- */
-EXPORT const char* GetProxyVersion(void)
-{
-    return PROXY_VERSION;
-}
-
-/*
  * Configure the bind address for the server.
  * Must be called before StartServer(). Defaults to "127.0.0.1".
  */

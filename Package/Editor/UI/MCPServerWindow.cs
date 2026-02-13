@@ -60,11 +60,6 @@ namespace UnityMCP.Editor.UI
 
         private void OnGUI()
         {
-            if (MCPProxy.NeedsRestart)
-            {
-                DrawRestartBanner();
-            }
-
             DrawToolbar();
 
             EditorGUILayout.Space(8);
@@ -231,20 +226,6 @@ namespace UnityMCP.Editor.UI
             }
 
             EditorGUI.indentLevel--;
-        }
-
-        private void DrawRestartBanner()
-        {
-            EditorGUILayout.HelpBox(
-                "Unity MCP has been updated. Restart the editor to load the new version.",
-                MessageType.Warning);
-
-            if (GUILayout.Button("Restart Editor"))
-            {
-                EditorApplication.OpenProject(System.IO.Directory.GetCurrentDirectory());
-            }
-
-            EditorGUILayout.Space(4);
         }
 
         private void DrawErrorMessage()

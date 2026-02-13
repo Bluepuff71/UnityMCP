@@ -67,7 +67,6 @@ jobs:
         run: |
           cd Proxy~
           gcc -shared -O2 -DNDEBUG -DMG_ENABLE_LINES=0 -DMG_TLS=MG_TLS_BUILTIN \
-            -DPROXY_VERSION="\"${{ needs.version.outputs.version }}\"" \
             proxy.c mongoose.c \
             -o UnityMCPProxy.dll \
             -lws2_32
@@ -87,7 +86,6 @@ jobs:
         run: |
           cd Proxy~
           clang -shared -O2 -DNDEBUG -DMG_ENABLE_LINES=0 -DMG_TLS=MG_TLS_BUILTIN \
-            -DPROXY_VERSION="\"${{ needs.version.outputs.version }}\"" \
             proxy.c mongoose.c \
             -o UnityMCPProxy.bundle \
             -arch arm64 -arch x86_64 \
@@ -108,7 +106,6 @@ jobs:
         run: |
           cd Proxy~
           gcc -shared -fPIC -O2 -DNDEBUG -DMG_ENABLE_LINES=0 -DMG_TLS=MG_TLS_BUILTIN \
-            -DPROXY_VERSION="\"${{ needs.version.outputs.version }}\"" \
             proxy.c mongoose.c \
             -o libUnityMCPProxy.so \
             -lpthread

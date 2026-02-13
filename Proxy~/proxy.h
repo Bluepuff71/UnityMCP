@@ -28,15 +28,6 @@ extern "C" {
 /*
  * Configuration constants
  */
-/*
- * Version string embedded at compile time.
- * CI passes -DPROXY_VERSION="x.y.z" during build.
- * Defaults to "dev" for local development builds.
- */
-#ifndef PROXY_VERSION
-#define PROXY_VERSION "dev"
-#endif
-
 #define PROXY_MAX_RESPONSE_SIZE 262144  /* 256KB */
 #define PROXY_MAX_REQUEST_SIZE 262144   /* 256KB */
 #define PROXY_REQUEST_TIMEOUT_MS 30000
@@ -105,14 +96,6 @@ EXPORT int IsPollerActive(void);
  * @return The process ID as an unsigned long
  */
 EXPORT unsigned long GetNativeProcessId(void);
-
-/*
- * Get the version string embedded at compile time.
- * Used by C# to detect version mismatch after a package update.
- *
- * @return Static string pointer (e.g., "1.4.0" or "dev")
- */
-EXPORT const char* GetProxyVersion(void);
 
 /*
  * Configure the bind address for the server.
