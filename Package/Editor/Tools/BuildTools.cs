@@ -104,47 +104,41 @@ namespace UnityMCP.Editor.Tools
                     options |= BuildOptions.Development;
                 }
 
-                // Perform build
-                BuildReport report;
-                try
+                // Capture values for the deferred callback
+                string[] sceneArray = scenePaths.ToArray();
+                string capturedJobId = job.jobId;
+
+                // Defer the actual build to the next editor frame so the MCP response
+                // with job_id is sent before BuildPipeline.BuildPlayer blocks the thread
+                EditorApplication.delayCall += () =>
                 {
-                    report = BuildPipeline.BuildPlayer(
-                        scenePaths.ToArray(),
-                        normalizedOutputPath,
-                        buildTarget,
-                        options
-                    );
-                }
-                catch (Exception buildException)
-                {
-                    BuildJobManager.SetCurrentJobError($"Build threw exception: {buildException.Message}");
-                    return new
+                    BuildReport report;
+                    try
                     {
-                        success = false,
-                        job_id = job.jobId,
-                        error = $"Build threw exception: {buildException.Message}"
-                    };
-                }
-
-                // Complete job with report
-                BuildJobManager.CompleteJob(report);
-
-                // Get updated job for response
-                var completedJob = BuildJobManager.GetJob(job.jobId);
-                bool buildSucceeded = report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded;
+                        report = BuildPipeline.BuildPlayer(
+                            sceneArray,
+                            normalizedOutputPath,
+                            buildTarget,
+                            options
+                        );
+                        BuildJobManager.CompleteJob(report);
+                    }
+                    catch (Exception buildException)
+                    {
+                        BuildJobManager.SetCurrentJobError($"Build threw exception: {buildException.Message}");
+                    }
+                };
 
                 return new
                 {
-                    success = buildSucceeded,
-                    job_id = job.jobId,
-                    status = completedJob?.status.ToString().ToLowerInvariant() ?? "unknown",
+                    success = true,
+                    job_id = capturedJobId,
+                    status = "building",
                     target = target,
                     output_path = normalizedOutputPath,
                     development = development,
                     scene_count = scenePaths.Count,
-                    message = buildSucceeded
-                        ? $"Build completed successfully. Use build_get_job with job_id '{job.jobId}' to get the full report."
-                        : $"Build failed. Use build_get_job with job_id '{job.jobId}' to see errors."
+                    message = $"Build started. Poll with build_get_job using job_id '{capturedJobId}' to track progress."
                 };
             }
             catch (Exception exception)
