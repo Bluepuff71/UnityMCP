@@ -148,11 +148,16 @@ namespace UnityMCP.Editor.Tools
                 Component newComponent = Undo.AddComponent(targetGameObject, componentType);
                 if (newComponent == null)
                 {
-                    return new
+                    // Undo.AddComponent may return null in Unity 6 even when the component was added
+                    newComponent = targetGameObject.GetComponent(componentType);
+                    if (newComponent == null)
                     {
-                        success = false,
-                        error = $"Failed to add component '{componentTypeName}' to '{targetGameObject.name}'."
-                    };
+                        return new
+                        {
+                            success = false,
+                            error = $"Failed to add component '{componentTypeName}' to '{targetGameObject.name}'."
+                        };
+                    }
                 }
 
                 // Set initial properties if provided
@@ -470,12 +475,15 @@ namespace UnityMCP.Editor.Tools
         #region Helper Methods - Property Setting
 
         /// <summary>
-        /// Sets multiple properties on a component using reflection.
+        /// Sets multiple properties on a component. Tries SerializedProperty first (handles
+        /// serialized paths like "m_Volume" from inspect), then falls back to reflection
+        /// (handles public C# property names like "volume").
         /// </summary>
         private static List<object> SetPropertiesOnComponent(Component component, Dictionary<string, object> properties)
         {
             var results = new List<object>();
             Type componentType = component.GetType();
+            var serializedObject = new SerializedObject(component);
 
             foreach (var kvp in properties)
             {
@@ -484,7 +492,24 @@ namespace UnityMCP.Editor.Tools
 
                 try
                 {
-                    // Try property first
+                    // Try SerializedProperty first (handles serialized paths like "m_Volume")
+                    SerializedProperty serializedProperty = serializedObject.FindProperty(propertyName);
+                    if (serializedProperty != null)
+                    {
+                        if (SetSerializedPropertyValue(serializedProperty, propertyValue))
+                        {
+                            serializedObject.ApplyModifiedProperties();
+                            results.Add(new Dictionary<string, object>
+                            {
+                                { "property", propertyName },
+                                { "success", true },
+                                { "memberType", "serializedProperty" }
+                            });
+                            continue;
+                        }
+                    }
+
+                    // Fall back to reflection: try C# property
                     PropertyInfo propertyInfo = componentType.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
                     if (propertyInfo != null && propertyInfo.CanWrite)
                     {
@@ -499,7 +524,7 @@ namespace UnityMCP.Editor.Tools
                         continue;
                     }
 
-                    // Try field
+                    // Fall back to reflection: try C# field
                     FieldInfo fieldInfo = componentType.GetField(propertyName, BindingFlags.Instance | BindingFlags.Public);
                     if (fieldInfo != null && !fieldInfo.IsInitOnly)
                     {
@@ -514,7 +539,7 @@ namespace UnityMCP.Editor.Tools
                         continue;
                     }
 
-                    // Not found
+                    // Not found via any method
                     results.Add(new Dictionary<string, object>
                     {
                         { "property", propertyName },
@@ -534,6 +559,111 @@ namespace UnityMCP.Editor.Tools
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Sets a SerializedProperty value from a generic object. Returns true on success.
+        /// </summary>
+        private static bool SetSerializedPropertyValue(SerializedProperty property, object value)
+        {
+            try
+            {
+                switch (property.propertyType)
+                {
+                    case SerializedPropertyType.Integer:
+                        property.intValue = Convert.ToInt32(value);
+                        return true;
+
+                    case SerializedPropertyType.Float:
+                        property.floatValue = Convert.ToSingle(value);
+                        return true;
+
+                    case SerializedPropertyType.Boolean:
+                        property.boolValue = Convert.ToBoolean(value);
+                        return true;
+
+                    case SerializedPropertyType.String:
+                        property.stringValue = value?.ToString() ?? "";
+                        return true;
+
+                    case SerializedPropertyType.Enum:
+                        if (value is string enumString)
+                        {
+                            int enumIndex = Array.FindIndex(property.enumNames,
+                                n => n.Equals(enumString, StringComparison.OrdinalIgnoreCase));
+                            if (enumIndex >= 0)
+                            {
+                                property.enumValueIndex = enumIndex;
+                                return true;
+                            }
+                        }
+                        property.enumValueIndex = Convert.ToInt32(value);
+                        return true;
+
+                    case SerializedPropertyType.Vector2:
+                        var vector2 = ParseVector2(value);
+                        if (vector2.HasValue) { property.vector2Value = vector2.Value; return true; }
+                        return false;
+
+                    case SerializedPropertyType.Vector3:
+                        var vector3 = ParseVector3(value);
+                        if (vector3.HasValue) { property.vector3Value = vector3.Value; return true; }
+                        return false;
+
+                    case SerializedPropertyType.Vector2Int:
+                        var v2i = ParseVector2(value);
+                        if (v2i.HasValue) { property.vector2IntValue = new Vector2Int((int)v2i.Value.x, (int)v2i.Value.y); return true; }
+                        return false;
+
+                    case SerializedPropertyType.Vector3Int:
+                        var v3i = ParseVector3(value);
+                        if (v3i.HasValue) { property.vector3IntValue = new Vector3Int((int)v3i.Value.x, (int)v3i.Value.y, (int)v3i.Value.z); return true; }
+                        return false;
+
+                    case SerializedPropertyType.Color:
+                        var color = ParseColor(value);
+                        if (color.HasValue) { property.colorValue = color.Value; return true; }
+                        return false;
+
+                    case SerializedPropertyType.Quaternion:
+                        var euler = ParseVector3(value);
+                        if (euler.HasValue) { property.quaternionValue = Quaternion.Euler(euler.Value); return true; }
+                        return false;
+
+                    case SerializedPropertyType.LayerMask:
+                        if (value is string layerName)
+                        {
+                            property.intValue = LayerMask.GetMask(layerName);
+                        }
+                        else
+                        {
+                            property.intValue = Convert.ToInt32(value);
+                        }
+                        return true;
+
+                    case SerializedPropertyType.ObjectReference:
+                        if (value == null)
+                        {
+                            property.objectReferenceValue = null;
+                            return true;
+                        }
+                        if (IsObjectReference(value))
+                        {
+                            var resolved = ResolveObjectReference((Dictionary<string, object>)value, typeof(UnityEngine.Object));
+                            property.objectReferenceValue = resolved;
+                            return true;
+                        }
+                        return false;
+
+                    default:
+                        // Unsupported type - fall back to reflection
+                        return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>
