@@ -88,7 +88,7 @@ Unity MCP runs a built-in HTTP server at `http://localhost:8080/`. Any MCP-compa
 
 Open the Unity MCP control panel from **Window > Unity MCP**:
 
-![Unity MCP Editor Window](.github/editor-window.png)
+<img src=".github/editor-window.png" alt="Unity MCP Editor Window" width="400">
 
 - **Start/Stop** the MCP server
 - **View registered tools** organized by category with foldout groups
