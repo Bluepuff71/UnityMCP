@@ -9,8 +9,12 @@ Model Context Protocol (MCP) server that enables AI assistants like Claude, Code
 ## Features
 
 - **Zero telemetry** - Completely private Unity automation. No data collection.
-- **40+ built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes through AI.
-- **Simple extension API** - Add custom AI tools with a single attribute.
+- **46 built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes through AI.
+- **28 built-in resources** - Read-only access to project settings, scene state, console output, and more.
+- **4 workflow prompts** - Pre-built prompt templates for common Unity workflows.
+- **Progressive discovery** - Use `search_tools` to explore available tools by category or keyword.
+- **Tool annotations** - Safety hints (readOnlyHint, destructiveHint) help AI assistants make better decisions.
+- **Simple extension API** - Add custom tools, resources, and prompts with a single attribute.
 
 ## Requirements
 
@@ -19,8 +23,8 @@ Model Context Protocol (MCP) server that enables AI assistants like Claude, Code
 
 ## Installation
 
-1. Open Unity Package Manager (Window → Package Manager)
-2. Click `+` → "Add package from git URL"
+1. Open Unity Package Manager (Window > Package Manager)
+2. Click `+` > "Add package from git URL"
 3. Enter the URL of whichever version you want
 
 ### Latest Version (Recommended)
@@ -100,11 +104,13 @@ Unity MCP uses a native C plugin to maintain an HTTP server on a background thre
 └─────────────────────────────────────┘
 ```
 
-When Unity recompiles scripts, the C# domain unloads temporarily. During this time, the native plugin continues accepting HTTP requests but returns a "Unity is recompiling" error instead of disconnecting. Once recompilation completes, requests are forwarded to Unity's main thread for execution.
+When Unity recompiles scripts, the C# domain unloads temporarily. During this time, the native plugin continues accepting HTTP connections, so AI assistants never experience a dropped connection. Any in-flight requests receive a transient error asking the client to retry. Once recompilation completes, the C# callback is re-registered and requests resume normally.
 
 ## Available MCP Tools
 
-Unity MCP provides over 40 built-in tools organized by category:
+46 built-in tools organized by category:
+
+> **Tip:** Use `search_tools` with no arguments for a quick category overview, or pass a `query` or `category` to explore further.
 
 ### GameObject Management
 - **gameobject_manage** - Create, modify, delete, duplicate GameObjects, or move them relative to other objects
@@ -128,7 +134,7 @@ Unity MCP provides over 40 built-in tools organized by category:
 - **manage_texture** - Modify texture import settings (format, compression, size, etc.)
 - **manage_shader** - Create and manage shader assets
 - **manage_script** - Create C# scripts from templates
-- **manage_scriptableobject** - Create and manage ScriptableObject assets
+- **manage_scriptable_object** - Create and manage ScriptableObject assets
 - **manage_vfx** - Create and configure particle systems, trail renderers, and line renderers
 
 ### Build & Testing
@@ -147,6 +153,7 @@ Unity MCP provides over 40 built-in tools organized by category:
 - **execute_menu_item** - Execute Unity Editor menu items by path (with safety blacklist)
 - **manage_editor** - Manage editor state, tags, layers, and tools
 - **unity_refresh** - Refresh Unity asset database and optionally request script compilation
+- **search_tools** - Search available tools by name, description, or category
 
 ### Console & Profiling
 - **console_read** - Read Unity Console log entries with filtering and pagination
@@ -173,7 +180,7 @@ Unity MCP provides over 40 built-in tools organized by category:
 
 ## Available MCP Resources
 
-Resources provide read-only access to Unity Editor state via URI patterns:
+28 built-in resources provide read-only access to Unity Editor state via URI patterns:
 
 ### Scene Resources
 - **scene://gameobject/{id}** - GameObject details by instance ID
@@ -217,7 +224,26 @@ Resources provide read-only access to Unity Editor state via URI patterns:
 ### Asset Resources
 - **assets://dependencies/{path}** - Asset dependencies - what an asset uses and what uses it
 
-## Adding Custom AI Tools
+## Available MCP Prompts
+
+4 built-in prompt templates for common Unity workflows:
+
+- **read_gameobject** - Inspect a GameObject's transform, components, and optionally its children hierarchy
+  - `name` (required) - Name of the GameObject to inspect
+  - `include_children` - Whether to include children hierarchy (true/false)
+
+- **inspect_prefab** - Examine a prefab asset by opening the prefab stage and reading its hierarchy
+  - `path` (required) - Path to the prefab asset (e.g., Assets/Prefabs/Player.prefab)
+
+- **modify_component** - Step-by-step guide to safely change a component property with verification
+  - `target` (required) - Name or path of the target GameObject
+  - `component` (required) - Component type to modify (e.g., Rigidbody, BoxCollider)
+  - `property` (required) - Property to modify (e.g., mass, isTrigger)
+
+- **setup_scene** - Set up a new scene with appropriate defaults for 3D, 2D, or UI
+  - `scene_type` - Type of scene: 3d, 2d, or ui (default: 3d)
+
+## Adding Custom Tools
 
 Create a static method and mark it with `[MCPTool]`:
 
@@ -234,27 +260,54 @@ public static class MyCustomTools
         return $"Hello, {name}!";
     }
 
-    [MCPTool("create_cube_at", "Creates a cube at specified position")]
-    public static object CreateCube(
-        [MCPParam("x", "X coordinate", required: true)] float x,
-        [MCPParam("y", "Y coordinate", required: true)] float y,
-        [MCPParam("z", "Z coordinate", required: true)] float z)
+    [MCPTool("spawn_enemy", "Spawn an enemy at a position with difficulty scaling",
+        Category = "Gameplay", DestructiveHint = true)]
+    public static object SpawnEnemy(
+        [MCPParam("enemy_type", "Type of enemy to spawn", required: true,
+            Enum = new[] { "goblin", "skeleton", "dragon" })] string enemyType,
+        [MCPParam("x", "X position", required: true)] float x,
+        [MCPParam("y", "Y position", required: true)] float y,
+        [MCPParam("z", "Z position", required: true)] float z,
+        [MCPParam("difficulty", "Difficulty multiplier (1-10)",
+            Minimum = 1, Maximum = 10)] float difficulty = 5)
     {
-        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        cube.transform.position = new Vector3(x, y, z);
-        cube.name = "Custom Cube";
+        GameObject enemy = new GameObject($"Enemy_{enemyType}");
+        enemy.transform.position = new Vector3(x, y, z);
 
         return new
         {
-            success = true,
-            message = $"Created cube at ({x}, {y}, {z})",
-            instanceID = cube.GetInstanceID()
+            instanceID = enemy.GetInstanceID(),
+            type = enemyType,
+            difficulty
         };
     }
 }
 ```
 
 Tools are automatically discovered on domain reload. No registration needed.
+
+### Tool Annotations
+
+Annotations provide hints to AI assistants about tool behavior:
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `Category` | string | `"Uncategorized"` | Groups related tools in `search_tools` results |
+| `ReadOnlyHint` | bool | `false` | Tool does not modify any state |
+| `DestructiveHint` | bool | `false` | Tool may perform irreversible operations |
+| `IdempotentHint` | bool | `false` | Same arguments always yield the same result |
+| `OpenWorldHint` | bool | `false` | Tool interacts with systems beyond Unity |
+| `Title` | string | `null` | Human-readable display title |
+
+### Parameter Constraints
+
+Constraints are included in the JSON Schema sent to AI assistants:
+
+| Property | Type | Description |
+|---|---|---|
+| `Enum` | string[] | Valid values for string parameters |
+| `Minimum` | double | Minimum value for numeric parameters |
+| `Maximum` | double | Maximum value for numeric parameters |
 
 ## Adding Custom Resources
 
@@ -284,6 +337,80 @@ public static class MyCustomResources
 ```
 
 Resources use URI patterns (e.g., `unity://player/stats`) and are read via `resources/read`.
+
+## Adding Custom Prompts
+
+Prompts provide reusable workflow templates for AI assistants. Use `[MCPPrompt]`:
+
+```csharp
+using System.Collections.Generic;
+using UnityMCP.Editor;
+using UnityMCP.Editor.Core;
+
+public static class MyCustomPrompts
+{
+    [MCPPrompt("debug_gameobject", "Debug a GameObject by inspecting its state")]
+    public static PromptResult DebugGameObject(
+        [MCPParam("name", "Name of the GameObject to debug", required: true)] string name,
+        [MCPParam("verbose", "Include full component details (true/false)")] string verbose = "false")
+    {
+        bool isVerbose = verbose?.ToLower() == "true";
+
+        string instructions = $@"Debug the GameObject ""{name}"" using these steps:
+
+1. Use `gameobject_find` with search_term=""{name}"" to locate it
+2. Use `component_manage` with action=""inspect"" to check each component";
+
+        if (isVerbose)
+        {
+            instructions += $@"
+3. Use `console_read` with filter=""{name}"" to check for related log messages";
+        }
+
+        return new PromptResult
+        {
+            description = $"Debug instructions for '{name}'",
+            messages = new List<PromptMessage>
+            {
+                new PromptMessage
+                {
+                    role = "user",
+                    content = new PromptMessageContent
+                    {
+                        type = "text",
+                        text = instructions
+                    }
+                }
+            }
+        };
+    }
+}
+```
+
+Prompts are automatically discovered on domain reload, just like tools and resources.
+
+## Configuration
+
+### Editor Window
+
+Open the Unity MCP control panel from **Window > Unity MCP**:
+
+- **Start/Stop** the MCP server
+- **View registered tools** organized by category with foldout groups
+- **Copy endpoint URL** to clipboard for easy client configuration
+
+### Port
+
+The default port is `8080`. To change it:
+
+1. Stop the server
+2. Enter a new port number in the editor window
+3. Click **Apply**
+4. Start the server
+
+### Verbose Logging
+
+Toggle **Verbose Logging** in the editor window to enable detailed debug output in the Unity Console. Useful for troubleshooting connection or tool execution issues.
 
 ## License
 
