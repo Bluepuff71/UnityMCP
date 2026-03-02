@@ -534,13 +534,31 @@ namespace UnityMCP.Editor.Core
     /// <summary>
     /// MCP tool call result content
     /// </summary>
+
+    /// <summary>
+    /// Annotations on a content block, providing hints about audience and priority.
+    /// </summary>
     [Serializable]
+    public class ContentAnnotations
+    {
+        /// <summary>
+        /// Who this content is intended for: "user", "assistant", or both.
+        /// </summary>
+        public List<string> audience;
+
+        /// <summary>
+        /// Priority hint (0.0 to 1.0). Higher values indicate more important content.
+        /// </summary>
+        public double? priority;
+    }
+
     public class ToolResultContent
     {
         public string type;
         public string text;
         public string mimeType;
         public string data;
+        public ContentAnnotations annotations;
 
         /// <summary>
         /// Creates a text result
@@ -551,6 +569,21 @@ namespace UnityMCP.Editor.Core
             {
                 type = "text",
                 text = text
+            };
+        }
+
+        /// <summary>
+        /// Creates a text result with audience annotation.
+        /// </summary>
+        public static ToolResultContent Text(string text, params string[] audience)
+        {
+            return new ToolResultContent
+            {
+                type = "text",
+                text = text,
+                annotations = audience.Length > 0
+                    ? new ContentAnnotations { audience = new List<string>(audience) }
+                    : null
             };
         }
 

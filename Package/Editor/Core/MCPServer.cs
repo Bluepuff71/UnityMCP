@@ -358,16 +358,40 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
                 object result = InvokeToolOnMainThread(toolName, argumentsObject);
 
                 var contentArray = new JArray();
-                contentArray.Add(new JObject
+
+                if (result is ToolResult multiContent)
                 {
-                    ["type"] = "text",
-                    ["text"] = SerializeToolResult(result)
-                });
+                    foreach (var item in multiContent.content)
+                    {
+                        var contentObj = new JObject { ["type"] = item.type };
+                        if (!string.IsNullOrEmpty(item.text)) contentObj["text"] = item.text;
+                        if (!string.IsNullOrEmpty(item.mimeType)) contentObj["mimeType"] = item.mimeType;
+                        if (!string.IsNullOrEmpty(item.data)) contentObj["data"] = item.data;
+                        if (item.annotations != null)
+                        {
+                            var annotationsObj = new JObject();
+                            if (item.annotations.audience != null && item.annotations.audience.Count > 0)
+                                annotationsObj["audience"] = new JArray(item.annotations.audience.ToArray());
+                            if (item.annotations.priority.HasValue)
+                                annotationsObj["priority"] = item.annotations.priority.Value;
+                            contentObj["annotations"] = annotationsObj;
+                        }
+                        contentArray.Add(contentObj);
+                    }
+                }
+                else
+                {
+                    contentArray.Add(new JObject
+                    {
+                        ["type"] = "text",
+                        ["text"] = SerializeToolResult(result)
+                    });
+                }
 
                 var toolResult = new JObject
                 {
                     ["content"] = contentArray,
-                    ["isError"] = false
+                    ["isError"] = result is ToolResult tr && tr.isError
                 };
 
                 return CreateSuccessResponse(toolResult, requestId);

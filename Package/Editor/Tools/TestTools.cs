@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEditor;
+using UnityMCP.Editor.Core;
 
 namespace UnityMCP.Editor.Tools
 {
@@ -18,11 +20,21 @@ namespace UnityMCP.Editor.Tools
         public static object Echo(
             [MCPParam("message", "The message to echo back", required: true)] string message)
         {
-            return new
+            string timestamp = DateTime.UtcNow.ToString("o");
+
+            return new ToolResult
             {
-                success = true,
-                echo = message,
-                timestamp = DateTime.UtcNow.ToString("o")
+                content = new List<ToolResultContent>
+                {
+                    // Structured JSON for the AI assistant
+                    ToolResultContent.Text(
+                        Newtonsoft.Json.JsonConvert.SerializeObject(new { success = true, echo = message, timestamp }),
+                        "assistant"),
+                    // Human-readable text for the CLI user
+                    ToolResultContent.Text(
+                        $"Echo: \"{message}\" (at {timestamp})",
+                        "user")
+                }
             };
         }
 
