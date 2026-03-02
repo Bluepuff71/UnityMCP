@@ -16,39 +16,21 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles prefab stage operations including opening, closing, saving, and creating prefabs.
     /// </summary>
+    [MCPTool("prefab_manage", "Manages prefab operations: open_stage, close_stage, save_open_stage, create_from_gameobject", Category = "Asset")]
     public static class ManagePrefabs
     {
-        #region Main Tool Entry Point
+        #region Action Methods
 
         /// <summary>
-        /// Manages prefab stage operations: open_stage, close_stage, save_open_stage, create_from_gameobject.
+        /// Opens a prefab in the Prefab Stage editor.
         /// </summary>
-        [MCPTool("prefab_manage", "Manages prefab operations: open_stage, close_stage, save_open_stage, create_from_gameobject", Category = "Asset", DestructiveHint = true)]
-        public static object Manage(
-            [MCPParam("action", "Action to perform: open_stage, close_stage, save_open_stage, create_from_gameobject", required: true, Enum = new[] { "open_stage", "close_stage", "save_open_stage", "create_from_gameobject" })] string action,
-            [MCPParam("prefab_path", "Path to the prefab asset (for open_stage and create_from_gameobject)")] string prefabPath = null,
-            [MCPParam("save_before_close", "Whether to save before closing the prefab stage (default: false)")] bool saveBeforeClose = false,
-            [MCPParam("target", "Name or instance ID of the GameObject to create prefab from")] string target = null,
-            [MCPParam("allow_overwrite", "Whether to overwrite existing prefab (default: false)")] bool allowOverwrite = false,
-            [MCPParam("search_inactive", "Whether to search inactive GameObjects (default: false)")] bool searchInactive = false)
+        [MCPAction("open_stage", Description = "Open a prefab in the Prefab Stage editor")]
+        public static object OpenStage(
+            [MCPParam("prefab_path", "Path to the prefab asset", required: true)] string prefabPath)
         {
-            if (string.IsNullOrEmpty(action))
-            {
-                throw MCPException.InvalidParams("Action parameter is required.");
-            }
-
-            string normalizedAction = action.ToLowerInvariant().Trim().Replace("-", "_");
-
             try
             {
-                return normalizedAction switch
-                {
-                    "open_stage" or "openstage" or "open" => HandleOpenStage(prefabPath),
-                    "close_stage" or "closestage" or "close" => HandleCloseStage(saveBeforeClose),
-                    "save_open_stage" or "saveopenstage" or "save" => HandleSaveOpenStage(),
-                    "create_from_gameobject" or "createfromgameobject" or "create" => HandleCreateFromGameObject(target, prefabPath, allowOverwrite, searchInactive),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: open_stage, close_stage, save_open_stage, create_from_gameobject")
-                };
+                return HandleOpenStage(prefabPath);
             }
             catch (MCPException)
             {
@@ -59,7 +41,84 @@ namespace UnityMCP.Editor.Tools
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'open_stage': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Closes the current prefab stage and returns to the main scene.
+        /// </summary>
+        [MCPAction("close_stage", Description = "Close the current prefab stage and return to the main scene")]
+        public static object CloseStage(
+            [MCPParam("save_before_close", "Whether to save before closing the prefab stage (default: false)")] bool saveBeforeClose = false)
+        {
+            try
+            {
+                return HandleCloseStage(saveBeforeClose);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'close_stage': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Saves the currently open prefab stage.
+        /// </summary>
+        [MCPAction("save_open_stage", Description = "Save the currently open prefab stage")]
+        public static object SaveOpenStage()
+        {
+            try
+            {
+                return HandleSaveOpenStage();
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'save_open_stage': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Creates a new prefab from a scene GameObject.
+        /// </summary>
+        [MCPAction("create_from_gameobject", Description = "Create a new prefab from a scene GameObject")]
+        public static object CreateFromGameObject(
+            [MCPParam("target", "Name or instance ID of the GameObject to create prefab from", required: true)] string target,
+            [MCPParam("prefab_path", "Path to save the new prefab asset", required: true)] string prefabPath,
+            [MCPParam("allow_overwrite", "Whether to overwrite existing prefab (default: false)")] bool allowOverwrite = false,
+            [MCPParam("search_inactive", "Whether to search inactive GameObjects (default: false)")] bool searchInactive = false)
+        {
+            try
+            {
+                return HandleCreateFromGameObject(target, prefabPath, allowOverwrite, searchInactive);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'create_from_gameobject': {exception.Message}"
                 };
             }
         }

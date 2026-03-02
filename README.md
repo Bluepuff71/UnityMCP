@@ -17,8 +17,8 @@ Unity-native [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) se
 - **Remote access** - Connect from other devices on your network with TLS encryption and API key authentication.
 - **Activity log** - Monitor MCP requests and responses in real time from the editor window.
 - **Progressive discovery** - Use `search_tools` to explore available tools by category or keyword.
-- **Tool annotations** - Safety hints (readOnlyHint, destructiveHint) help AI assistants make better decisions.
-- **Simple extension API** - Add custom tools, resources, and prompts with a single C# attribute.
+- **Per-action annotations** - Safety hints (readOnlyHint, destructiveHint) are resolved per action, so AI assistants receive accurate signals even for multi-action tools.
+- **Simple extension API** - Add custom tools, resources, and prompts with a single C# attribute. Use the action-based pattern to group related operations under one tool name.
 
 ## Requirements
 
@@ -153,6 +153,7 @@ Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity m
 - **scene_get_active** - Get information about the currently active scene
 - **scene_get_hierarchy** - Get the hierarchy of GameObjects in the current scene with pagination
 - **scene_screenshot** - Capture a screenshot of the Game View
+- **scene_checkpoint** - Save, restore, list, or diff scene checkpoints (`action`: `save`, `list`, `restore`, `diff`)
 
 ### Asset Management
 - **asset_manage** - Create, delete, move, rename, duplicate, import, search, or get info about assets
@@ -165,18 +166,12 @@ Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity m
 - **manage_vfx** - Create and configure particle systems, trail renderers, and line renderers
 
 ### Build & Testing
-- **build_start** - Start a player build asynchronously, returns job_id for polling
-- **build_get_job** - Get build job status and results
-- **tests_run** - Start Unity Test Runner asynchronously (EditMode or PlayMode)
-- **tests_get_job** - Get test run job status and results
+- **build** - Start a player build or poll job status (`action`: `start`, `get_job`)
+- **tests** - Run the Unity Test Runner or poll job status (`action`: `run`, `get_job`)
 
 ### Editor Control
-- **playmode_enter** - Enter play mode
-- **playmode_exit** - Exit play mode
-- **playmode_pause** - Toggle or set pause state
-- **playmode_step** - Advance a single frame while paused
-- **selection_get** - Get currently selected objects in the Unity Editor
-- **selection_set** - Set selection by instance IDs or asset paths
+- **playmode** - Manage play mode state (`action`: `enter`, `exit`, `pause`, `step`)
+- **selection** - Get or set editor selection (`action`: `get`, `set`)
 - **execute_menu_item** - Execute Unity Editor menu items by path (with safety blacklist)
 - **manage_editor** - Manage editor state, tags, layers, and tools
 - **unity_refresh** - Refresh Unity asset database and optionally request script compilation
@@ -184,9 +179,7 @@ Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity m
 
 ### Console & Profiling
 - **console_read** - Read Unity Console log entries with filtering and pagination
-- **profiler_start** - Start profiler recording, returns job_id for polling
-- **profiler_stop** - Stop profiler recording and finalize job
-- **profiler_get_job** - Poll profiler job status and get captured data
+- **profiler** - Control profiler recording or retrieve captured data (`action`: `start`, `stop`, `get_job`)
 
 ### UI Toolkit
 - **uitoolkit_query** - Query VisualElements in EditorWindows with compact overview and drill-down refs
@@ -316,7 +309,11 @@ Unity MCP is entirely self-contained within the Unity Editor. A native C plugin 
 <details>
 <summary>Click to expand</summary>
 
-Create a static method and mark it with `[MCPTool]`:
+There are two ways to define tools: a **single-method tool** for one-shot operations, and an **action-based tool** for grouping related operations under a single tool name.
+
+#### Single-method tools
+
+Place `[MCPTool]` on a static method:
 
 ```csharp
 using UnityMCP.Editor;
@@ -355,22 +352,78 @@ public static class MyCustomTools
 }
 ```
 
+#### Action-based tools
+
+Place `[MCPTool]` on a static class and `[MCPAction]` on each action method. Use this pattern when several related operations share a tool name and some parameters.
+
+```csharp
+using UnityEditor;
+using UnityMCP.Editor;
+using UnityEngine;
+
+[MCPTool("enemy_manager", "Manage enemies in the scene", Category = "Gameplay")]
+public static class EnemyManagerTool
+{
+    [MCPAction("spawn", Description = "Spawn an enemy at a position",
+        DestructiveHint = true)]
+    public static object Spawn(
+        [MCPParam("type", "Enemy type", required: true,
+            Enum = new[] { "goblin", "skeleton", "dragon" })] string type,
+        [MCPParam("x", "X position", required: true)] float x,
+        [MCPParam("y", "Y position", required: true)] float y,
+        [MCPParam("z", "Z position", required: true)] float z)
+    {
+        GameObject enemy = new GameObject($"Enemy_{type}");
+        enemy.transform.position = new Vector3(x, y, z);
+        return new { instanceID = enemy.GetInstanceID(), type };
+    }
+
+    [MCPAction("list", Description = "List all enemies in the scene",
+        ReadOnlyHint = true)]
+    public static object List()
+    {
+        var enemies = GameObject.FindGameObjectsWithTag("Enemy");
+        return new { count = enemies.Length };
+    }
+
+    [MCPAction("despawn", Description = "Remove an enemy from the scene",
+        DestructiveHint = true)]
+    public static object Despawn(
+        [MCPParam("instance_id", "Instance ID of the enemy to remove",
+            required: true)] int instanceId)
+    {
+        var target = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+        if (target == null) return new { success = false, error = "Enemy not found." };
+        Object.DestroyImmediate(target);
+        return new { success = true };
+    }
+}
+```
+
+The framework generates a unified JSON schema with a required `action` enum parameter. Parameters that only apply to certain actions are annotated in their descriptions automatically (e.g., `"(for action: 'spawn')"`). Required validation is enforced per action at invoke time, not in the schema.
+
+**Annotation resolution for action-based tools:**
+- `destructiveHint = true` if **any** action has `DestructiveHint = true`
+- `readOnlyHint = true` only if **all** actions have `ReadOnlyHint = true`
+
+The server uses per-action `DestructiveHint` metadata to tell AI assistants which specific actions warrant a checkpoint before proceeding, rather than flagging every call to the tool.
+
 Tools are automatically discovered on domain reload. No registration needed.
 
-#### Tool Annotations
+#### Tool annotations
 
-Annotations provide hints to AI assistants about tool behavior:
+Annotations provide hints to AI assistants about tool behavior. For single-method tools, set them on `[MCPTool]`. For action-based tools, set them on `[MCPAction]` for per-action accuracy; class-level `[MCPTool]` annotations are also respected as a fallback.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Category` | string | `"Uncategorized"` | Groups related tools in `search_tools` results |
-| `ReadOnlyHint` | bool | `false` | Tool does not modify any state |
-| `DestructiveHint` | bool | `false` | Tool may perform irreversible operations |
+| `Category` | string | `"Uncategorized"` | Groups related tools in `search_tools` results (set on `[MCPTool]`) |
+| `ReadOnlyHint` | bool | `false` | Operation does not modify any state |
+| `DestructiveHint` | bool | `false` | Operation may perform irreversible changes |
 | `IdempotentHint` | bool | `false` | Same arguments always yield the same result |
-| `OpenWorldHint` | bool | `false` | Tool interacts with systems beyond Unity |
-| `Title` | string | `null` | Human-readable display title |
+| `OpenWorldHint` | bool | `false` | Operation interacts with systems beyond Unity |
+| `Title` | string | `null` | Human-readable display title (set on `[MCPTool]`) |
 
-#### Parameter Constraints
+#### Parameter constraints
 
 Constraints are included in the JSON Schema sent to AI assistants:
 

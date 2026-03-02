@@ -14,51 +14,22 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Tool for managing shaders: get info, list, find, and manage shader keywords.
     /// </summary>
+    [MCPTool("manage_shader", "Manage shaders: get info, list, find, manage keywords", Category = "Asset")]
     public static class ManageShader
     {
+        #region Actions
+
         /// <summary>
-        /// Manages shaders: get info, list, find, and manage shader keywords.
+        /// Gets detailed information about a shader.
         /// </summary>
-        /// <param name="action">The action to perform: get, list, find, get_keywords, set_keywords</param>
-        /// <param name="shaderPath">Asset path to shader file</param>
-        /// <param name="shaderName">Shader name (e.g., "Standard", "URP/Lit")</param>
-        /// <param name="folderPath">Folder to search in for list/find</param>
-        /// <param name="searchPattern">Pattern to search for (find action)</param>
-        /// <param name="searchType">Type of search: name, property, keyword</param>
-        /// <param name="keywords">Array of keyword names to enable/disable</param>
-        /// <param name="enable">Whether to enable (true) or disable (false) keywords</param>
-        /// <param name="materialPath">Material path for per-material keywords</param>
-        /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_shader", "Manage shaders: get info, list, find, manage keywords", Category = "Asset", DestructiveHint = true)]
-        public static object Execute(
-            [MCPParam("action", "Action: get, list, find, get_keywords, set_keywords", required: true, Enum = new[] { "get", "list", "find", "get_keywords", "set_keywords" })] string action,
-            [MCPParam("shader_path", "Asset path to shader file")] string shaderPath = null,
+        [MCPAction("get", Description = "Get detailed shader info by name or path", ReadOnlyHint = true)]
+        public static object Get(
             [MCPParam("shader_name", "Shader name (e.g., Standard, URP/Lit)")] string shaderName = null,
-            [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null,
-            [MCPParam("search_pattern", "Pattern to search for (find action)")] string searchPattern = null,
-            [MCPParam("search_type", "Type of search: name, property, keyword")] string searchType = "name",
-            [MCPParam("keywords", "Array of keyword names to enable/disable")] List<object> keywords = null,
-            [MCPParam("enable", "Enable (true) or disable (false) keywords")] bool enable = true,
-            [MCPParam("material_path", "Material path for per-material keywords")] string materialPath = null)
+            [MCPParam("shader_path", "Asset path to shader file")] string shaderPath = null)
         {
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                throw MCPException.InvalidParams("The 'action' parameter is required.");
-            }
-
-            string normalizedAction = action.Trim().ToLowerInvariant();
-
             try
             {
-                return normalizedAction switch
-                {
-                    "get" => HandleGet(shaderPath, shaderName),
-                    "list" => HandleList(folderPath),
-                    "find" => HandleFind(searchPattern, searchType, folderPath),
-                    "get_keywords" => HandleGetKeywords(shaderPath, shaderName, materialPath),
-                    "set_keywords" => HandleSetKeywords(keywords, enable, materialPath),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: get, list, find, get_keywords, set_keywords")
-                };
+                return HandleGet(shaderPath, shaderName);
             }
             catch (MCPException)
             {
@@ -66,14 +37,125 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[ManageShader] Error executing action '{action}': {exception.Message}");
+                Debug.LogWarning($"[ManageShader] Error executing action 'get': {exception.Message}");
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'get': {exception.Message}"
                 };
             }
         }
+
+        /// <summary>
+        /// Lists shaders in the project or a specific folder.
+        /// </summary>
+        [MCPAction("list", Description = "List shaders in the project or a specific folder", ReadOnlyHint = true)]
+        public static object List(
+            [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null)
+        {
+            try
+            {
+                return HandleList(folderPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageShader] Error executing action 'list': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'list': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Finds shaders by name pattern, property, or keyword.
+        /// </summary>
+        [MCPAction("find", Description = "Find shaders by name, property, or keyword pattern", ReadOnlyHint = true)]
+        public static object Find(
+            [MCPParam("search_pattern", "Pattern to search for (find action)")] string searchPattern = null,
+            [MCPParam("search_type", "Type of search: name, property, keyword", Enum = new[] { "name", "property", "keyword" })] string searchType = "name",
+            [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null)
+        {
+            try
+            {
+                return HandleFind(searchPattern, searchType, folderPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageShader] Error executing action 'find': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'find': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Gets shader keywords (global or per-material).
+        /// </summary>
+        [MCPAction("get_keywords", Description = "Get shader keywords (global or per-material)", ReadOnlyHint = true)]
+        public static object GetKeywords(
+            [MCPParam("shader_name", "Shader name (e.g., Standard, URP/Lit)")] string shaderName = null,
+            [MCPParam("material_path", "Material path for per-material keywords")] string materialPath = null)
+        {
+            try
+            {
+                return HandleGetKeywords(null, shaderName, materialPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageShader] Error executing action 'get_keywords': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'get_keywords': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Sets shader keywords (global or per-material).
+        /// </summary>
+        [MCPAction("set_keywords", Description = "Enable or disable shader keywords on a material or globally")]
+        public static object SetKeywords(
+            [MCPParam("material_path", "Material path for per-material keywords", required: true)] string materialPath,
+            [MCPParam("keywords", "Array of keyword names to enable/disable", required: true)] List<object> keywords,
+            [MCPParam("enable", "Enable (true) or disable (false) keywords")] bool enable = true)
+        {
+            try
+            {
+                return HandleSetKeywords(keywords, enable, materialPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageShader] Error executing action 'set_keywords': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'set_keywords': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
 
         #region Action Handlers
 

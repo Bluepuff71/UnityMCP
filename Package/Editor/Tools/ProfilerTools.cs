@@ -5,35 +5,21 @@ using UnityMCP.Editor.Services;
 namespace UnityMCP.Editor.Tools
 {
     /// <summary>
-    /// Tools for profiling Unity Editor and runtime performance.
-    /// Uses an async job pattern for recording profiler data.
+    /// Profile Unity Editor and runtime performance.
     /// </summary>
+    [MCPTool("profiler", "Manage profiler recording: start, stop, or poll job status", Category = "Profiler")]
     public static class ProfilerTools
     {
-        /// <summary>
-        /// Starts profiler recording, returning a job_id for polling.
-        /// </summary>
-        /// <param name="durationSeconds">Maximum recording duration in seconds (1-60).</param>
-        /// <param name="includeFrameDetails">Whether to include per-frame data in results.</param>
-        /// <returns>Result object with job_id and initial status.</returns>
-        [MCPTool("profiler_start", "Start profiler recording, returns job_id for polling", Category = "Profiler", DestructiveHint = true)]
+        [MCPAction("start", Description = "Start profiler recording, returns job_id for polling")]
         public static object Start(
             [MCPParam("duration_seconds", "Maximum recording duration in seconds (1-60)")] int durationSeconds = 10,
             [MCPParam("include_frame_details", "Include per-frame data in results")] bool includeFrameDetails = false)
         {
             try
             {
-                // Validate duration
-                if (durationSeconds < 1)
-                {
-                    durationSeconds = 1;
-                }
-                else if (durationSeconds > 60)
-                {
-                    durationSeconds = 60;
-                }
+                if (durationSeconds < 1) durationSeconds = 1;
+                else if (durationSeconds > 60) durationSeconds = 60;
 
-                // Check if already recording
                 if (ProfilerJobManager.IsRecording)
                 {
                     var currentJob = ProfilerJobManager.CurrentJob;
@@ -46,7 +32,6 @@ namespace UnityMCP.Editor.Tools
                     };
                 }
 
-                // Start new recording
                 var job = ProfilerJobManager.StartJob(durationSeconds, includeFrameDetails);
                 if (job == null)
                 {
@@ -64,7 +49,7 @@ namespace UnityMCP.Editor.Tools
                     status = "recording",
                     target_duration_seconds = durationSeconds,
                     include_frame_details = includeFrameDetails,
-                    message = $"Profiler recording started. Use profiler_get_job with job_id '{job.jobId}' to poll status, or profiler_stop to end early."
+                    message = $"Profiler recording started. Use profiler with action='get_job' and job_id '{job.jobId}' to poll status, or action='stop' to end early."
                 };
             }
             catch (Exception exception)
@@ -78,18 +63,12 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Stops the current profiler recording.
-        /// </summary>
-        /// <param name="jobId">Optional job_id to verify correct recording is stopped.</param>
-        /// <returns>Result object with final job status and statistics.</returns>
-        [MCPTool("profiler_stop", "Stop profiler recording and finalize job", Category = "Profiler", DestructiveHint = true)]
+        [MCPAction("stop", Description = "Stop profiler recording and finalize job")]
         public static object Stop(
             [MCPParam("job_id", "Job ID to stop (optional, verifies correct recording)")] string jobId = null)
         {
             try
             {
-                // Check if recording
                 if (!ProfilerJobManager.IsRecording)
                 {
                     return new
@@ -101,7 +80,6 @@ namespace UnityMCP.Editor.Tools
 
                 var currentJob = ProfilerJobManager.CurrentJob;
 
-                // Verify job_id if provided
                 if (!string.IsNullOrEmpty(jobId) && currentJob != null && currentJob.jobId != jobId)
                 {
                     return new
@@ -112,7 +90,6 @@ namespace UnityMCP.Editor.Tools
                     };
                 }
 
-                // Stop recording
                 var completedJob = ProfilerJobManager.StopRecording();
                 if (completedJob == null)
                 {
@@ -142,13 +119,7 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Gets the status and data of a profiler job.
-        /// </summary>
-        /// <param name="jobId">The job ID to query.</param>
-        /// <param name="includeDetails">Whether to include detailed frame data if available.</param>
-        /// <returns>Result object with job status and optional data.</returns>
-        [MCPTool("profiler_get_job", "Poll job status and get captured data", Category = "Profiler", ReadOnlyHint = true)]
+        [MCPAction("get_job", Description = "Poll job status and get captured data", ReadOnlyHint = true)]
         public static object GetJob(
             [MCPParam("job_id", "Job ID to query", required: true)] string jobId,
             [MCPParam("include_details", "Include detailed frame data if available")] bool includeDetails = true)

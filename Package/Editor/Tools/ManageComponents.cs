@@ -17,6 +17,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles component operations on GameObjects including add, remove, and set_property actions.
     /// </summary>
+    [MCPTool("component_manage", "Manages components: add, remove, set_property, or inspect on GameObjects. Use action='inspect' first to discover available properties before set_property. Requires a target instance ID from gameobject_find.", Category = "Component")]
     public static class ManageComponents
     {
         #region Constants
@@ -33,26 +34,18 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
-        #region Main Tool Entry Point
+        #region Actions
 
         /// <summary>
-        /// Manages components on GameObjects with add, remove, set_property, and inspect actions.
+        /// Adds a component to a GameObject, optionally setting initial properties.
         /// </summary>
-        [MCPTool("component_manage", "Manages components: add, remove, set_property, or inspect on GameObjects", Category = "Component", DestructiveHint = true)]
-        public static object Manage(
-            [MCPParam("action", "Action to perform: add, remove, set_property, inspect", required: true, Enum = new[] { "add", "remove", "set_property", "inspect" })] string action,
+        [MCPAction("add", Description = "Add a component to a GameObject")]
+        public static object Add(
             [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target,
             [MCPParam("component_type", "The component type name (e.g., 'Rigidbody', 'BoxCollider')", required: true)] string componentType,
-            [MCPParam("property", "Single property name to set (for set_property action)")] string property = null,
-            [MCPParam("value", "Value for the single property (for set_property action)")] object value = null,
             [MCPParam("properties", "Object mapping property names to values (for multiple properties)")] object properties = null,
             [MCPParam("search_method", "How to find the target: by_id, by_name, by_path (default: auto-detect)")] string searchMethod = null)
         {
-            if (string.IsNullOrEmpty(action))
-            {
-                throw MCPException.InvalidParams("Action parameter is required.");
-            }
-
             if (string.IsNullOrEmpty(target))
             {
                 throw MCPException.InvalidParams("Target parameter is required.");
@@ -63,18 +56,9 @@ namespace UnityMCP.Editor.Tools
                 throw MCPException.InvalidParams("Component_type parameter is required.");
             }
 
-            string normalizedAction = action.ToLowerInvariant();
-
             try
             {
-                return normalizedAction switch
-                {
-                    "add" => HandleAdd(target, componentType, properties, searchMethod),
-                    "remove" => HandleRemove(target, componentType, searchMethod),
-                    "set_property" => HandleSetProperty(target, componentType, property, value, properties, searchMethod),
-                    "inspect" => HandleInspect(target, componentType, searchMethod),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: add, remove, set_property, inspect")
-                };
+                return HandleAdd(target, componentType, properties, searchMethod);
             }
             catch (MCPException)
             {
@@ -85,7 +69,121 @@ namespace UnityMCP.Editor.Tools
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'add': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Removes a component from a GameObject.
+        /// </summary>
+        [MCPAction("remove", Description = "Remove a component from a GameObject", DestructiveHint = true)]
+        public static object Remove(
+            [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target,
+            [MCPParam("component_type", "The component type name (e.g., 'Rigidbody', 'BoxCollider')", required: true)] string componentType,
+            [MCPParam("search_method", "How to find the target: by_id, by_name, by_path (default: auto-detect)")] string searchMethod = null)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                throw MCPException.InvalidParams("Target parameter is required.");
+            }
+
+            if (string.IsNullOrEmpty(componentType))
+            {
+                throw MCPException.InvalidParams("Component_type parameter is required.");
+            }
+
+            try
+            {
+                return HandleRemove(target, componentType, searchMethod);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'remove': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Sets one or more properties on a component.
+        /// </summary>
+        [MCPAction("set_property", Description = "Set properties on a component")]
+        public static object SetProperty(
+            [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target,
+            [MCPParam("component_type", "The component type name (e.g., 'Rigidbody', 'BoxCollider')", required: true)] string componentType,
+            [MCPParam("property", "Single property name to set (for set_property action)")] string property = null,
+            [MCPParam("value", "Value for the single property (for set_property action)")] object value = null,
+            [MCPParam("properties", "Object mapping property names to values (for multiple properties)")] object properties = null,
+            [MCPParam("search_method", "How to find the target: by_id, by_name, by_path (default: auto-detect)")] string searchMethod = null)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                throw MCPException.InvalidParams("Target parameter is required.");
+            }
+
+            if (string.IsNullOrEmpty(componentType))
+            {
+                throw MCPException.InvalidParams("Component_type parameter is required.");
+            }
+
+            try
+            {
+                return HandleSetProperty(target, componentType, property, value, properties, searchMethod);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'set_property': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Inspects a component, listing all serialized properties and their values.
+        /// </summary>
+        [MCPAction("inspect", Description = "List all serialized properties on a component", ReadOnlyHint = true)]
+        public static object Inspect(
+            [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target,
+            [MCPParam("component_type", "The component type name (e.g., 'Rigidbody', 'BoxCollider')", required: true)] string componentType,
+            [MCPParam("search_method", "How to find the target: by_id, by_name, by_path (default: auto-detect)")] string searchMethod = null)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                throw MCPException.InvalidParams("Target parameter is required.");
+            }
+
+            if (string.IsNullOrEmpty(componentType))
+            {
+                throw MCPException.InvalidParams("Component_type parameter is required.");
+            }
+
+            try
+            {
+                return HandleInspect(target, componentType, searchMethod);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'inspect': {exception.Message}"
                 };
             }
         }

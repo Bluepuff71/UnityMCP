@@ -5,7 +5,7 @@ namespace UnityMCP.Editor
     /// <summary>
     /// Marks a static method as an MCP tool that can be invoked by clients.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public class MCPToolAttribute : Attribute
     {
         /// <summary>

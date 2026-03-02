@@ -110,7 +110,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Diagnoses the current editor state and returns structured findings across multiple categories.
         /// </summary>
-        [MCPTool("diagnose", "Inspects the current editor state and returns structured diagnostic findings", ReadOnlyHint = true, Category = "Diagnostics")]
+        [MCPTool("diagnose", "Scans for missing references, shader issues, console errors, and build readiness. Use when something looks wrong or before building to catch problems early.", ReadOnlyHint = true, Category = "Diagnostics")]
         public static object Diagnose(
             [MCPParam("scope", "Scope of inspection: 'selected' (current selection), 'scene' (active scene), or 'project' (shader/build checks only)", Enum = new[] { "selected", "scene", "project" })] string scope = "scene",
             [MCPParam("checks", "Optional array of specific checks to run: console, references, components, shaders, build")] List<object> checks = null)

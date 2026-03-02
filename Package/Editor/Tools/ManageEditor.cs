@@ -9,6 +9,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Tool for managing editor state including play mode, tags, layers, and tool selection.
     /// </summary>
+    [MCPTool("manage_editor", "Manage editor state, tags, layers, and tools", Category = "Editor")]
     public static class ManageEditor
     {
         private const int FirstUserLayerIndex = 8;
@@ -19,58 +20,151 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         private static readonly string[] ValidTools = { "View", "Move", "Rotate", "Scale", "Rect", "Transform" };
 
-        /// <summary>
-        /// Manages editor state, tags, layers, and tools.
-        /// </summary>
-        /// <param name="action">The action to perform: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer</param>
-        /// <param name="toolName">Tool name for set_active_tool: View, Move, Rotate, Scale, Rect, Transform</param>
-        /// <param name="tagName">Tag name for add_tag/remove_tag</param>
-        /// <param name="layerName">Layer name for add_layer/remove_layer</param>
-        /// <returns>Result object indicating success or failure with appropriate message.</returns>
-        [MCPTool("manage_editor", "Manage editor state, tags, layers, and tools", Category = "Editor", DestructiveHint = true)]
-        public static object Execute(
-            [MCPParam("action", "Action: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer", required: true, Enum = new[] { "play", "pause", "stop", "set_active_tool", "add_tag", "remove_tag", "add_layer", "remove_layer" })] string action,
-            [MCPParam("tool_name", "Tool name for set_active_tool: View, Move, Rotate, Scale, Rect, Transform")] string toolName = null,
-            [MCPParam("tag_name", "Tag name for add_tag/remove_tag")] string tagName = null,
-            [MCPParam("layer_name", "Layer name for add_layer/remove_layer")] string layerName = null)
+        [MCPAction("play")]
+        public static object Play()
         {
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                return new
-                {
-                    success = false,
-                    error = "The 'action' parameter is required and cannot be empty."
-                };
-            }
-
-            string normalizedAction = action.Trim().ToLowerInvariant();
-
             try
             {
-                return normalizedAction switch
-                {
-                    "play" => HandlePlay(),
-                    "pause" => HandlePause(),
-                    "stop" => HandleStop(),
-                    "set_active_tool" => HandleSetActiveTool(toolName),
-                    "add_tag" => HandleAddTag(tagName),
-                    "remove_tag" => HandleRemoveTag(tagName),
-                    "add_layer" => HandleAddLayer(layerName),
-                    "remove_layer" => HandleRemoveLayer(layerName),
-                    _ => new
-                    {
-                        success = false,
-                        error = $"Unknown action: '{action}'. Valid actions are: play, pause, stop, set_active_tool, add_tag, remove_tag, add_layer, remove_layer."
-                    }
-                };
+                return HandlePlay();
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[ManageEditor] Error executing action '{action}': {exception.Message}");
+                Debug.LogWarning($"[ManageEditor] Error executing action 'play': {exception.Message}");
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'play': {exception.Message}"
+                };
+            }
+        }
+
+        [MCPAction("pause")]
+        public static object Pause()
+        {
+            try
+            {
+                return HandlePause();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageEditor] Error executing action 'pause': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'pause': {exception.Message}"
+                };
+            }
+        }
+
+        [MCPAction("stop")]
+        public static object Stop()
+        {
+            try
+            {
+                return HandleStop();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageEditor] Error executing action 'stop': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'stop': {exception.Message}"
+                };
+            }
+        }
+
+        [MCPAction("set_active_tool")]
+        public static object SetActiveTool(
+            [MCPParam("tool_name", "Tool name for set_active_tool: View, Move, Rotate, Scale, Rect, Transform", required: true)] string toolName)
+        {
+            try
+            {
+                return HandleSetActiveTool(toolName);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageEditor] Error executing action 'set_active_tool': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'set_active_tool': {exception.Message}"
+                };
+            }
+        }
+
+        [MCPAction("add_tag")]
+        public static object AddTag(
+            [MCPParam("tag_name", "Tag name for add_tag/remove_tag", required: true)] string tagName)
+        {
+            try
+            {
+                return HandleAddTag(tagName);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageEditor] Error executing action 'add_tag': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'add_tag': {exception.Message}"
+                };
+            }
+        }
+
+        [MCPAction("remove_tag", DestructiveHint = true)]
+        public static object RemoveTag(
+            [MCPParam("tag_name", "Tag name for add_tag/remove_tag", required: true)] string tagName)
+        {
+            try
+            {
+                return HandleRemoveTag(tagName);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageEditor] Error executing action 'remove_tag': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'remove_tag': {exception.Message}"
+                };
+            }
+        }
+
+        [MCPAction("add_layer")]
+        public static object AddLayer(
+            [MCPParam("layer_name", "Layer name for add_layer/remove_layer", required: true)] string layerName)
+        {
+            try
+            {
+                return HandleAddLayer(layerName);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageEditor] Error executing action 'add_layer': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'add_layer': {exception.Message}"
+                };
+            }
+        }
+
+        [MCPAction("remove_layer", DestructiveHint = true)]
+        public static object RemoveLayer(
+            [MCPParam("layer_name", "Layer name for add_layer/remove_layer", required: true)] string layerName)
+        {
+            try
+            {
+                return HandleRemoveLayer(layerName);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageEditor] Error executing action 'remove_layer': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'remove_layer': {exception.Message}"
                 };
             }
         }

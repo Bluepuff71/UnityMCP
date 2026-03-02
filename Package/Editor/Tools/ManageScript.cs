@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using UnityMCP.Editor;
 using UnityMCP.Editor.Core;
 using UnityMCP.Editor.Services;
 using UnityMCP.Editor.Utilities;
@@ -13,6 +14,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Tool for managing C# scripts: create, read, update, delete, and validate.
     /// </summary>
+    [MCPTool("manage_script", "Manage C# scripts: create, read, update, delete, validate", Category = "Asset")]
     public static class ManageScript
     {
         /// <summary>
@@ -20,55 +22,24 @@ namespace UnityMCP.Editor.Tools
         /// </summary>
         private static readonly string[] ValidScriptTypes = { "monobehaviour", "scriptableobject", "editor", "plain" };
 
+        #region Actions
+
         /// <summary>
-        /// Manages C# scripts: create, read, update, delete, and validate.
+        /// Creates a new C# script file with optional template.
         /// </summary>
-        /// <param name="action">The action to perform: create, read, update, delete, validate</param>
-        /// <param name="name">Script name without .cs extension</param>
-        /// <param name="path">Directory path relative to Assets (default: "Scripts")</param>
-        /// <param name="contents">Script contents for create/update</param>
-        /// <param name="scriptType">Template type for create: MonoBehaviour, ScriptableObject, Editor, Plain</param>
-        /// <param name="namespaceName">Namespace for the script</param>
-        /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_script", "Manage C# scripts: create, read, update, delete, validate", Category = "Asset", DestructiveHint = true)]
-        public static object Execute(
-            [MCPParam("action", "Action: create, read, update, delete, validate", required: true, Enum = new[] { "create", "read", "update", "delete", "validate" })] string action,
+        [MCPAction("create", Description = "Create a new C# script with optional template")]
+        public static object Create(
             [MCPParam("name", "Script name without .cs extension", required: true)] string name,
             [MCPParam("path", "Directory path relative to Assets (default: Scripts)")] string path = "Scripts",
-            [MCPParam("contents", "Script contents for create/update")] string contents = null,
             [MCPParam("script_type", "Template type: MonoBehaviour, ScriptableObject, Editor, Plain (default: MonoBehaviour)")] string scriptType = "MonoBehaviour",
-            [MCPParam("namespace_name", "Namespace for the script")] string namespaceName = null)
+            [MCPParam("namespace_name", "Namespace for the script")] string namespaceName = null,
+            [MCPParam("contents", "Script contents for create")] string contents = null)
         {
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                throw MCPException.InvalidParams("The 'action' parameter is required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                throw MCPException.InvalidParams("The 'name' parameter is required.");
-            }
-
-            // Validate script name
-            string validationError = ValidateScriptName(name);
-            if (validationError != null)
-            {
-                throw MCPException.InvalidParams(validationError);
-            }
-
-            string normalizedAction = action.Trim().ToLowerInvariant();
+            ValidateRequiredName(name);
 
             try
             {
-                return normalizedAction switch
-                {
-                    "create" => HandleCreate(name, path, contents, scriptType, namespaceName),
-                    "read" => HandleRead(name, path),
-                    "update" => HandleUpdate(name, path, contents),
-                    "delete" => HandleDelete(name, path),
-                    "validate" => HandleValidate(name, path, contents),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: create, read, update, delete, validate")
-                };
+                return HandleCreate(name, path, contents, scriptType, namespaceName);
             }
             catch (MCPException)
             {
@@ -76,14 +47,133 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[ManageScript] Error executing action '{action}': {exception.Message}");
+                Debug.LogWarning($"[ManageScript] Error executing action 'create': {exception.Message}");
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'create': {exception.Message}"
                 };
             }
         }
+
+        /// <summary>
+        /// Reads the contents of a C# script file.
+        /// </summary>
+        [MCPAction("read", Description = "Read the contents of a C# script file", ReadOnlyHint = true)]
+        public static object Read(
+            [MCPParam("name", "Script name without .cs extension", required: true)] string name,
+            [MCPParam("path", "Directory path relative to Assets (default: Scripts)")] string path = "Scripts")
+        {
+            ValidateRequiredName(name);
+
+            try
+            {
+                return HandleRead(name, path);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageScript] Error executing action 'read': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'read': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Updates the contents of a C# script file (full replace).
+        /// </summary>
+        [MCPAction("update", Description = "Update the contents of a C# script file")]
+        public static object Update(
+            [MCPParam("name", "Script name without .cs extension", required: true)] string name,
+            [MCPParam("path", "Directory path relative to Assets (default: Scripts)")] string path = "Scripts",
+            [MCPParam("contents", "Script contents for update", required: true)] string contents = null)
+        {
+            ValidateRequiredName(name);
+
+            try
+            {
+                return HandleUpdate(name, path, contents);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageScript] Error executing action 'update': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'update': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Deletes a C# script file.
+        /// </summary>
+        [MCPAction("delete", Description = "Delete a C# script file", DestructiveHint = true)]
+        public static object Delete(
+            [MCPParam("name", "Script name without .cs extension", required: true)] string name,
+            [MCPParam("path", "Directory path relative to Assets (default: Scripts)")] string path = "Scripts")
+        {
+            ValidateRequiredName(name);
+
+            try
+            {
+                return HandleDelete(name, path);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageScript] Error executing action 'delete': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'delete': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Validates script syntax (basic structural validation).
+        /// </summary>
+        [MCPAction("validate", Description = "Validate script syntax with basic structural checks", ReadOnlyHint = true)]
+        public static object Validate(
+            [MCPParam("name", "Script name without .cs extension", required: true)] string name,
+            [MCPParam("path", "Directory path relative to Assets (default: Scripts)")] string path = "Scripts")
+        {
+            ValidateRequiredName(name);
+
+            try
+            {
+                return HandleValidate(name, path, null);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageScript] Error executing action 'validate': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'validate': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
 
         #region Action Handlers
 
@@ -519,6 +609,23 @@ namespace UnityMCP.Editor.Tools
         #endregion
 
         #region Validation
+
+        /// <summary>
+        /// Validates the required name parameter and script name format.
+        /// </summary>
+        private static void ValidateRequiredName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw MCPException.InvalidParams("The 'name' parameter is required.");
+            }
+
+            string validationError = ValidateScriptName(name);
+            if (validationError != null)
+            {
+                throw MCPException.InvalidParams(validationError);
+            }
+        }
 
         /// <summary>
         /// Validates a script name (must be a valid C# identifier).

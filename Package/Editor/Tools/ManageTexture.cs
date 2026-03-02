@@ -13,68 +13,21 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Tool for managing textures: get info, list, find, and modify import settings.
     /// </summary>
+    [MCPTool("manage_texture", "Manage textures: get info, list, find, modify import settings", Category = "Asset")]
     public static class ManageTexture
     {
+        #region Actions
+
         /// <summary>
-        /// Manages textures: get info, list, find, and modify import settings.
+        /// Gets detailed information about a texture including import settings.
         /// </summary>
-        /// <param name="action">The action to perform: get, list, find, set_import_settings</param>
-        /// <param name="texturePath">Asset path to texture file</param>
-        /// <param name="folderPath">Folder to search in for list/find</param>
-        /// <param name="searchPattern">Pattern for find action (name pattern, dimensions, or format)</param>
-        /// <param name="searchType">Type of search: name, dimension, format</param>
-        /// <param name="minWidth">Minimum width filter for dimension search</param>
-        /// <param name="maxWidth">Maximum width filter for dimension search</param>
-        /// <param name="minHeight">Minimum height filter for dimension search</param>
-        /// <param name="maxHeight">Maximum height filter for dimension search</param>
-        /// <param name="format">Texture format to find</param>
-        /// <param name="maxSize">Set max size for importer (32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384)</param>
-        /// <param name="textureType">Set texture type (Default, NormalMap, Editor GUI, Sprite, Cursor, Cookie, Lightmap, DirectionalLightmap, Shadowmask, SingleChannel)</param>
-        /// <param name="compression">Set compression (None, LowQuality, Normal, HighQuality)</param>
-        /// <param name="srgb">Set sRGB (gamma) color space flag</param>
-        /// <param name="generateMipmaps">Set mipmap generation</param>
-        /// <param name="readable">Set read/write enabled</param>
-        /// <param name="filterMode">Set filter mode (Point, Bilinear, Trilinear)</param>
-        /// <param name="wrapMode">Set wrap mode (Repeat, Clamp, Mirror, MirrorOnce)</param>
-        /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_texture", "Manage textures: get info, list, find, modify import settings", Category = "Asset", DestructiveHint = true)]
-        public static object Execute(
-            [MCPParam("action", "Action: get, list, find, set_import_settings", required: true, Enum = new[] { "get", "list", "find", "set_import_settings" })] string action,
-            [MCPParam("texture_path", "Asset path to texture file")] string texturePath = null,
-            [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null,
-            [MCPParam("search_pattern", "Pattern for find action")] string searchPattern = null,
-            [MCPParam("search_type", "Type of search: name, dimension, format")] string searchType = "name",
-            [MCPParam("min_width", "Minimum width filter for dimension search")] int? minWidth = null,
-            [MCPParam("max_width", "Maximum width filter for dimension search")] int? maxWidth = null,
-            [MCPParam("min_height", "Minimum height filter for dimension search")] int? minHeight = null,
-            [MCPParam("max_height", "Maximum height filter for dimension search")] int? maxHeight = null,
-            [MCPParam("format", "Texture format to find")] string format = null,
-            [MCPParam("max_size", "Max size: 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384")] int? maxSize = null,
-            [MCPParam("texture_type", "Type: Default, NormalMap, Sprite, Editor GUI, Cursor, Cookie, Lightmap, SingleChannel")] string textureType = null,
-            [MCPParam("compression", "Compression: None, LowQuality, Normal, HighQuality")] string compression = null,
-            [MCPParam("srgb", "sRGB (gamma) color space")] bool? srgb = null,
-            [MCPParam("generate_mipmaps", "Generate mipmaps")] bool? generateMipmaps = null,
-            [MCPParam("readable", "Read/Write enabled")] bool? readable = null,
-            [MCPParam("filter_mode", "Filter mode: Point, Bilinear, Trilinear")] string filterMode = null,
-            [MCPParam("wrap_mode", "Wrap mode: Repeat, Clamp, Mirror, MirrorOnce")] string wrapMode = null)
+        [MCPAction("get", Description = "Get detailed texture info including import settings", ReadOnlyHint = true)]
+        public static object Get(
+            [MCPParam("texture_path", "Asset path to texture file", required: true)] string texturePath)
         {
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                throw MCPException.InvalidParams("The 'action' parameter is required.");
-            }
-
-            string normalizedAction = action.Trim().ToLowerInvariant();
-
             try
             {
-                return normalizedAction switch
-                {
-                    "get" => HandleGet(texturePath),
-                    "list" => HandleList(folderPath),
-                    "find" => HandleFind(searchPattern, searchType, folderPath, minWidth, maxWidth, minHeight, maxHeight, format),
-                    "set_import_settings" => HandleSetImportSettings(texturePath, maxSize, textureType, compression, srgb, generateMipmaps, readable, filterMode, wrapMode),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: get, list, find, set_import_settings")
-                };
+                return HandleGet(texturePath);
             }
             catch (MCPException)
             {
@@ -82,14 +35,109 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[ManageTexture] Error executing action '{action}': {exception.Message}");
+                Debug.LogWarning($"[ManageTexture] Error executing action 'get': {exception.Message}");
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'get': {exception.Message}"
                 };
             }
         }
+
+        /// <summary>
+        /// Lists textures in the project or a specific folder.
+        /// </summary>
+        [MCPAction("list", Description = "List textures in the project or a specific folder", ReadOnlyHint = true)]
+        public static object List(
+            [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null)
+        {
+            try
+            {
+                return HandleList(folderPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageTexture] Error executing action 'list': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'list': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Finds textures by name pattern, dimension, or format.
+        /// </summary>
+        [MCPAction("find", Description = "Find textures by name, dimensions, or format", ReadOnlyHint = true)]
+        public static object Find(
+            [MCPParam("search_pattern", "Pattern for find action")] string searchPattern = null,
+            [MCPParam("search_type", "Type of search: name, dimension, format")] string searchType = "name",
+            [MCPParam("folder_path", "Folder to search in for list/find")] string folderPath = null,
+            [MCPParam("min_width", "Minimum width filter for dimension search")] int? minWidth = null,
+            [MCPParam("max_width", "Maximum width filter for dimension search")] int? maxWidth = null,
+            [MCPParam("min_height", "Minimum height filter for dimension search")] int? minHeight = null,
+            [MCPParam("max_height", "Maximum height filter for dimension search")] int? maxHeight = null,
+            [MCPParam("format", "Texture format to find")] string format = null)
+        {
+            try
+            {
+                return HandleFind(searchPattern, searchType, folderPath, minWidth, maxWidth, minHeight, maxHeight, format);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageTexture] Error executing action 'find': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'find': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Modifies texture importer settings.
+        /// </summary>
+        [MCPAction("set_import_settings", Description = "Modify texture import settings")]
+        public static object SetImportSettings(
+            [MCPParam("texture_path", "Asset path to texture file", required: true)] string texturePath,
+            [MCPParam("texture_type", "Type: Default, NormalMap, Sprite, Editor GUI, Cursor, Cookie, Lightmap, SingleChannel")] string textureType = null,
+            [MCPParam("max_size", "Max size: 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384")] int? maxSize = null,
+            [MCPParam("compression", "Compression: None, LowQuality, Normal, HighQuality")] string compression = null,
+            [MCPParam("filter_mode", "Filter mode: Point, Bilinear, Trilinear")] string filterMode = null,
+            [MCPParam("wrap_mode", "Wrap mode: Repeat, Clamp, Mirror, MirrorOnce")] string wrapMode = null,
+            [MCPParam("srgb", "sRGB (gamma) color space")] bool? srgb = null,
+            [MCPParam("readable", "Read/Write enabled")] bool? readable = null,
+            [MCPParam("generate_mipmaps", "Generate mipmaps")] bool? generateMipmaps = null)
+        {
+            try
+            {
+                return HandleSetImportSettings(texturePath, maxSize, textureType, compression, srgb, generateMipmaps, readable, filterMode, wrapMode);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageTexture] Error executing action 'set_import_settings': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'set_import_settings': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
 
         #region Action Handlers
 

@@ -14,6 +14,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Tool for managing materials: create, modify properties, and assign to renderers.
     /// </summary>
+    [MCPTool("manage_material", "Manage materials: create, modify properties, assign to renderers", Category = "Asset")]
     public static class ManageMaterial
     {
         /// <summary>
@@ -30,50 +31,19 @@ namespace UnityMCP.Editor.Tools
             { "URP/Particles/Unlit", "Universal Render Pipeline/Particles/Unlit" }
         };
 
+        #region Actions
+
         /// <summary>
-        /// Manages materials: create, modify properties, and assign to renderers.
+        /// Creates a new material asset.
         /// </summary>
-        /// <param name="action">The action to perform: create, get_info, set_property, set_color, assign_to_renderer, set_renderer_color</param>
-        /// <param name="materialPath">Path to material asset (e.g., "Assets/Materials/MyMat.mat")</param>
-        /// <param name="shader">Shader name for create (default: Universal Render Pipeline/Lit or Standard)</param>
-        /// <param name="property">Property name (e.g., "_Color", "_BaseColor", "_MainTex")</param>
-        /// <param name="value">Value to set (color as hex/object, float, texture path, vector)</param>
-        /// <param name="color">Color value as hex string "#RRGGBB" or object {r,g,b,a}</param>
-        /// <param name="target">Target GameObject name or path for renderer operations</param>
-        /// <param name="slot">Material slot index (default: 0)</param>
-        /// <param name="mode">For set_renderer_color: "property_block", "shared", or "instance"</param>
-        /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_material", "Manage materials: create, modify properties, assign to renderers", Category = "Asset", DestructiveHint = true)]
-        public static object Execute(
-            [MCPParam("action", "Action: create, get_info, set_property, set_color, assign_to_renderer, set_renderer_color", required: true, Enum = new[] { "create", "get_info", "set_property", "set_color", "assign_to_renderer", "set_renderer_color" })] string action,
-            [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)")] string materialPath = null,
-            [MCPParam("shader", "Shader name for create (e.g., Standard, URP/Lit, Universal Render Pipeline/Lit)")] string shader = null,
-            [MCPParam("property", "Property name (e.g., _Color, _BaseColor, _MainTex)")] string property = null,
-            [MCPParam("value", "Value to set (color as hex/object, float, texture path, vector as array)")] object value = null,
-            [MCPParam("color", "Color value as hex string #RRGGBB or object {r,g,b,a}")] object color = null,
-            [MCPParam("target", "Target GameObject name or path for renderer operations")] string target = null,
-            [MCPParam("slot", "Material slot index (default: 0)")] int slot = 0,
-            [MCPParam("mode", "For set_renderer_color: property_block, shared, or instance (default: property_block)")] string mode = "property_block")
+        [MCPAction("create", Description = "Create a new material asset")]
+        public static object Create(
+            [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)", required: true)] string materialPath,
+            [MCPParam("shader", "Shader name for create (e.g., Standard, URP/Lit, Universal Render Pipeline/Lit)")] string shader = null)
         {
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                throw MCPException.InvalidParams("The 'action' parameter is required.");
-            }
-
-            string normalizedAction = action.Trim().ToLowerInvariant();
-
             try
             {
-                return normalizedAction switch
-                {
-                    "create" => HandleCreate(materialPath, shader),
-                    "get_info" => HandleGetInfo(materialPath),
-                    "set_property" => HandleSetProperty(materialPath, property, value),
-                    "set_color" => HandleSetColor(materialPath, property, color),
-                    "assign_to_renderer" => HandleAssignToRenderer(materialPath, target, slot),
-                    "set_renderer_color" => HandleSetRendererColor(target, property, color, slot, mode),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: create, get_info, set_property, set_color, assign_to_renderer, set_renderer_color")
-                };
+                return HandleCreate(materialPath, shader);
             }
             catch (MCPException)
             {
@@ -81,14 +51,156 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[ManageMaterial] Error executing action '{action}': {exception.Message}");
+                Debug.LogWarning($"[ManageMaterial] Error executing action 'create': {exception.Message}");
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'create': {exception.Message}"
                 };
             }
         }
+
+        /// <summary>
+        /// Gets detailed information about a material including all shader properties.
+        /// </summary>
+        [MCPAction("get_info", Description = "Get detailed information about a material", ReadOnlyHint = true)]
+        public static object GetInfo(
+            [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)", required: true)] string materialPath)
+        {
+            try
+            {
+                return HandleGetInfo(materialPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageMaterial] Error executing action 'get_info': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'get_info': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Sets a material shader property (color, float, texture, vector).
+        /// </summary>
+        [MCPAction("set_property", Description = "Set a material shader property value")]
+        public static object SetProperty(
+            [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)", required: true)] string materialPath,
+            [MCPParam("property", "Property name (e.g., _Color, _BaseColor, _MainTex)", required: true)] string property,
+            [MCPParam("value", "Value to set (color as hex/object, float, texture path, vector as array)", required: true)] object value)
+        {
+            try
+            {
+                return HandleSetProperty(materialPath, property, value);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageMaterial] Error executing action 'set_property': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'set_property': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Convenience action to set material color.
+        /// </summary>
+        [MCPAction("set_color", Description = "Set a material color property")]
+        public static object SetColor(
+            [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)", required: true)] string materialPath,
+            [MCPParam("property", "Property name (e.g., _Color, _BaseColor, _MainTex)")] string property = null,
+            [MCPParam("color", "Color value as hex string #RRGGBB or object {r,g,b,a}", required: true)] object color = null)
+        {
+            try
+            {
+                return HandleSetColor(materialPath, property, color);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageMaterial] Error executing action 'set_color': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'set_color': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Assigns a material to a renderer on a GameObject.
+        /// </summary>
+        [MCPAction("assign_to_renderer", Description = "Assign a material to a renderer on a GameObject")]
+        public static object AssignToRenderer(
+            [MCPParam("target", "Target GameObject name or path for renderer operations", required: true)] string target,
+            [MCPParam("material_path", "Path to material asset (e.g., Assets/Materials/MyMat.mat)", required: true)] string materialPath,
+            [MCPParam("slot", "Material slot index (default: 0)")] int slot = 0)
+        {
+            try
+            {
+                return HandleAssignToRenderer(materialPath, target, slot);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageMaterial] Error executing action 'assign_to_renderer': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'assign_to_renderer': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Sets color on a renderer via PropertyBlock, shared material, or instanced material.
+        /// </summary>
+        [MCPAction("set_renderer_color", Description = "Set color on a renderer via PropertyBlock, shared, or instanced material")]
+        public static object SetRendererColor(
+            [MCPParam("target", "Target GameObject name or path for renderer operations", required: true)] string target,
+            [MCPParam("color", "Color value as hex string #RRGGBB or object {r,g,b,a}", required: true)] object color,
+            [MCPParam("property", "Property name (e.g., _Color, _BaseColor, _MainTex)")] string property = null,
+            [MCPParam("mode", "For set_renderer_color: property_block, shared, or instance (default: property_block)")] string mode = "property_block",
+            [MCPParam("slot", "Material slot index (default: 0)")] int slot = 0)
+        {
+            try
+            {
+                return HandleSetRendererColor(target, property, color, slot, mode);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageMaterial] Error executing action 'set_renderer_color': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'set_renderer_color': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
 
         #region Action Handlers
 

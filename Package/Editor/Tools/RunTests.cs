@@ -8,16 +8,14 @@ using UnityMCP.Editor.Services;
 namespace UnityMCP.Editor.Tools
 {
     /// <summary>
-    /// Tool for starting asynchronous Unity test runs.
+    /// Run Unity tests and poll job status.
     /// </summary>
+    [MCPTool("tests", "Run Unity Test Runner or poll test job status", Category = "Tests")]
     public static class RunTests
     {
         private const int RetryAfterMs = 5000;
 
-        /// <summary>
-        /// Starts an asynchronous Unity Test Runner job and returns immediately with a job ID for polling.
-        /// </summary>
-        [MCPTool("tests_run", "Starts Unity Test Runner asynchronously, returns job_id for polling with tests_get_job", Category = "Tests", DestructiveHint = true)]
+        [MCPAction("run", Description = "Start Unity Test Runner asynchronously, returns job_id for polling")]
         public static object Run(
             [MCPParam("mode", "Test mode: EditMode or PlayMode (default: EditMode)")] string mode = "EditMode",
             [MCPParam("test_names", "Comma-separated list of specific test names to run")] string testNames = null,
@@ -27,14 +25,12 @@ namespace UnityMCP.Editor.Tools
             [MCPParam("include_details", "Include full test result details in job result")] bool includeDetails = true,
             [MCPParam("include_failed_tests", "Include failed test information in job result")] bool includeFailedTests = true)
         {
-            // Parse and validate mode
             TestMode testMode;
             if (!TryParseTestMode(mode, out testMode))
             {
                 throw MCPException.InvalidParams($"Invalid test mode: '{mode}'. Must be 'EditMode' or 'PlayMode'.");
             }
 
-            // Check if tests are already running
             if (TestJobManager.IsRunning)
             {
                 var currentJob = TestJobManager.CurrentJob;
@@ -47,7 +43,6 @@ namespace UnityMCP.Editor.Tools
                 };
             }
 
-            // Start a new job
             var job = TestJobManager.StartJob(testMode.ToString());
             if (job == null)
             {
@@ -61,7 +56,6 @@ namespace UnityMCP.Editor.Tools
 
             try
             {
-                // Build the filter
                 var filter = new TestFilter
                 {
                     Mode = testMode,
@@ -71,7 +65,6 @@ namespace UnityMCP.Editor.Tools
                     Assemblies = ParseCommaSeparatedList(assemblyNames)
                 };
 
-                // Start the test run asynchronously
                 TestRunnerService.Instance.StartTestRunAsync(filter, includeDetails, includeFailedTests);
 
                 return new
@@ -85,7 +78,6 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                // Mark the job as failed
                 TestJobManager.SetCurrentJobError($"Failed to start tests: {exception.Message}");
 
                 return new
@@ -97,17 +89,45 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Tries to parse a test mode string case-insensitively.
-        /// </summary>
+        [MCPAction("get_job", Description = "Get test job status and results", ReadOnlyHint = true)]
+        public static object GetJob(
+            [MCPParam("job_id", "The job ID returned by tests run action", required: true)] string jobId,
+            [MCPParam("include_details", "Include full test result details")] bool includeDetails = true,
+            [MCPParam("include_failed_tests", "Include failed test information")] bool includeFailedTests = true)
+        {
+            if (string.IsNullOrEmpty(jobId))
+            {
+                throw MCPException.InvalidParams("job_id is required");
+            }
+
+            var job = TestJobManager.GetJob(jobId);
+            if (job == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = $"Job not found: {jobId}"
+                };
+            }
+
+            bool isStuck = job.IsStuckSuspected();
+
+            return new
+            {
+                success = true,
+                job = job.ToSerializable(includeDetails, includeFailedTests),
+                is_complete = job.status != TestJobStatus.Running,
+                stuck_warning = isStuck ? "Test appears stuck - no progress for 60 seconds" : null
+            };
+        }
+
+        #region Helper Methods
+
         private static bool TryParseTestMode(string modeString, out TestMode mode)
         {
             mode = TestMode.EditMode;
 
-            if (string.IsNullOrEmpty(modeString))
-            {
-                return true; // Default to EditMode
-            }
+            if (string.IsNullOrEmpty(modeString)) return true;
 
             string normalizedMode = modeString.Trim().ToLowerInvariant();
 
@@ -126,9 +146,6 @@ namespace UnityMCP.Editor.Tools
             return false;
         }
 
-        /// <summary>
-        /// Parses a comma-separated string into a list of trimmed, non-empty strings.
-        /// </summary>
         private static List<string> ParseCommaSeparatedList(string input)
         {
             if (string.IsNullOrEmpty(input))
@@ -142,5 +159,7 @@ namespace UnityMCP.Editor.Tools
                 .Where(s => !string.IsNullOrEmpty(s))
                 .ToList();
         }
+
+        #endregion
     }
 }

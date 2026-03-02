@@ -9,17 +9,12 @@ using UnityEngine;
 namespace UnityMCP.Editor.Tools
 {
     /// <summary>
-    /// Tools for managing the Unity Editor selection state.
+    /// Get or set the Unity Editor selection.
     /// </summary>
+    [MCPTool("selection", "Manage editor selection: get or set selected objects", Category = "Editor")]
     public static class SelectionTools
     {
-        #region Selection Get
-
-        /// <summary>
-        /// Gets the currently selected objects in the Unity Editor.
-        /// </summary>
-        /// <returns>Information about the current selection including count and object details.</returns>
-        [MCPTool("selection_get", "Get currently selected objects in the Unity Editor", Category = "Editor", ReadOnlyHint = true)]
+        [MCPAction("get", Description = "Get currently selected objects in the Unity Editor", ReadOnlyHint = true)]
         public static object Get()
         {
             try
@@ -37,7 +32,6 @@ namespace UnityMCP.Editor.Tools
                     objectDataList.Add(BuildSelectedObjectData(selectedObject));
                 }
 
-                // Determine the active object (primary selection)
                 object activeObjectData = null;
                 if (Selection.activeObject != null)
                 {
@@ -63,17 +57,7 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        #endregion
-
-        #region Selection Set
-
-        /// <summary>
-        /// Sets the selection to specified objects by instance IDs or asset paths.
-        /// </summary>
-        /// <param name="instanceIds">Array of instance IDs to select.</param>
-        /// <param name="paths">Array of asset paths to select.</param>
-        /// <returns>Result indicating success or failure with selection details.</returns>
-        [MCPTool("selection_set", "Set selection by instance IDs or asset paths", Category = "Editor", DestructiveHint = true)]
+        [MCPAction("set", Description = "Set selection by instance IDs or asset paths")]
         public static object Set(
             [MCPParam("instance_ids", "Array of instance IDs to select")] List<object> instanceIds = null,
             [MCPParam("paths", "Array of asset paths to select")] List<object> paths = null)
@@ -84,7 +68,6 @@ namespace UnityMCP.Editor.Tools
                 var failedIds = new List<int>();
                 var failedPaths = new List<string>();
 
-                // Process instance IDs
                 if (instanceIds != null && instanceIds.Count > 0)
                 {
                     foreach (var idValue in instanceIds)
@@ -107,7 +90,6 @@ namespace UnityMCP.Editor.Tools
                     }
                 }
 
-                // Process asset paths
                 if (paths != null && paths.Count > 0)
                 {
                     foreach (var pathValue in paths)
@@ -130,10 +112,8 @@ namespace UnityMCP.Editor.Tools
                     }
                 }
 
-                // Validate we have something to select
                 if (objectsToSelect.Count == 0 && (instanceIds == null || instanceIds.Count == 0) && (paths == null || paths.Count == 0))
                 {
-                    // Clear selection if no IDs or paths provided
                     Selection.objects = Array.Empty<UnityEngine.Object>();
                     return new
                     {
@@ -155,10 +135,8 @@ namespace UnityMCP.Editor.Tools
                     };
                 }
 
-                // Set the selection
                 Selection.objects = objectsToSelect.ToArray();
 
-                // Build response with selected object data
                 var selectedObjectsData = objectsToSelect.Select(BuildSelectedObjectData).ToList();
 
                 var response = new Dictionary<string, object>
@@ -192,15 +170,8 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        #endregion
-
         #region Helper Methods
 
-        /// <summary>
-        /// Builds a data object representing a selected object's information.
-        /// </summary>
-        /// <param name="selectedObject">The Unity object to describe.</param>
-        /// <returns>An anonymous object containing the object's details.</returns>
         private static object BuildSelectedObjectData(UnityEngine.Object selectedObject)
         {
             if (selectedObject == null)
@@ -215,7 +186,6 @@ namespace UnityMCP.Editor.Tools
                 { "type", selectedObject.GetType().Name }
             };
 
-            // Add additional info for GameObjects
             if (selectedObject is GameObject gameObject)
             {
                 baseData["isGameObject"] = true;
@@ -226,7 +196,6 @@ namespace UnityMCP.Editor.Tools
                 baseData["layerName"] = LayerMask.LayerToName(gameObject.layer);
                 baseData["path"] = GetGameObjectPath(gameObject);
 
-                // Add transform info
                 baseData["transform"] = new
                 {
                     localPosition = new[] { gameObject.transform.localPosition.x, gameObject.transform.localPosition.y, gameObject.transform.localPosition.z },
@@ -234,7 +203,6 @@ namespace UnityMCP.Editor.Tools
                     localScale = new[] { gameObject.transform.localScale.x, gameObject.transform.localScale.y, gameObject.transform.localScale.z }
                 };
 
-                // Get component types
                 var componentTypes = new List<string>();
                 var components = gameObject.GetComponents<Component>();
                 foreach (var component in components)
@@ -250,7 +218,6 @@ namespace UnityMCP.Editor.Tools
             {
                 baseData["isGameObject"] = false;
 
-                // Add asset path if it's a project asset
                 string assetPath = AssetDatabase.GetAssetPath(selectedObject);
                 if (!string.IsNullOrEmpty(assetPath))
                 {
@@ -266,11 +233,6 @@ namespace UnityMCP.Editor.Tools
             return baseData;
         }
 
-        /// <summary>
-        /// Gets the full hierarchy path of a GameObject.
-        /// </summary>
-        /// <param name="gameObject">The GameObject to get the path for.</param>
-        /// <returns>The full hierarchy path as a string.</returns>
         private static string GetGameObjectPath(GameObject gameObject)
         {
             if (gameObject == null)
@@ -297,48 +259,15 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Attempts to parse an instance ID from various input formats.
-        /// </summary>
-        /// <param name="value">The value to parse.</param>
-        /// <param name="instanceId">The parsed instance ID if successful.</param>
-        /// <returns>True if parsing succeeded, false otherwise.</returns>
         private static bool TryParseInstanceId(object value, out int instanceId)
         {
             instanceId = 0;
 
-            if (value == null)
-            {
-                return false;
-            }
-
-            // Handle direct int
-            if (value is int intValue)
-            {
-                instanceId = intValue;
-                return true;
-            }
-
-            // Handle long (JSON often deserializes integers as long)
-            if (value is long longValue)
-            {
-                instanceId = (int)longValue;
-                return true;
-            }
-
-            // Handle double (JSON sometimes deserializes as double)
-            if (value is double doubleValue)
-            {
-                instanceId = (int)doubleValue;
-                return true;
-            }
-
-            // Handle string representation
-            if (value is string stringValue && int.TryParse(stringValue, out int parsedValue))
-            {
-                instanceId = parsedValue;
-                return true;
-            }
+            if (value == null) return false;
+            if (value is int intValue) { instanceId = intValue; return true; }
+            if (value is long longValue) { instanceId = (int)longValue; return true; }
+            if (value is double doubleValue) { instanceId = (int)doubleValue; return true; }
+            if (value is string stringValue && int.TryParse(stringValue, out int parsedValue)) { instanceId = parsedValue; return true; }
 
             return false;
         }

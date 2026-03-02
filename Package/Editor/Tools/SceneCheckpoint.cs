@@ -10,33 +10,18 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// MCP tools for saving, restoring, and comparing scene checkpoints.
     /// </summary>
+    [MCPTool("scene_checkpoint", "Save, restore, or compare scene checkpoints for undo/restore. Call with action='save' before destructive operations (deleting objects, editing scripts, bulk modifications).", Category = "Scene")]
     public static class SceneCheckpoint
     {
-        #region Scene Checkpoint (Save / List)
-
-        /// <summary>
-        /// Saves a new scene checkpoint or lists all existing checkpoints.
-        /// </summary>
-        [MCPTool("scene_checkpoint", "Save or list scene checkpoints for undo/restore capability. Checkpoints capture both the scene and any assets modified by tools since the last save (bucket model).", Category = "Scene", DestructiveHint = true)]
-        public static object Checkpoint(
-            [MCPParam("action", "Action: 'save' to create checkpoint, 'list' to view all checkpoints", required: true, Enum = new[] { "save", "list" })] string action,
-            [MCPParam("name", "Optional name for the checkpoint (save only)")] string name = null,
-            [MCPParam("new_bucket", "Start a new checkpoint bucket (true) or fold into current (false)")] bool newBucket = true)
-        {
-            string normalizedAction = (action ?? "").ToLowerInvariant().Trim();
-
-            return normalizedAction switch
-            {
-                "save" => SaveCheckpoint(name, newBucket),
-                "list" => ListCheckpoints(),
-                _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: save, list")
-            };
-        }
+        #region Save
 
         /// <summary>
         /// Saves the current scene state as a checkpoint.
         /// </summary>
-        private static object SaveCheckpoint(string checkpointName, bool newBucket)
+        [MCPAction("save", Description = "Save a new scene checkpoint")]
+        public static object Save(
+            [MCPParam("name", "Optional name for the checkpoint")] string name = null,
+            [MCPParam("new_bucket", "Start a new checkpoint bucket (true) or fold into current (false)")] bool newBucket = true)
         {
             try
             {
@@ -60,7 +45,7 @@ namespace UnityMCP.Editor.Tools
                     };
                 }
 
-                CheckpointMetadata metadata = CheckpointManager.SaveCheckpoint(checkpointName, newBucket);
+                CheckpointMetadata metadata = CheckpointManager.SaveCheckpoint(name, newBucket);
 
                 if (metadata == CheckpointManager.NothingToSave)
                 {
@@ -97,10 +82,15 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
+        #endregion
+
+        #region List
+
         /// <summary>
         /// Lists all existing checkpoints sorted by timestamp descending.
         /// </summary>
-        private static object ListCheckpoints()
+        [MCPAction("list", Description = "List all existing checkpoints", ReadOnlyHint = true)]
+        public static object List()
         {
             try
             {
@@ -125,13 +115,13 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
-        #region Scene Restore
+        #region Restore
 
         /// <summary>
         /// Restores a previously saved scene checkpoint.
         /// Automatically creates a "before restore" checkpoint before restoring.
         /// </summary>
-        [MCPTool("scene_restore", "Restore a previously saved scene checkpoint. Restores both the scene file and all tracked asset snapshots stored in the bucket.", Category = "Scene", DestructiveHint = true)]
+        [MCPAction("restore", Description = "Restore a previously saved scene checkpoint, including tracked asset snapshots. Automatically saves a safety checkpoint before restoring.", DestructiveHint = true)]
         public static object Restore(
             [MCPParam("checkpoint_id", "ID of the checkpoint to restore", required: true)] string checkpointId)
         {
@@ -205,13 +195,13 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
-        #region Scene Diff
+        #region Diff
 
         /// <summary>
         /// Compares two checkpoints or the current scene against a checkpoint.
         /// Reports added and removed root objects and count changes.
         /// </summary>
-        [MCPTool("scene_diff", "Compare two checkpoints or current scene vs a checkpoint. Reports root object and tracked asset differences.", Category = "Scene", ReadOnlyHint = true)]
+        [MCPAction("diff", Description = "Compare two checkpoints or current scene vs a checkpoint. Use checkpoint_a='current' to compare live scene against a saved checkpoint. Reports root object and tracked asset differences.", ReadOnlyHint = true)]
         public static object Diff(
             [MCPParam("checkpoint_a", "First checkpoint ID (or 'current' for active scene)", required: true)] string checkpointA,
             [MCPParam("checkpoint_b", "Second checkpoint ID (or 'current' for active scene)")] string checkpointB = "current")

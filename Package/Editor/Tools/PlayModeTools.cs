@@ -5,15 +5,12 @@ using UnityEngine;
 namespace UnityMCP.Editor.Tools
 {
     /// <summary>
-    /// Tools for controlling Unity Editor play mode state.
+    /// Manage play mode state: enter, exit, pause, step.
     /// </summary>
+    [MCPTool("playmode", "Manage play mode state", Category = "Editor")]
     public static class PlayModeTools
     {
-        /// <summary>
-        /// Enters play mode.
-        /// </summary>
-        /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_enter", "Enter play mode", Category = "Editor", DestructiveHint = true)]
+        [MCPAction("enter", Description = "Enter play mode")]
         public static object Enter()
         {
             try
@@ -72,11 +69,7 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Exits play mode.
-        /// </summary>
-        /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_exit", "Exit play mode", Category = "Editor", DestructiveHint = true)]
+        [MCPAction("exit", Description = "Exit play mode")]
         public static object Exit()
         {
             try
@@ -113,12 +106,7 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Toggles or sets the pause state during play mode.
-        /// </summary>
-        /// <param name="paused">Optional explicit pause state. If omitted, toggles current state.</param>
-        /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_pause", "Toggle or set pause state", Category = "Editor", DestructiveHint = true)]
+        [MCPAction("pause", Description = "Toggle or set pause state")]
         public static object Pause(
             [MCPParam("paused", "Set pause state (true/false), omit to toggle")] bool? paused = null)
         {
@@ -129,7 +117,7 @@ namespace UnityMCP.Editor.Tools
                     return new
                     {
                         success = false,
-                        error = "Cannot pause when not in play mode. Use playmode_enter first.",
+                        error = "Cannot pause when not in play mode. Use playmode with action='enter' first.",
                         isPlaying = false,
                         isPaused = false
                     };
@@ -177,11 +165,7 @@ namespace UnityMCP.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Advances a single frame while in play mode (paused).
-        /// </summary>
-        /// <returns>Result object with current play mode state.</returns>
-        [MCPTool("playmode_step", "Advance single frame", Category = "Editor", DestructiveHint = true)]
+        [MCPAction("step", Description = "Advance single frame")]
         public static object Step()
         {
             try
@@ -191,13 +175,12 @@ namespace UnityMCP.Editor.Tools
                     return new
                     {
                         success = false,
-                        error = "Cannot step when not in play mode. Use playmode_enter first.",
+                        error = "Cannot step when not in play mode. Use playmode with action='enter' first.",
                         isPlaying = false,
                         isPaused = false
                     };
                 }
 
-                // Step advances one frame and pauses if not already paused
                 EditorApplication.Step();
 
                 return new
@@ -205,7 +188,7 @@ namespace UnityMCP.Editor.Tools
                     success = true,
                     message = "Advanced one frame.",
                     isPlaying = true,
-                    isPaused = true // Step always results in paused state
+                    isPaused = true
                 };
             }
             catch (Exception exception)

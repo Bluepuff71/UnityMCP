@@ -14,50 +14,23 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles asset management operations including create, delete, move, duplicate, import, and search.
     /// </summary>
+    [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset")]
     public static class ManageAsset
     {
         private const int DefaultPageSize = 50;
         private const int MaxPageSize = 500;
 
-        #region Main Tool Entry Point
+        #region Action Methods
 
-        /// <summary>
-        /// Manages assets in the Unity project with various operations.
-        /// </summary>
-        [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset", DestructiveHint = true)]
-        public static object Manage(
-            [MCPParam("action", "Action to perform: create, delete, move, rename, duplicate, import, search, get_info, create_folder", required: true, Enum = new[] { "create", "delete", "move", "rename", "duplicate", "import", "search", "get_info", "create_folder" })] string action,
+        [MCPAction("create", Description = "Create a new asset")]
+        public static object Create(
             [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')")] string path = null,
-            [MCPParam("destination", "Destination path for move/duplicate operations")] string destination = null,
             [MCPParam("asset_type", "Asset type for create: folder, material, physicsmaterial")] string assetType = null,
-            [MCPParam("properties", "Properties for create/modify operations (e.g., shader, friction, bounciness)")] Dictionary<string, object> properties = null,
-            [MCPParam("search_pattern", "Search pattern for search operation")] string searchPattern = null,
-            [MCPParam("filter_type", "Filter by asset type for search (e.g., 'Material', 'Prefab', 'Texture2D')")] string filterType = null,
-            [MCPParam("page_size", "Number of results per page for search (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
-            [MCPParam("page_number", "Page number for search results (1-based, default: 1)", Minimum = 1)] int pageNumber = 1)
+            [MCPParam("properties", "Properties for create/modify operations (e.g., shader, friction, bounciness)")] Dictionary<string, object> properties = null)
         {
-            if (string.IsNullOrEmpty(action))
-            {
-                throw MCPException.InvalidParams("Action parameter is required.");
-            }
-
-            string normalizedAction = action.ToLowerInvariant().Trim();
-
             try
             {
-                return normalizedAction switch
-                {
-                    "create" => HandleCreate(path, assetType, properties),
-                    "create_folder" => HandleCreateFolder(path),
-                    "delete" => HandleDelete(path),
-                    "move" => HandleMove(path, destination),
-                    "rename" => HandleRename(path, destination),
-                    "duplicate" => HandleDuplicate(path, destination),
-                    "import" => HandleImport(path),
-                    "search" => HandleSearch(searchPattern, filterType, path, pageSize, pageNumber),
-                    "get_info" => HandleGetInfo(path),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: create, delete, move, rename, duplicate, import, search, get_info, create_folder")
-                };
+                return HandleCreate(path, assetType, properties);
             }
             catch (MCPException)
             {
@@ -65,11 +38,157 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                return new
-                {
-                    success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
-                };
+                throw new MCPException($"Error executing action 'create': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("delete", Description = "Delete an asset", DestructiveHint = true)]
+        public static object Delete(
+            [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')", required: true)] string path)
+        {
+            try
+            {
+                return HandleDelete(path);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'delete': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("move", Description = "Move an asset to a new location")]
+        public static object Move(
+            [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')", required: true)] string path,
+            [MCPParam("destination", "Destination path for move operation", required: true)] string destination)
+        {
+            try
+            {
+                return HandleMove(path, destination);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'move': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("rename", Description = "Rename an asset")]
+        public static object Rename(
+            [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')", required: true)] string path,
+            [MCPParam("destination", "The new name or full path for the asset")] string destination = null)
+        {
+            try
+            {
+                return HandleRename(path, destination);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'rename': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("duplicate", Description = "Duplicate an asset")]
+        public static object Duplicate(
+            [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')", required: true)] string path,
+            [MCPParam("destination", "Destination path for the duplicate")] string destination = null)
+        {
+            try
+            {
+                return HandleDuplicate(path, destination);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'duplicate': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("import", Description = "Reimport an asset")]
+        public static object Import(
+            [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')", required: true)] string path)
+        {
+            try
+            {
+                return HandleImport(path);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'import': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("search", Description = "Search for assets by pattern and type", ReadOnlyHint = true)]
+        public static object Search(
+            [MCPParam("search_pattern", "Search pattern for search operation")] string searchPattern = null,
+            [MCPParam("filter_type", "Filter by asset type for search (e.g., 'Material', 'Prefab', 'Texture2D')")] string filterType = null,
+            [MCPParam("page_number", "Page number for search results (1-based, default: 1)", Minimum = 1)] int pageNumber = 1,
+            [MCPParam("page_size", "Number of results per page for search (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize)
+        {
+            try
+            {
+                return HandleSearch(searchPattern, filterType, null, pageSize, pageNumber);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'search': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("get_info", Description = "Get detailed information about an asset", ReadOnlyHint = true)]
+        public static object GetInfo(
+            [MCPParam("path", "Asset path (e.g., 'Assets/Materials/New.mat')", required: true)] string path)
+        {
+            try
+            {
+                return HandleGetInfo(path);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'get_info': {exception.Message}", MCPErrorCodes.InternalError);
+            }
+        }
+
+        [MCPAction("create_folder", Description = "Create a new folder")]
+        public static object CreateFolder(
+            [MCPParam("path", "Folder path (e.g., 'Assets/NewFolder')", required: true)] string path)
+        {
+            try
+            {
+                return HandleCreateFolder(path);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Error executing action 'create_folder': {exception.Message}", MCPErrorCodes.InternalError);
             }
         }
 
@@ -119,7 +238,7 @@ namespace UnityMCP.Editor.Tools
             {
                 return normalizedAssetType switch
                 {
-                    "folder" => CreateFolder(normalizedPath),
+                    "folder" => CreateFolderAsset(normalizedPath),
                     "material" or "mat" => CreateMaterial(normalizedPath, properties),
                     "physicsmaterial" or "physics_material" or "physic_material" => CreatePhysicsMaterial(normalizedPath, properties),
                     _ => throw MCPException.InvalidParams($"Unsupported asset type: '{assetType}'. Supported types: folder, material, physicsmaterial")
@@ -656,7 +775,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Creates a folder at the specified path.
         /// </summary>
-        private static object CreateFolder(string path)
+        private static object CreateFolderAsset(string path)
         {
             return CreateFolderRecursive(path);
         }

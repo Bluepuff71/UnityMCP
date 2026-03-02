@@ -18,20 +18,44 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles GameObject manipulation operations including create, modify, delete, duplicate, and move_relative.
     /// </summary>
+    [MCPTool("gameobject_manage", "Manages GameObjects: create, modify, delete, duplicate, or move_relative. Use gameobject_find first to get instance IDs for existing objects.", Category = "GameObject")]
     public static class ManageGameObject
     {
         private const string UntaggedTag = "Untagged";
 
-        #region Main Tool Entry Point
+        #region Action Methods
 
         /// <summary>
-        /// Manages GameObjects in the scene with create, modify, delete, duplicate, and move_relative actions.
+        /// Creates a new GameObject from scratch, a primitive, or a prefab.
         /// </summary>
-        [MCPTool("gameobject_manage", "Manages GameObjects: create, modify, delete, duplicate, or move_relative", Category = "GameObject", DestructiveHint = true)]
-        public static object Manage(
-            [MCPParam("action", "Action to perform: create, modify, delete, duplicate, move_relative", required: true, Enum = new[] { "create", "modify", "delete", "duplicate", "move_relative" })] string action,
+        [MCPAction("create", Description = "Create a new GameObject")]
+        public static object Create(
+            [MCPParam("name", "Name for new object")] string name = null,
+            [MCPParam("parent", "Instance ID or name/path of parent GameObject")] string parent = null,
+            [MCPParam("position", "Local position as [x,y,z] array or {x,y,z} object")] object position = null,
+            [MCPParam("rotation", "Local euler angles as [x,y,z] array or {x,y,z} object")] object rotation = null,
+            [MCPParam("scale", "Local scale as [x,y,z] array or {x,y,z} object")] object scale = null,
+            [MCPParam("tag", "Tag to assign")] string tag = null,
+            [MCPParam("layer", "Layer name to assign")] string layer = null,
+            [MCPParam("primitiveType", "Primitive type: Cube, Sphere, Capsule, Cylinder, Plane, Quad")] string primitiveType = null,
+            [MCPParam("prefabPath", "Path to prefab asset for instantiation")] string prefabPath = null,
+            [MCPParam("componentsToAdd", "Array of component type names to add")] List<object> componentsToAdd = null)
+        {
+            try
+            {
+                return HandleCreate(name, parent, position, rotation, scale, tag, layer, primitiveType, prefabPath, componentsToAdd);
+            }
+            catch (MCPException) { throw; }
+            catch (Exception ex) { throw new MCPException($"Error creating GameObject: {ex.Message}", ex, MCPErrorCodes.InternalError); }
+        }
+
+        /// <summary>
+        /// Modifies properties of an existing GameObject.
+        /// </summary>
+        [MCPAction("modify", Description = "Modify an existing GameObject")]
+        public static object Modify(
             [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject")] string target = null,
-            [MCPParam("name", "Name for new object (create) or rename target (modify)")] string name = null,
+            [MCPParam("name", "New name for the GameObject")] string name = null,
             [MCPParam("parent", "Instance ID or name/path of parent GameObject")] string parent = null,
             [MCPParam("position", "Local position as [x,y,z] array or {x,y,z} object")] object position = null,
             [MCPParam("rotation", "Local euler angles as [x,y,z] array or {x,y,z} object")] object rotation = null,
@@ -39,54 +63,77 @@ namespace UnityMCP.Editor.Tools
             [MCPParam("setActive", "Activate or deactivate the GameObject")] bool? setActive = null,
             [MCPParam("tag", "Tag to assign to the GameObject")] string tag = null,
             [MCPParam("layer", "Layer name to assign to the GameObject")] string layer = null,
-            [MCPParam("primitiveType", "Primitive type for create: Cube, Sphere, Capsule, Cylinder, Plane, Quad")] string primitiveType = null,
-            [MCPParam("prefabPath", "Path to prefab asset for instantiation")] string prefabPath = null,
             [MCPParam("componentsToAdd", "Array of component type names to add")] List<object> componentsToAdd = null,
-            [MCPParam("componentsToRemove", "Array of component type names to remove")] List<string> componentsToRemove = null,
-            [MCPParam("new_name", "New name for duplicated object")] string newName = null,
-            [MCPParam("offset", "Position offset as [x,y,z] for duplicate or move_relative")] object offset = null,
-            [MCPParam("reference_object", "Reference object for move_relative action")] string referenceObject = null,
-            [MCPParam("direction", "Direction for move_relative: left, right, up, down, forward, back")] string direction = null,
-            [MCPParam("distance", "Distance for move_relative")] float distance = 1f,
-            [MCPParam("world_space", "Use world space for move_relative (default: true)")] bool worldSpace = true)
+            [MCPParam("componentsToRemove", "Array of component type names to remove")] List<string> componentsToRemove = null)
         {
-            if (string.IsNullOrEmpty(action))
-            {
-                throw MCPException.InvalidParams("Action parameter is required.");
-            }
-
-            string normalizedAction = action.ToLowerInvariant();
-
-            // Usability improvement: alias 'name' to 'target' for modification actions
-            if (string.IsNullOrEmpty(target) && !string.IsNullOrEmpty(name) && normalizedAction != "create")
+            // Usability improvement: alias 'name' to 'target' when target is not provided
+            if (string.IsNullOrEmpty(target) && !string.IsNullOrEmpty(name))
             {
                 target = name;
             }
 
             try
             {
-                return normalizedAction switch
-                {
-                    "create" => HandleCreate(name, parent, position, rotation, scale, tag, layer, primitiveType, prefabPath, componentsToAdd),
-                    "modify" => HandleModify(target, name, parent, position, rotation, scale, setActive, tag, layer, componentsToAdd, componentsToRemove),
-                    "delete" => HandleDelete(target),
-                    "duplicate" => HandleDuplicate(target, newName, position, offset, parent),
-                    "move_relative" => HandleMoveRelative(target, referenceObject, direction, distance, offset, worldSpace),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: create, modify, delete, duplicate, move_relative")
-                };
+                return HandleModify(target, name, parent, position, rotation, scale, setActive, tag, layer, componentsToAdd, componentsToRemove);
             }
-            catch (MCPException)
+            catch (MCPException) { throw; }
+            catch (Exception ex) { throw new MCPException($"Error modifying GameObject: {ex.Message}", ex, MCPErrorCodes.InternalError); }
+        }
+
+        /// <summary>
+        /// Deletes one or more GameObjects from the scene.
+        /// </summary>
+        [MCPAction("delete", Description = "Delete a GameObject", DestructiveHint = true)]
+        public static object Delete(
+            [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target = null)
+        {
+            // Usability improvement: alias 'name' to 'target' is not needed here since target is required
+
+            try
             {
-                throw;
+                return HandleDelete(target);
             }
-            catch (Exception exception)
+            catch (MCPException) { throw; }
+            catch (Exception ex) { throw new MCPException($"Error deleting GameObject: {ex.Message}", ex, MCPErrorCodes.InternalError); }
+        }
+
+        /// <summary>
+        /// Duplicates an existing GameObject.
+        /// </summary>
+        [MCPAction("duplicate", Description = "Duplicate a GameObject")]
+        public static object Duplicate(
+            [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target = null,
+            [MCPParam("new_name", "New name for duplicated object")] string newName = null,
+            [MCPParam("position", "World position as [x,y,z] array or {x,y,z} object")] object position = null,
+            [MCPParam("offset", "Position offset as [x,y,z] from the original")] object offset = null,
+            [MCPParam("parent", "Instance ID or name/path of parent GameObject")] string parent = null)
+        {
+            try
             {
-                return new
-                {
-                    success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
-                };
+                return HandleDuplicate(target, newName, position, offset, parent);
             }
+            catch (MCPException) { throw; }
+            catch (Exception ex) { throw new MCPException($"Error duplicating GameObject: {ex.Message}", ex, MCPErrorCodes.InternalError); }
+        }
+
+        /// <summary>
+        /// Moves a GameObject relative to a reference object.
+        /// </summary>
+        [MCPAction("move_relative", Description = "Move a GameObject relative to a reference object")]
+        public static object MoveRelative(
+            [MCPParam("target", "Instance ID (int) or name/path (string) to identify target GameObject", required: true)] string target = null,
+            [MCPParam("reference_object", "Reference object for move_relative action")] string referenceObject = null,
+            [MCPParam("direction", "Direction for move_relative: left, right, up, down, forward, back")] string direction = null,
+            [MCPParam("distance", "Distance for move_relative")] float distance = 1f,
+            [MCPParam("offset", "Position offset as [x,y,z]")] object offset = null,
+            [MCPParam("world_space", "Use world space for move_relative (default: true)")] bool worldSpace = true)
+        {
+            try
+            {
+                return HandleMoveRelative(target, referenceObject, direction, distance, offset, worldSpace);
+            }
+            catch (MCPException) { throw; }
+            catch (Exception ex) { throw new MCPException($"Error moving GameObject: {ex.Message}", ex, MCPErrorCodes.InternalError); }
         }
 
         #endregion

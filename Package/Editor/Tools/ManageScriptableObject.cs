@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using UnityMCP.Editor;
 using UnityMCP.Editor.Core;
 using UnityMCP.Editor.Services;
 using UnityMCP.Editor.Utilities;
@@ -15,46 +16,25 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Tool for managing ScriptableObject assets: create, modify, get, and list.
     /// </summary>
+    [MCPTool("manage_scriptable_object", "Manage ScriptableObjects: create, modify, get, list", Category = "Asset")]
     public static class ManageScriptableObject
     {
+        #region Actions
+
         /// <summary>
-        /// Manages ScriptableObject assets: create, modify, get, or list.
+        /// Creates a new ScriptableObject asset.
         /// </summary>
-        /// <param name="action">The action to perform: create, modify, get, list</param>
-        /// <param name="typeName">Full or short type name for the ScriptableObject class</param>
-        /// <param name="folderPath">Folder path for create (e.g., "Assets/Data")</param>
-        /// <param name="assetName">Name for the asset file</param>
-        /// <param name="assetPath">Path to existing asset for modify/get</param>
-        /// <param name="overwrite">Whether to overwrite existing asset (default: false)</param>
-        /// <param name="patches">Array of property patches for create/modify</param>
-        /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_scriptable_object", "Manage ScriptableObjects: create, modify, get, list", Category = "Asset", DestructiveHint = true)]
-        public static object Execute(
-            [MCPParam("action", "Action: create, modify, get, list", required: true, Enum = new[] { "create", "modify", "get", "list" })] string action,
-            [MCPParam("type_name", "ScriptableObject type name (full or short)")] string typeName = null,
+        [MCPAction("create", Description = "Create a new ScriptableObject asset")]
+        public static object Create(
+            [MCPParam("type_name", "ScriptableObject type name (full or short)", required: true)] string typeName,
+            [MCPParam("asset_name", "Asset file name (without .asset extension)", required: true)] string assetName,
             [MCPParam("folder_path", "Folder path for create (e.g., Assets/Data)")] string folderPath = null,
-            [MCPParam("asset_name", "Asset file name (without .asset extension)")] string assetName = null,
-            [MCPParam("asset_path", "Path to existing asset for modify/get")] string assetPath = null,
             [MCPParam("overwrite", "Overwrite existing asset (default: false)")] bool overwrite = false,
             [MCPParam("patches", "Property patches array: [{path, value, op}]")] List<object> patches = null)
         {
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                throw MCPException.InvalidParams("The 'action' parameter is required.");
-            }
-
-            string normalizedAction = action.Trim().ToLowerInvariant();
-
             try
             {
-                return normalizedAction switch
-                {
-                    "create" => HandleCreate(typeName, folderPath, assetName, overwrite, patches),
-                    "modify" => HandleModify(assetPath, patches),
-                    "get" => HandleGet(assetPath),
-                    "list" => HandleList(typeName, folderPath),
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: create, modify, get, list")
-                };
+                return HandleCreate(typeName, folderPath, assetName, overwrite, patches);
             }
             catch (MCPException)
             {
@@ -62,14 +42,96 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[ManageScriptableObject] Error executing action '{action}': {exception.Message}");
+                Debug.LogWarning($"[ManageScriptableObject] Error executing action 'create': {exception.Message}");
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'create': {exception.Message}"
                 };
             }
         }
+
+        /// <summary>
+        /// Modifies an existing ScriptableObject asset with property patches.
+        /// </summary>
+        [MCPAction("modify", Description = "Modify properties of an existing ScriptableObject asset")]
+        public static object Modify(
+            [MCPParam("asset_path", "Path to existing asset for modify", required: true)] string assetPath,
+            [MCPParam("patches", "Property patches array: [{path, value, op}]")] List<object> patches = null)
+        {
+            try
+            {
+                return HandleModify(assetPath, patches);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageScriptableObject] Error executing action 'modify': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'modify': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Gets detailed information about a ScriptableObject asset.
+        /// </summary>
+        [MCPAction("get", Description = "Get detailed information about a ScriptableObject asset", ReadOnlyHint = true)]
+        public static object Get(
+            [MCPParam("asset_path", "Path to existing asset", required: true)] string assetPath)
+        {
+            try
+            {
+                return HandleGet(assetPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageScriptableObject] Error executing action 'get': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'get': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Lists ScriptableObject assets, optionally filtered by type and folder.
+        /// </summary>
+        [MCPAction("list", Description = "List ScriptableObject assets by type or folder", ReadOnlyHint = true)]
+        public static object List(
+            [MCPParam("type_name", "ScriptableObject type name (full or short)")] string typeName = null,
+            [MCPParam("folder_path", "Folder path to search in")] string folderPath = null)
+        {
+            try
+            {
+                return HandleList(typeName, folderPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageScriptableObject] Error executing action 'list': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'list': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
 
         #region Action Handlers
 

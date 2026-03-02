@@ -81,21 +81,21 @@ namespace UnityMCP.Editor.Tools
 ## Key Tools
 - `gameobject_manage` - Create, modify, delete, duplicate, move objects.
 - `component_manage` - Add/remove/modify components on GameObjects.
-- `find_gameobjects` - Search for objects by name, tag, layer, or component type.
-- `selection_set` / `selection_get` - Track which objects are selected in the Editor.",
+- `gameobject_find` - Search for objects by name, tag, layer, or component type.
+- `selection` action='get' / action='set' - Track which objects are selected in the Editor.",
 
             ["scripting"] = @"# Scripting Guide
 
 ## Script Creation Workflow
-1. Use `script_manage` with action='create' to generate a new C# script file.
+1. Use `manage_script` with action='create' to generate a new C# script file.
 2. Call `unity_refresh` with compile='request' to trigger compilation.
 3. Check `console_read` for compilation errors - fix any issues in the script.
 4. Once compiled, attach the script using `component_manage` action='add' with the script's class name.
-5. Configure exposed fields via `component_manage` action='modify'.
+5. Configure exposed fields via `component_manage` action='set_property'.
 
 ## Script Editing Workflow
-1. Use `script_manage` action='read' to view current script contents.
-2. Use `script_manage` action='write' to update the script.
+1. Use `manage_script` action='read' to view current script contents.
+2. Use `manage_script` action='update' to update the script.
 3. Call `unity_refresh` with compile='request' after every edit.
 4. Always check `console_read` for errors before proceeding.
 
@@ -104,7 +104,7 @@ namespace UnityMCP.Editor.Tools
 - Colliders (BoxCollider, SphereCollider, MeshCollider): Required for physics interactions and triggers.
 - AudioSource: Needs an AudioClip assigned to play sounds.
 - Animator: Requires an AnimatorController asset for animation state machines.
-- Use `component_manage` action='get' to inspect component properties and available fields.
+- Use `component_manage` action='inspect' to inspect component properties and available fields.
 
 ## MonoBehaviour Lifecycle (execution order)
 - Awake() -> OnEnable() -> Start() [initialization phase]
@@ -120,7 +120,7 @@ namespace UnityMCP.Editor.Tools
 - Use `[RequireComponent(typeof(...))]` to enforce component dependencies.
 
 ## Key Tools
-- `script_manage` - Create, read, write, and search for scripts.
+- `manage_script` - Create, read, update, delete, and validate scripts.
 - `component_manage` - Attach scripts and configure serialized fields.
 - `console_read` - Check for compilation and runtime errors.
 - `unity_refresh` - Trigger compilation after script changes.",
@@ -128,10 +128,10 @@ namespace UnityMCP.Editor.Tools
             ["materials"] = @"# Materials and Shaders Guide
 
 ## Material Setup Pipeline
-1. Use `material_manage` action='create' to create a new material.
+1. Use `manage_material` action='create' to create a new material.
 2. Specify a shader (default is 'Standard' for Built-in RP, or 'Universal Render Pipeline/Lit' for URP).
-3. Use `material_manage` action='modify' to set properties (colors, textures, values).
-4. Assign the material to a renderer via `component_manage` action='modify' on MeshRenderer/SkinnedMeshRenderer.
+3. Use `manage_material` action='set_property' or action='set_color' to set properties.
+4. Assign the material to a renderer via `manage_material` action='assign_to_renderer'.
 
 ## Common Shader Properties (Standard/URP Lit)
 - _Color / _BaseColor: Main tint color as [r, g, b, a] with values 0-1.
@@ -140,11 +140,11 @@ namespace UnityMCP.Editor.Tools
 - _Smoothness / _Glossiness: Surface smoothness 0-1.
 - _BumpMap / _NormalMap: Normal map texture for surface detail.
 - _EmissionColor: Emission color (set to non-black to enable emission).
-- Use `shader_get_info` to discover all properties for any shader.
+- Use `manage_shader` action='get' to discover all properties for any shader.
 
 ## Texture Import Settings
-- Use `texture_manage` action='get_settings' to check current import settings.
-- Use `texture_manage` action='set_settings' to configure:
+- Use `manage_texture` action='get' to check current import settings.
+- Use `manage_texture` action='set_import_settings' to configure:
   - textureType: 'Default', 'NormalMap', 'Sprite', 'Cursor', 'Lightmap'.
   - maxSize: Power of 2 (256, 512, 1024, 2048, 4096). Smaller = less memory.
   - compression: 'None', 'LowQuality', 'NormalQuality', 'HighQuality'.
@@ -152,14 +152,14 @@ namespace UnityMCP.Editor.Tools
 - Normal maps: Set textureType to 'NormalMap' before assigning to _BumpMap.
 
 ## Material Inspection
-- `material_manage` action='get' returns all current property values.
-- `shader_get_info` lists every property the shader exposes with types and defaults.
+- `manage_material` action='get_info' returns all current property values.
+- `manage_shader` action='get' lists every property the shader exposes with types and defaults.
 - Use `asset_manage` action='search' with type filter 'Material' to find existing materials.
 
 ## Key Tools
-- `material_manage` - Create, modify, inspect, and search materials.
-- `shader_get_info` - List shader properties, keywords, and render queue.
-- `texture_manage` - Import settings and texture configuration.
+- `manage_material` - Create, modify, inspect, and assign materials.
+- `manage_shader` - Get shader info, list/find shaders, manage keywords.
+- `manage_texture` - Import settings and texture configuration.
 - `asset_manage` - Search and manage material/texture assets.",
 
             ["debugging"] = @"# Debugging Guide
@@ -176,27 +176,27 @@ namespace UnityMCP.Editor.Tools
 
 ## Diagnostic Workflow
 1. Use `scene_get_hierarchy` to verify scene structure is correct.
-2. Use `component_manage` action='get' to inspect component state and field values.
-3. Use `find_gameobjects` to verify objects exist with expected names/tags/components.
+2. Use `component_manage` action='inspect' to inspect component state and field values.
+3. Use `gameobject_find` to verify objects exist with expected names/tags/components.
 4. Use `scene_screenshot` to visually verify the scene state.
-5. Use `selection_set` then `selection_get` to focus on specific objects.
+5. Use `selection` action='set' then action='get' to focus on specific objects.
 
 ## Profiler Workflow (Performance)
-1. Start a capture with `profiler_capture` specifying duration and categories.
+1. Start a capture with `profiler` action='start' specifying duration.
 2. This returns a job_id immediately (async operation).
-3. Poll `profiler_get_job` with the job_id until status is 'completed'.
+3. Poll `profiler` action='get_job' with the job_id until status is 'completed'.
 4. Results include frame times, CPU/GPU usage, memory stats, and top functions.
 5. Look for frames exceeding 16.67ms (60fps target) or 33.33ms (30fps target).
 
 ## Common Error Patterns and Fixes
 - 'Can't add component because class doesn't exist': Script has compilation errors or class name doesn't match filename. Check `console_read` for compile errors.
-- 'Material doesn't have property': Wrong property name for the shader. Use `shader_get_info` to find correct names.
-- 'Object reference not set': A serialized field is null. Use `component_manage` action='get' to check, then action='modify' to assign.
+- 'Material doesn't have property': Wrong property name for the shader. Use `manage_shader` action='get' to find correct names.
+- 'Object reference not set': A serialized field is null. Use `component_manage` action='inspect' to check, then action='set_property' to assign.
 - 'Script class cannot be found': Call `unity_refresh` with compile='request' first.
 
 ## Key Tools
 - `console_read` - Read and filter Unity Console log entries.
-- `profiler_capture` / `profiler_get_job` - Performance profiling (async).
+- `profiler` action='start' / action='get_job' - Performance profiling (async).
 - `scene_screenshot` - Visual verification of scene state.
 - `scene_get_hierarchy` - Structural verification of scene objects.",
 
@@ -205,15 +205,15 @@ namespace UnityMCP.Editor.Tools
 ## Build Workflow
 1. Verify there are no compilation errors: `console_read` with types='error'.
 2. Ensure the scene is saved: `scene_save`.
-3. Start a build with `build_start`, specifying target platform and scenes.
+3. Start a build with `build` action='start', specifying target platform and scenes.
 4. This returns a job_id immediately (async operation).
-5. Poll `build_get_job` with the job_id until status is 'completed' or 'failed'.
+5. Poll `build` action='get_job' with the job_id until status is 'completed' or 'failed'.
 6. Check build result for errors in the response.
 
 ## Test Running
-1. Use `run_tests` to start test execution (EditMode or PlayMode).
+1. Use `tests` action='run' to start test execution (EditMode or PlayMode).
 2. This returns a job_id immediately (async operation).
-3. Poll `get_test_job` with the job_id until status is 'completed'.
+3. Poll `tests` action='get_job' with the job_id until status is 'completed'.
 4. Results include pass/fail counts and individual test results with messages.
 5. Fix failing tests, recompile with `unity_refresh`, then re-run.
 
@@ -232,8 +232,8 @@ All long-running operations (build, test, profiler) follow the same pattern:
 6. If 'failed', the result payload contains error details.
 
 ## Key Tools
-- `build_start` / `build_get_job` - Build pipeline (async).
-- `run_tests` / `get_test_job` - Test execution (async).
+- `build` action='start' / action='get_job' - Build pipeline (async).
+- `tests` action='run' / action='get_job' - Test execution (async).
 - `console_read` - Check for build/compile errors before building.
 - `scene_save` - Save scenes before building.
 - `manage_editor` - Check and configure editor/build settings.",
@@ -256,7 +256,7 @@ All long-running operations (build, test, profiler) follow the same pattern:
 ## EventSystem Requirements
 - Every scene with UI interaction needs exactly one EventSystem object.
 - If UI clicks aren't working, check for a missing EventSystem.
-- Use `find_gameobjects` with component_type='EventSystem' to verify.
+- Use `gameobject_find` with component_type='EventSystem' to verify.
 - Create one via `execute_menu_item` with 'GameObject/UI/Event System'.
 
 ## UI Toolkit Querying
@@ -269,7 +269,7 @@ All long-running operations (build, test, profiler) follow the same pattern:
 - `uitoolkit_query` - Inspect UI Toolkit panels and elements.
 - `gameobject_manage` - Create Canvas and UI GameObjects.
 - `component_manage` - Configure UI components (Canvas, Image, Button, Text).
-- `find_gameobjects` - Verify EventSystem and Canvas existence.
+- `gameobject_find` - Verify EventSystem and Canvas existence.
 - `execute_menu_item` - Access Unity's built-in UI creation menu items.",
 
             ["workflows"] = @"# Multi-Step Workflow Recipes
@@ -277,10 +277,10 @@ All long-running operations (build, test, profiler) follow the same pattern:
 ## Create a Prefab from Scratch
 1. `gameobject_manage` action='create' -> create the base object (e.g., cube, empty).
 2. `component_manage` action='add' -> add required components (Rigidbody, Collider, scripts).
-3. `component_manage` action='modify' -> configure component properties.
-4. `material_manage` action='create' -> create a material for appearance.
-5. `component_manage` action='modify' -> assign material to MeshRenderer.
-6. `prefab_manage` action='create' -> save as prefab asset at desired path.
+3. `component_manage` action='set_property' -> configure component properties.
+4. `manage_material` action='create' -> create a material for appearance.
+5. `manage_material` action='assign_to_renderer' -> assign material to MeshRenderer.
+6. `prefab_manage` action='create_from_gameobject' -> save as prefab asset at desired path.
 
 ## Set Up a Complete Scene
 1. `scene_create` -> create a new empty scene.
@@ -292,36 +292,36 @@ All long-running operations (build, test, profiler) follow the same pattern:
 
 ## Debug a Runtime Error
 1. `console_read` types='error' include_stacktrace=true -> identify the error.
-2. `script_manage` action='read' -> read the problematic script.
-3. `component_manage` action='get' -> inspect the failing component's field values.
-4. `script_manage` action='write' -> fix the script.
+2. `manage_script` action='read' -> read the problematic script.
+3. `component_manage` action='inspect' -> inspect the failing component's field values.
+4. `manage_script` action='update' -> fix the script.
 5. `unity_refresh` compile='request' -> recompile.
 6. `console_read` types='error' -> verify the error is resolved.
 
 ## Create and Apply a Custom Material
-1. `shader_get_info` -> inspect available shader properties.
-2. `material_manage` action='create' -> create material with chosen shader.
-3. `material_manage` action='modify' -> set color, texture, and value properties.
-4. `find_gameobjects` -> find target objects.
-5. `component_manage` action='modify' -> assign material to each object's renderer.
+1. `manage_shader` action='get' -> inspect available shader properties.
+2. `manage_material` action='create' -> create material with chosen shader.
+3. `manage_material` action='set_property' / action='set_color' -> set color, texture, and value properties.
+4. `gameobject_find` -> find target objects.
+5. `manage_material` action='assign_to_renderer' -> assign material to each object's renderer.
 6. `scene_screenshot` -> visually verify the result.
 
 ## Iterative Script Development
-1. `script_manage` action='create' -> create initial script.
+1. `manage_script` action='create' -> create initial script.
 2. `unity_refresh` compile='request' -> compile.
 3. `console_read` types='error' -> check for compilation errors.
-4. If errors: `script_manage` action='write' -> fix, then repeat steps 2-3.
+4. If errors: `manage_script` action='update' -> fix, then repeat steps 2-3.
 5. `component_manage` action='add' -> attach compiled script to a GameObject.
-6. `component_manage` action='modify' -> configure serialized fields.
-7. `play_mode_control` action='enter' -> test in play mode.
+6. `component_manage` action='set_property' -> configure serialized fields.
+7. `playmode` action='enter' -> test in play mode.
 8. `console_read` types='error,warning,log' -> check runtime behavior.
 
 ## Performance Investigation
-1. `profiler_capture` -> start profiling session.
-2. `profiler_get_job` -> poll until complete.
+1. `profiler` action='start' -> start profiling session.
+2. `profiler` action='get_job' -> poll until complete.
 3. Analyze frame times and hotspots in the results.
 4. `scene_get_hierarchy` -> check for excessive object counts.
-5. `component_manage` action='get' -> inspect suspected expensive components.
+5. `component_manage` action='inspect' -> inspect suspected expensive components.
 6. Make optimizations, then re-profile to verify improvement.
 
 ## Tool Chaining Tips
@@ -329,7 +329,7 @@ All long-running operations (build, test, profiler) follow the same pattern:
 - Use `scene_get_hierarchy` before and after bulk operations to verify changes.
 - Use `scene_screenshot` after visual changes to confirm the result.
 - Save frequently with `scene_save` to avoid losing work.
-- Use `find_gameobjects` to locate objects by name/tag instead of hardcoding instance IDs.
+- Use `gameobject_find` to locate objects by name/tag instead of hardcoding instance IDs.
 - For async operations (build, test, profiler), always use the poll pattern: start -> get_job -> check status.
 
 ## Checkpoint & Asset Tracking
@@ -338,7 +338,7 @@ All long-running operations (build, test, profiler) follow the same pattern:
 - All destructive tools (create, modify, delete, etc.) automatically call `CheckpointManager.Track()` to register modified assets.
 - When a checkpoint is saved, all pending tracked assets are snapshotted alongside the scene file.
 - Restoring a checkpoint restores both the scene and all tracked asset files.
-- Use `scene_diff` to compare checkpoints, including tracked asset differences.
+- Use `scene_checkpoint` action='diff' to compare checkpoints, including tracked asset differences.
 
 ### Tool Author Convention for Track()
 When writing new tools that modify **project assets** (materials, scripts, prefabs, textures, ScriptableObjects), add a one-liner after each mutation:
@@ -347,7 +347,30 @@ When writing new tools that modify **project assets** (materials, scripts, prefa
 - Place Track() **after** the modification is complete (after SetDirty, SaveAssets, etc.).
 - For **delete** operations, Track() goes **before** the deletion (the object is destroyed after).
 - **Do NOT** call Track() on scene GameObjects or components — they have no asset path and the call is a no-op. Scene changes are captured by the scene file copy.
-- Import `using UnityMCP.Editor.Services;` to access CheckpointManager."
+- Import `using UnityMCP.Editor.Services;` to access CheckpointManager.",
+
+            ["getting_started"] = @"# Getting Started with UnityMCP
+
+## First Steps
+1. Call `scene_get_active` to see what scene is loaded and whether it has unsaved changes.
+2. Call `scene_describe` for an overview of the scene (camera, lighting, objects, issues).
+3. Call `scene_checkpoint` action='save' to create a safety checkpoint before making changes.
+
+## Core Workflow: Find -> Inspect -> Modify -> Verify
+- `gameobject_find` or `scene_get_hierarchy` to locate objects (returns instance IDs).
+- `component_manage` action='inspect' to read component properties.
+- `gameobject_manage` or `component_manage` to make changes.
+- `scene_screenshot` or `component_manage` action='inspect' to verify results.
+
+## Safety Practices
+- Save checkpoints before destructive operations (delete, bulk modify, script edits).
+- Check `console_read` after `unity_refresh` or script changes for compile errors.
+- Use `scene_save` periodically to persist changes to disk.
+
+## Discovering More Tools
+- `search_tools` with no args for a full category listing.
+- `unity_guide` with a topic for detailed guidance: scene, gameobjects, scripting, materials, debugging, building, ui, workflows.
+- `diagnose` to scan for missing references, shader issues, and build problems."
         };
 
         private const string OverviewContent = @"# Unity MCP Tool Guide
@@ -355,6 +378,7 @@ When writing new tools that modify **project assets** (materials, scripts, prefa
 ## Available Topics
 Call unity_guide with a topic parameter for detailed guidance on each area:
 
+- **getting_started** - First steps, core workflow pattern, safety practices, and tool discovery.
 - **scene** - Scene composition, hierarchy structure, lighting setup, and coordinate conventions.
 - **gameobjects** - Object creation, parenting, transform conventions, and prefab workflow.
 - **scripting** - Script lifecycle, creation-to-attachment workflow, and common component patterns.
@@ -368,7 +392,7 @@ Call unity_guide with a topic parameter for detailed guidance on each area:
 - **Coordinate System:** Left-handed Y-up. X=right, Y=up, Z=forward. 1 unit = 1 meter. Rotations in degrees.
 - **Scale Norms:** Default scale is [1,1,1]. Standard humanoid is ~1.8 units tall. Keep uniform scale to avoid distortion.
 - **Naming Conventions:** Use PascalCase for GameObjects ('PlayerCharacter'), paths with forward slashes ('Environment/Trees/Oak01'), and descriptive names that indicate purpose.
-- **Async Pattern:** Long operations (build, test, profiler) return a job_id. Poll the corresponding get_job tool until status is 'completed' or 'failed'.";
+- **Async Pattern:** Long operations (build, test, profiler) return a job_id. Poll the same tool with action='get_job' until status is 'completed' or 'failed'.";
 
         #endregion
 
@@ -379,9 +403,9 @@ Call unity_guide with a topic parameter for detailed guidance on each area:
         /// When called without a topic, returns an overview of all available topics.
         /// When called with a topic, returns detailed guidance for that area.
         /// </summary>
-        [MCPTool("unity_guide", "Returns guidance for AI agents on using Unity tools and conventions", Category = "Guide", ReadOnlyHint = true)]
+        [MCPTool("unity_guide", "Returns guidance on Unity tools, conventions, and workflow recipes. New session? Start with topic='getting_started'. Use topic='workflows' for tool chaining recipes.", Category = "Guide", ReadOnlyHint = true)]
         public static object Guide(
-            [MCPParam("topic", "Topic to get guidance on", Enum = new[] { "scene", "gameobjects", "scripting", "materials", "debugging", "building", "ui", "workflows" })] string topic = null)
+            [MCPParam("topic", "Topic to get guidance on", Enum = new[] { "getting_started", "scene", "gameobjects", "scripting", "materials", "debugging", "building", "ui", "workflows" })] string topic = null)
         {
             try
             {

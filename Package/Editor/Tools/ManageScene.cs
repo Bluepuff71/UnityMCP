@@ -530,7 +530,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Captures a screenshot of the Game View or Scene View, with optional target framing and camera angle.
         /// </summary>
-        [MCPTool("scene_screenshot", "Captures a screenshot of the Game View or Scene View with optional target framing and camera angle", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("scene_screenshot", "Captures a screenshot of the Game View or Scene View with optional target framing and camera angle", Category = "Scene", ReadOnlyHint = true)]
         public static object CaptureScreenshot(
             [MCPParam("filename", "Filename for the screenshot (without extension)")] string filename = null,
             [MCPParam("super_size", "Multiplier for resolution (1-4, default: 1)", Minimum = 1, Maximum = 4)] int superSize = 1,

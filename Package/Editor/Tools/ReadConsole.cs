@@ -11,6 +11,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Provides access to Unity Console log entries using reflection to access internal APIs.
     /// </summary>
+    [MCPTool("console_read", "Reads Unity Console log entries with filtering and pagination. Check after unity_refresh or script changes to catch compile errors. Use types='error,warning' to filter for problems.", Category = "Console")]
     public static class ReadConsole
     {
         #region Constants
@@ -129,14 +130,13 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
-        #region Main Tool Entry Point
+        #region Actions
 
         /// <summary>
-        /// Reads Unity Console log entries with filtering and pagination support.
+        /// Reads Unity Console log entries with filtering, pagination, deduplication, and message truncation.
         /// </summary>
-        [MCPTool("console_read", "Reads Unity Console log entries with filtering and pagination", Category = "Console", DestructiveHint = true)]
-        public static object Read(
-            [MCPParam("action", "Action to perform: 'get' to read entries, 'clear' to clear console (default: get)", Enum = new[] { "get", "clear" })] string action = "get",
+        [MCPAction("get", Description = "Read console log entries with filtering and pagination", ReadOnlyHint = true)]
+        public static object Get(
             [MCPParam("types", "Comma-separated log types to include: error, warning, log, all (default: error,warning)")] string types = "error,warning",
             [MCPParam("count", "Maximum entries to return (non-paging mode, overrides page_size if set)")] int? count = null,
             [MCPParam("page_size", "Entries per page (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
@@ -147,7 +147,6 @@ namespace UnityMCP.Editor.Tools
             [MCPParam("deduplicate", "Collapse consecutive identical messages into one with a count (default: true)")] bool deduplicate = true,
             [MCPParam("max_message_length", "Maximum message length before truncation (default: 500, 0 for unlimited)", Minimum = 0)] int maxMessageLength = DefaultMaxMessageLength)
         {
-            // Check if reflection is available
             if (!isReflectionInitialized)
             {
                 return new
@@ -157,19 +156,30 @@ namespace UnityMCP.Editor.Tools
                 };
             }
 
-            string normalizedAction = (action ?? "get").ToLowerInvariant().Trim();
+            return GetEntries(types, count, pageSize, cursor, filterText, format, includeStacktrace, deduplicate, maxMessageLength);
+        }
 
-            return normalizedAction switch
+        /// <summary>
+        /// Clears the Unity Console.
+        /// </summary>
+        [MCPAction("clear", Description = "Clear all console log entries", DestructiveHint = true)]
+        public static object Clear()
+        {
+            if (!isReflectionInitialized)
             {
-                "get" => GetEntries(types, count, pageSize, cursor, filterText, format, includeStacktrace, deduplicate, maxMessageLength),
-                "clear" => ClearConsole(),
-                _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: get, clear")
-            };
+                return new
+                {
+                    success = false,
+                    error = $"Console API not available: {reflectionError}"
+                };
+            }
+
+            return ClearConsole();
         }
 
         #endregion
 
-        #region Actions
+        #region Action Implementations
 
         /// <summary>
         /// Gets console log entries with filtering, pagination, deduplication, and message truncation.
