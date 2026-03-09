@@ -7,18 +7,8 @@
 
 Unity-native [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for AI-powered game development. Connect Claude, Codex, Cursor, and other AI assistants directly to the Unity Editor — no Node.js, Python, or external runtimes required. Install the package and start building.
 
-## New in v2.0
-
-- **Action-based tools** — Related operations grouped under one tool with an `action` parameter. `manage_gameobject` replaces separate create/delete/modify tools. Per-action safety annotations tell AI assistants exactly which actions are destructive.
-- **Scene checkpoints** — Save and restore scene state with asset tracking. Bucket model: mutable active checkpoint freezes into immutable history. Diff any two checkpoints to see what changed.
-- **Recipes** — One-call scene setup templates. `execute_recipe` with `fps_prototype` builds a playable FPS scene in one tool call. 4 built-in recipes, extensible with `[MCPRecipe]`.
-- **Vision capture** — `vision_capture` sends Game/Scene View screenshots (including Canvas UI overlays) directly to AI assistants as base64 images for visual analysis.
-- **Scene diagnostics** — `describe_scene` generates a narrative overview. `diagnose_scene` scans for missing references, shader issues, and build problems with structured severity levels.
-- **Guided workflows** — `get_unity_guide` returns markdown guides by topic so AI assistants learn your toolset on demand.
-- **Scene export** — `export_scene` packages your scene as a `.unitypackage`, screenshot gallery (4 angles), or markdown report.
-- **Editor window rebuilt** — UI Toolkit tabbed interface with Status, Activity, Registry (searchable tool/resource/prompt/recipe catalog), and Checkpoints tabs.
-- **Verb-first naming** — All tools renamed for consistency: `manage_gameobject`, `run_build`, `read_console`, `find_gameobject`, etc.
-- **Domain reload resilience** — Compilation gate defers requests during recompilation. Response dedup cache prevents duplicate tool execution.
+> [!TIP]
+> **New in v2.0** — Vision capture, scene checkpoints, recipes, scene diagnostics, guided workflows, action-based tools, scene export, and a redesigned editor window.
 
 ## Features
 
