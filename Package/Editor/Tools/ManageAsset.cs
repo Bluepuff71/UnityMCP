@@ -14,7 +14,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles asset management operations including create, delete, move, duplicate, import, and search.
     /// </summary>
-    [MCPTool("asset_manage", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset")]
+    [MCPTool("manage_asset", "Manages assets: create, delete, move, rename, duplicate, import, search, get_info, create_folder", Category = "Asset")]
     public static class ManageAsset
     {
         private const int DefaultPageSize = 50;

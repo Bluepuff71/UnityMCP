@@ -13,7 +13,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Lists all available scene recipes with descriptions and parameters.
         /// </summary>
-        [MCPTool("recipe_list", "Lists all available scene recipes with descriptions and parameters", Category = "Recipes", ReadOnlyHint = true)]
+        [MCPTool("list_recipes", "Lists all available scene recipes with descriptions and parameters", Category = "Recipes", ReadOnlyHint = true)]
         public static object ListRecipes()
         {
             var definitions = RecipeRegistry.GetDefinitions();
@@ -60,7 +60,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Executes a scene recipe by name with optional parameters.
         /// </summary>
-        [MCPTool("recipe_execute", "Execute a scene recipe by name", Category = "Recipes", DestructiveHint = true)]
+        [MCPTool("execute_recipe", "Execute a scene recipe by name", Category = "Recipes", DestructiveHint = true)]
         public static object ExecuteRecipe(
             [MCPParam("name", "Name of the recipe to execute", required: true)] string name,
             [MCPParam("params", "JSON object of recipe parameters")] string paramsJson = null)

@@ -17,7 +17,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles component operations on GameObjects including add, remove, and set_property actions.
     /// </summary>
-    [MCPTool("component_manage", "Manages components: add, remove, set_property, or inspect on GameObjects. Use action='inspect' first to discover available properties before set_property. Requires a target instance ID from gameobject_find.", Category = "Component")]
+    [MCPTool("manage_component", "Manages components: add, remove, set_property, or inspect on GameObjects. Use action='inspect' first to discover available properties before set_property. Requires a target instance ID from find_gameobject.", Category = "Component")]
     public static class ManageComponents
     {
         #region Constants

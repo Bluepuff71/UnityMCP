@@ -12,7 +12,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Build Unity player builds and poll job status.
     /// </summary>
-    [MCPTool("build", "Manage player builds: start a build or poll job status", Category = "Build")]
+    [MCPTool("run_build", "Manage player builds: start a build or poll job status", Category = "Build")]
     public static class BuildTools
     {
         [MCPAction("start", Description = "Start a player build, returns job_id for polling")]

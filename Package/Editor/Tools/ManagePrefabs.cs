@@ -16,7 +16,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles prefab stage operations including opening, closing, saving, and creating prefabs.
     /// </summary>
-    [MCPTool("prefab_manage", "Manages prefab operations: open_stage, close_stage, save_open_stage, create_from_gameobject", Category = "Asset")]
+    [MCPTool("manage_prefab", "Manages prefab operations: open_stage, close_stage, save_open_stage, create_from_gameobject", Category = "Asset")]
     public static class ManagePrefabs
     {
         #region Action Methods

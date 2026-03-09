@@ -33,7 +33,7 @@ namespace UnityMCP.Editor.Core
         /// <summary>
         /// Records a tool invocation.
         /// </summary>
-        /// <param name="toolName">The MCP tool name (e.g. "gameobject_manage").</param>
+        /// <param name="toolName">The MCP tool name (e.g. "manage_gameobject").</param>
         /// <param name="success">Whether the tool completed without throwing.</param>
         /// <param name="detail">Optional short detail string.</param>
         public static void Record(string toolName, bool success, string detail = null)

@@ -10,7 +10,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// MCP tools for saving, restoring, and comparing scene checkpoints.
     /// </summary>
-    [MCPTool("scene_checkpoint", "Save, restore, or compare scene checkpoints for undo/restore. Call with action='save' before destructive operations (deleting objects, editing scripts, bulk modifications).", Category = "Scene")]
+    [MCPTool("manage_checkpoint", "Save, restore, or compare scene checkpoints for undo/restore. Call with action='save' before destructive operations (deleting objects, editing scripts, bulk modifications).", Category = "Scene")]
     public static class SceneCheckpoint
     {
         #region Save

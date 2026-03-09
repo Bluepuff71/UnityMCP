@@ -69,7 +69,7 @@ namespace UnityMCP.Editor.UI.Tabs
             // Empty state
             _emptyState = new VisualElement();
             _emptyState.AddToClassList("empty-state");
-            Label emptyLabel = new Label("No checkpoints saved.\nUse the button above or call scene_checkpoint from an AI client.");
+            Label emptyLabel = new Label("No checkpoints saved.\nUse the button above or call manage_checkpoint from an AI client.");
             emptyLabel.AddToClassList("empty-state-text");
             _emptyState.Add(emptyLabel);
         }

@@ -18,14 +18,14 @@ namespace UnityMCP.Editor.Prompts
 
             string instructions = $@"Use the following MCP tools to read detailed info about the GameObject named ""{name}"":
 
-1. Use `gameobject_find` with search_term=""{name}"" to find the GameObject and get its instance ID
-2. Use `component_manage` with action=""inspect"" and target=""{name}"" and component_type=""Transform"" to see its position, rotation, and scale
-3. Use `gameobject_find` with search_term=""{name}"" to see what components are attached";
+1. Use `find_gameobject` with search_term=""{name}"" to find the GameObject and get its instance ID
+2. Use `manage_component` with action=""inspect"" and target=""{name}"" and component_type=""Transform"" to see its position, rotation, and scale
+3. Use `find_gameobject` with search_term=""{name}"" to see what components are attached";
 
             if (showChildren)
             {
                 instructions += $@"
-4. Use `scene_get_hierarchy` with parent=""{name}"" and max_depth=3 to see the children hierarchy";
+4. Use `get_scene_hierarchy` with parent=""{name}"" and max_depth=3 to see the children hierarchy";
             }
 
             return new PromptResult
@@ -52,11 +52,11 @@ namespace UnityMCP.Editor.Prompts
         {
             string instructions = $@"Use the following MCP tools to inspect the prefab at ""{path}"":
 
-1. Use `asset_manage` with action=""get_info"" and path=""{path}"" to get the prefab asset details
-2. Use `prefab_manage` with action=""open_stage"" and prefab_path=""{path}"" to open the prefab for editing
-3. Use `scene_get_hierarchy` with max_depth=3 to see the prefab's internal hierarchy
-4. For each important GameObject in the hierarchy, use `component_manage` with action=""inspect"" to see its components
-5. Use `prefab_manage` with action=""close_stage"" to close the prefab stage when done";
+1. Use `manage_asset` with action=""get_info"" and path=""{path}"" to get the prefab asset details
+2. Use `manage_prefab` with action=""open_stage"" and prefab_path=""{path}"" to open the prefab for editing
+3. Use `get_scene_hierarchy` with max_depth=3 to see the prefab's internal hierarchy
+4. For each important GameObject in the hierarchy, use `manage_component` with action=""inspect"" to see its components
+5. Use `manage_prefab` with action=""close_stage"" to close the prefab stage when done";
 
             return new PromptResult
             {
@@ -84,10 +84,10 @@ namespace UnityMCP.Editor.Prompts
         {
             string instructions = $@"Use the following MCP tools to modify the {component}.{property} on ""{target}"":
 
-1. Use `gameobject_find` with search_term=""{target}"" to verify the GameObject exists
-2. Use `component_manage` with action=""inspect"", target=""{target}"", component_type=""{component}"" to see current property values and verify the property name
-3. Use `component_manage` with action=""set_property"", target=""{target}"", component_type=""{component}"", property=""{property}"", and value=<new_value> to set the property
-4. Use `component_manage` with action=""inspect"", target=""{target}"", component_type=""{component}"" again to verify the change took effect";
+1. Use `find_gameobject` with search_term=""{target}"" to verify the GameObject exists
+2. Use `manage_component` with action=""inspect"", target=""{target}"", component_type=""{component}"" to see current property values and verify the property name
+3. Use `manage_component` with action=""set_property"", target=""{target}"", component_type=""{component}"", property=""{property}"", and value=<new_value> to set the property
+4. Use `manage_component` with action=""inspect"", target=""{target}"", component_type=""{component}"" again to verify the change took effect";
 
             return new PromptResult
             {
@@ -120,37 +120,37 @@ namespace UnityMCP.Editor.Prompts
                 case "2d":
                     instructions = @"Use the following MCP tools to set up a new 2D scene:
 
-1. Use `scene_create` with name=""NewScene2D"" to create a new scene
-2. Use `scene_load` with name=""NewScene2D"" to load the scene
-3. Use `gameobject_find` with search_term=""Main Camera"" to find the default camera
-4. Use `component_manage` with action=""set_property"", target=""Main Camera"", component_type=""Camera"", property=""orthographic"", value=true to set it to orthographic
-5. Use `gameobject_manage` with action=""create"", name=""Background"", primitiveType=""Quad"", position=[0,0,1], scale=[20,20,1] to create a background
-6. Use `scene_save` to save the scene";
+1. Use `create_scene` with name=""NewScene2D"" to create a new scene
+2. Use `load_scene` with name=""NewScene2D"" to load the scene
+3. Use `find_gameobject` with search_term=""Main Camera"" to find the default camera
+4. Use `manage_component` with action=""set_property"", target=""Main Camera"", component_type=""Camera"", property=""orthographic"", value=true to set it to orthographic
+5. Use `manage_gameobject` with action=""create"", name=""Background"", primitiveType=""Quad"", position=[0,0,1], scale=[20,20,1] to create a background
+6. Use `save_scene` to save the scene";
                     break;
 
                 case "ui":
                     instructions = @"Use the following MCP tools to set up a new UI scene:
 
-1. Use `scene_create` with name=""NewSceneUI"" to create a new scene
-2. Use `scene_load` with name=""NewSceneUI"" to load the scene
-3. Use `gameobject_manage` with action=""create"", name=""Canvas"" to create a Canvas (add Canvas, CanvasScaler, and GraphicRaycaster components)
-4. Use `component_manage` with action=""add"", target=""Canvas"", component_type=""Canvas""
-5. Use `component_manage` with action=""add"", target=""Canvas"", component_type=""UnityEngine.UI.CanvasScaler""
-6. Use `component_manage` with action=""add"", target=""Canvas"", component_type=""UnityEngine.UI.GraphicRaycaster""
-7. Use `gameobject_manage` with action=""create"", name=""EventSystem""
-8. Use `component_manage` with action=""add"", target=""EventSystem"", component_type=""UnityEngine.EventSystems.EventSystem""
-9. Use `scene_save` to save the scene";
+1. Use `create_scene` with name=""NewSceneUI"" to create a new scene
+2. Use `load_scene` with name=""NewSceneUI"" to load the scene
+3. Use `manage_gameobject` with action=""create"", name=""Canvas"" to create a Canvas (add Canvas, CanvasScaler, and GraphicRaycaster components)
+4. Use `manage_component` with action=""add"", target=""Canvas"", component_type=""Canvas""
+5. Use `manage_component` with action=""add"", target=""Canvas"", component_type=""UnityEngine.UI.CanvasScaler""
+6. Use `manage_component` with action=""add"", target=""Canvas"", component_type=""UnityEngine.UI.GraphicRaycaster""
+7. Use `manage_gameobject` with action=""create"", name=""EventSystem""
+8. Use `manage_component` with action=""add"", target=""EventSystem"", component_type=""UnityEngine.EventSystems.EventSystem""
+9. Use `save_scene` to save the scene";
                     break;
 
                 default: // "3d"
                     instructions = @"Use the following MCP tools to set up a new 3D scene:
 
-1. Use `scene_create` with name=""NewScene3D"" to create a new scene
-2. Use `scene_load` with name=""NewScene3D"" to load the scene
-3. Use `gameobject_manage` with action=""create"", name=""Ground"", primitiveType=""Plane"", position=[0,0,0], scale=[10,1,10] to create a ground plane
-4. Use `gameobject_manage` with action=""create"", name=""Directional Light"" and then use `component_manage` to add a Light component with type=Directional
-5. Use `gameobject_find` with search_term=""Main Camera"" to find the camera and reposition with `gameobject_manage` action=""modify"" position=[0,5,-10] rotation=[30,0,0]
-6. Use `scene_save` to save the scene";
+1. Use `create_scene` with name=""NewScene3D"" to create a new scene
+2. Use `load_scene` with name=""NewScene3D"" to load the scene
+3. Use `manage_gameobject` with action=""create"", name=""Ground"", primitiveType=""Plane"", position=[0,0,0], scale=[10,1,10] to create a ground plane
+4. Use `manage_gameobject` with action=""create"", name=""Directional Light"" and then use `manage_component` to add a Light component with type=Directional
+5. Use `find_gameobject` with search_term=""Main Camera"" to find the camera and reposition with `manage_gameobject` action=""modify"" position=[0,5,-10] rotation=[30,0,0]
+6. Use `save_scene` to save the scene";
                     break;
             }
 

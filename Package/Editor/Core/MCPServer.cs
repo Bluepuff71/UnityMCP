@@ -25,20 +25,20 @@ namespace UnityMCP.Editor.Core
         private const string ServerInstructions =
 @"UnityMCP controls the Unity Editor. Follow these practices:
 
-SAFETY: Save a checkpoint (scene_checkpoint action='save') before destructive operations like deleting objects, modifying materials, or editing scripts. Use scene_checkpoint action='restore' to roll back if something goes wrong.
+SAFETY: Save a checkpoint (manage_checkpoint action='save') before destructive operations like deleting objects, modifying materials, or editing scripts. Use manage_checkpoint action='restore' to roll back if something goes wrong.
 
-WORKFLOW: find -> inspect -> modify -> verify. Use gameobject_find or scene_get_hierarchy to locate objects, component_manage action='inspect' to read state, then modify, then verify with scene_screenshot or another inspect call.
+WORKFLOW: find -> inspect -> modify -> verify. Use find_gameobject or get_scene_hierarchy to locate objects, manage_component action='inspect' to read state, then modify, then verify with capture_screenshot or another inspect call.
 
-DISCOVERY: Call unity_guide with topic='getting_started' for workflow recipes and best practices. Call search_tools with no args for a category overview of all tools.
+DISCOVERY: Call get_unity_guide with topic='getting_started' for workflow recipes and best practices. Call search_tools with no args for a category overview of all tools.
 
-VERIFICATION: Check console_read after unity_refresh or script changes to catch compile errors. Use scene_describe for a quick scene overview. Use diagnose to scan for missing references, shader issues, and build problems.
+VERIFICATION: Check read_console after refresh_unity or script changes to catch compile errors. Use describe_scene for a quick scene overview. Use diagnose to scan for missing references, shader issues, and build problems.
 
 ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same tool with action='get_job' until status is 'completed' or 'failed'.";
 
         private const string CheckpointNudgeBlanket =
-            " Save a checkpoint (scene_checkpoint action='save') before making changes.";
+            " Save a checkpoint (manage_checkpoint action='save') before making changes.";
         private const string CheckpointNudgePrefix =
-            " Save a checkpoint (scene_checkpoint action='save') before ";
+            " Save a checkpoint (manage_checkpoint action='save') before ";
 
         /// <summary>
         /// Gets the singleton instance of the MCP server.

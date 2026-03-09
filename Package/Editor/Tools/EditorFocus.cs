@@ -20,7 +20,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Focuses the Scene View on a specified GameObject, selecting it and optionally locking the view.
         /// </summary>
-        [MCPTool("editor_focus", "Frame and select a GameObject in the Scene View", Category = "Editor", ReadOnlyHint = false)]
+        [MCPTool("focus_editor", "Frame and select a GameObject in the Scene View", Category = "Editor", ReadOnlyHint = false)]
         public static object FocusOnTarget(
             [MCPParam("target", "GameObject name, path, or instance ID to focus on", required: true)] string target,
             [MCPParam("lock", "Lock the Scene View to follow this object (keeps it selected)")] bool lockView = false)

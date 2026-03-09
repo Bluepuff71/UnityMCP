@@ -11,7 +11,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Get or set the Unity Editor selection.
     /// </summary>
-    [MCPTool("selection", "Manage editor selection: get or set selected objects", Category = "Editor")]
+    [MCPTool("manage_selection", "Manage editor selection: get or set selected objects", Category = "Editor")]
     public static class SelectionTools
     {
         [MCPAction("get", Description = "Get currently selected objects in the Unity Editor", ReadOnlyHint = true)]

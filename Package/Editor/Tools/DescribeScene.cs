@@ -109,7 +109,7 @@ namespace UnityMCP.Editor.Tools
         /// Returns a narrative, AI-optimized summary of the active scene including
         /// camera info, lighting, key objects, and lightweight issue detection.
         /// </summary>
-        [MCPTool("scene_describe", "Returns a narrative summary of the active scene including camera, lighting, key objects, and issue detection. Good starting point to understand scene state before making changes.",
+        [MCPTool("describe_scene", "Returns a narrative summary of the active scene including camera, lighting, key objects, and issue detection. Good starting point to understand scene state before making changes.",
             Category = "Scene", ReadOnlyHint = true)]
         public static object Describe(
             [MCPParam("page_size", "Maximum number of root objects to include per page (default: 50)", Minimum = 1, Maximum = 200)] int pageSize = DefaultPageSize,
@@ -641,7 +641,7 @@ namespace UnityMCP.Editor.Tools
                     {
                         consoleParts.Add($"{warningCount} warning{(warningCount != 1 ? "s" : "")}");
                     }
-                    issues.Add($"Console has {string.Join(" and ", consoleParts)} (use console_read for details)");
+                    issues.Add($"Console has {string.Join(" and ", consoleParts)} (use read_console for details)");
                 }
             }
             catch

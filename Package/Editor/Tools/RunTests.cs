@@ -10,7 +10,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Run Unity tests and poll job status.
     /// </summary>
-    [MCPTool("tests", "Run Unity Test Runner or poll test job status", Category = "Tests")]
+    [MCPTool("run_tests", "Run Unity Test Runner or poll test job status", Category = "Tests")]
     public static class RunTests
     {
         private const int RetryAfterMs = 5000;

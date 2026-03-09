@@ -122,7 +122,7 @@ namespace UnityMCP.Editor.Tools
         /// <param name="outputPath">Custom output directory path. Defaults to the project temp directory.</param>
         /// <param name="includeDependencies">Whether to include asset dependencies in unitypackage exports.</param>
         /// <returns>Result object describing the export outcome.</returns>
-        [MCPTool("scene_export", "Export the current scene as a unitypackage, screenshot gallery, or markdown report",
+        [MCPTool("export_scene", "Export the current scene as a unitypackage, screenshot gallery, or markdown report",
             Category = "Export", DestructiveHint = true, OpenWorldHint = true)]
         public static object Export(
             [MCPParam("format", "Export format", required: true, Enum = new[] { "unitypackage", "screenshot_gallery", "report" })] string format,

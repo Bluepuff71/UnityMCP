@@ -7,7 +7,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Profile Unity Editor and runtime performance.
     /// </summary>
-    [MCPTool("profiler", "Manage profiler recording: start, stop, or poll job status", Category = "Profiler")]
+    [MCPTool("run_profiler", "Manage profiler recording: start, stop, or poll job status", Category = "Profiler")]
     public static class ProfilerTools
     {
         [MCPAction("start", Description = "Start profiler recording, returns job_id for polling")]

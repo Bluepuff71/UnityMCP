@@ -110,7 +110,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Diagnoses the current editor state and returns structured findings across multiple categories.
         /// </summary>
-        [MCPTool("diagnose", "Scans for missing references, shader issues, console errors, and build readiness. Use when something looks wrong or before building to catch problems early.", ReadOnlyHint = true, Category = "Diagnostics")]
+        [MCPTool("diagnose_scene", "Scans for missing references, shader issues, console errors, and build readiness. Use when something looks wrong or before building to catch problems early.", ReadOnlyHint = true, Category = "Diagnostics")]
         public static object Diagnose(
             [MCPParam("scope", "Scope of inspection: 'selected' (current selection), 'scene' (active scene), or 'project' (shader/build checks only)", Enum = new[] { "selected", "scene", "project" })] string scope = "scene",
             [MCPParam("checks", "Optional array of specific checks to run: console, references, components, shaders, build")] List<object> checks = null)
@@ -366,7 +366,7 @@ namespace UnityMCP.Editor.Tools
             {
                 issues.Add(CreateIssue("warning", "console",
                     $"Failed to read console: {exception.Message}",
-                    "Try using 'console_read' tool directly."));
+                    "Try using 'read_console' tool directly."));
             }
         }
 
@@ -422,7 +422,7 @@ namespace UnityMCP.Editor.Tools
                 return "Serialization error. Ensure all serialized types are marked [Serializable] and have valid default constructors.";
             }
 
-            return "Review the error message and stacktrace. Use 'console_read' for more details.";
+            return "Review the error message and stacktrace. Use 'read_console' for more details.";
         }
 
         #endregion

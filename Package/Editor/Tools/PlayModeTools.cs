@@ -8,7 +8,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Manage play mode state: enter, exit, pause, step.
     /// </summary>
-    [MCPTool("playmode", "Manage play mode state", Category = "Editor")]
+    [MCPTool("manage_playmode", "Manage play mode state", Category = "Editor")]
     public static class PlayModeTools
     {
         [MCPAction("enter", Description = "Enter play mode")]

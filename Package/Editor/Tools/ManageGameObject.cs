@@ -18,7 +18,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Handles GameObject manipulation operations including create, modify, delete, duplicate, and move_relative.
     /// </summary>
-    [MCPTool("gameobject_manage", "Manages GameObjects: create, modify, delete, duplicate, or move_relative. Use gameobject_find first to get instance IDs for existing objects.", Category = "GameObject")]
+    [MCPTool("manage_gameobject", "Manages GameObjects: create, modify, delete, duplicate, or move_relative. Use find_gameobject first to get instance IDs for existing objects.", Category = "GameObject")]
     public static class ManageGameObject
     {
         private const string UntaggedTag = "Untagged";
@@ -949,6 +949,41 @@ namespace UnityMCP.Editor.Tools
 
             try
             {
+                // Handle string input (from MCP clients that coerce arrays/objects to strings)
+                if (input is string stringInput)
+                {
+                    stringInput = stringInput.Trim();
+                    if (stringInput.StartsWith("["))
+                    {
+                        // Parse "[x, y, z]" format
+                        string inner = stringInput.Trim('[', ']');
+                        string[] parts = inner.Split(',');
+                        if (parts.Length >= 3)
+                        {
+                            return new Vector3(
+                                float.Parse(parts[0].Trim(), System.Globalization.CultureInfo.InvariantCulture),
+                                float.Parse(parts[1].Trim(), System.Globalization.CultureInfo.InvariantCulture),
+                                float.Parse(parts[2].Trim(), System.Globalization.CultureInfo.InvariantCulture)
+                            );
+                        }
+                    }
+                    else if (stringInput.StartsWith("{"))
+                    {
+                        // Parse JSON object string via Newtonsoft
+                        var jObject = Newtonsoft.Json.Linq.JObject.Parse(stringInput);
+                        if (jObject.TryGetValue("x", out var xToken) &&
+                            jObject.TryGetValue("y", out var yToken) &&
+                            jObject.TryGetValue("z", out var zToken))
+                        {
+                            return new Vector3(
+                                (float)xToken,
+                                (float)yToken,
+                                (float)zToken
+                            );
+                        }
+                    }
+                }
+
                 // Handle List<object> (from JSON array)
                 if (input is List<object> list && list.Count >= 3)
                 {
