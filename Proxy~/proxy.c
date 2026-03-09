@@ -178,6 +178,18 @@ static const char* BuildErrorResponse(int code, const char* message, const char*
 }
 
 /*
+ * Build a JSON-RPC error response with an additional data object for recovery guidance.
+ * data_json must be a pre-formatted JSON object string (e.g. {"recoverable":true}).
+ */
+static const char* BuildErrorResponseWithData(int code, const char* message, const char* data_json, const char* id)
+{
+    snprintf(s_error_response_buffer, sizeof(s_error_response_buffer),
+        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%d,\"message\":\"%s\",\"data\":%s},\"id\":%s}",
+        code, message, data_json, id);
+    return s_error_response_buffer;
+}
+
+/*
  * CORS headers: local mode includes Access-Control-Allow-Origin: *,
  * remote mode omits it to prevent cross-origin requests from arbitrary websites.
  */
@@ -338,7 +350,8 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
             if (elapsed_time >= PROXY_REQUEST_TIMEOUT_MS)
             {
                 mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Unity recompilation timed out.", request_id));
+                    BuildErrorResponseWithData(-32000, "Unity recompilation timed out.",
+                        "{\"recoverable\":true,\"retryAfterMs\":5000,\"reason\":\"recompilation\"}", request_id));
                 return;
             }
             if (!s_running)
@@ -366,7 +379,8 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
             {
                 s_has_request = 0;
                 mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Request processing timed out.", request_id));
+                    BuildErrorResponseWithData(-32000, "Request processing timed out.",
+                        "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"timeout\"}", request_id));
                 return;
             }
             if (!s_running)
@@ -380,7 +394,8 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
             {
                 s_has_request = 0;
                 mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Request interrupted by Unity domain reload. Please retry.", request_id));
+                    BuildErrorResponseWithData(-32000, "Request interrupted by Unity domain reload. Please retry.",
+                        "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"domain_reload\"}", request_id));
                 return;
             }
             PROXY_SLEEP_MS(1);

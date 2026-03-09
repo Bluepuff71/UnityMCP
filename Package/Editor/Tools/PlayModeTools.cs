@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using UnityEditor;
 using UnityEngine;
 
@@ -70,7 +71,8 @@ namespace UnityMCP.Editor.Tools
         }
 
         [MCPAction("exit", Description = "Exit play mode")]
-        public static object Exit()
+        public static object Exit(
+            [MCPParam("wait_for_reload", "Wait for Unity to fully exit play mode and finish any domain reload before returning. Set false for fire-and-forget.")] bool waitForReload = true)
         {
             try
             {
@@ -87,12 +89,51 @@ namespace UnityMCP.Editor.Tools
 
                 EditorApplication.isPlaying = false;
 
+                if (!waitForReload)
+                {
+                    return new
+                    {
+                        success = true,
+                        message = "Exiting play mode (not waiting for completion).",
+                        isPlaying = false,
+                        isPaused = false
+                    };
+                }
+
+                // Poll until Unity has fully exited play mode and is no longer compiling.
+                // Thread.Sleep on the main thread blocks the editor UI, but this is acceptable
+                // because the wait is typically <1s and the native proxy HTTP thread is already
+                // blocking waiting for this response anyway.
+                const int pollIntervalMs = 50;
+                const int timeoutMs = 10000;
+                int elapsedMs = 0;
+
+                while (elapsedMs < timeoutMs)
+                {
+                    if (!EditorApplication.isPlaying && !EditorApplication.isCompiling)
+                    {
+                        return new
+                        {
+                            success = true,
+                            message = "Play mode exited successfully.",
+                            isPlaying = false,
+                            isPaused = false,
+                            waitedMs = elapsedMs
+                        };
+                    }
+
+                    Thread.Sleep(pollIntervalMs);
+                    elapsedMs += pollIntervalMs;
+                }
+
                 return new
                 {
                     success = true,
-                    message = "Exiting play mode.",
-                    isPlaying = false,
-                    isPaused = false
+                    message = "Play mode exit initiated but Unity is still transitioning after 10s timeout. Subsequent requests may fail during this transition.",
+                    isPlaying = EditorApplication.isPlaying,
+                    isPaused = EditorApplication.isPaused,
+                    isCompiling = EditorApplication.isCompiling,
+                    warning = "timeout"
                 };
             }
             catch (Exception exception)

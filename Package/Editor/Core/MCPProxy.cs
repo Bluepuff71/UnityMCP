@@ -319,6 +319,12 @@ namespace UnityMCP.Editor.Core
             // via Camera.Render or AssetDatabase operations).
             if (s_isProcessingRequest) return;
 
+            // Defer request consumption while Unity is compiling. The request stays in
+            // the native buffer; the HTTP thread blocks with its existing 30s timeout.
+            // If compilation triggers domain reload, OnBeforeReload sets polling inactive
+            // and the native proxy returns a structured domain reload error.
+            if (EditorApplication.isCompiling) return;
+
             IntPtr ptr = GetPendingRequest();
             if (ptr == IntPtr.Zero)
             {
