@@ -145,7 +145,8 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 
 46 built-in tools organized by category:
 
-> **Tip:** Use `search_tools` with no arguments for a category overview, or pass a `query` or `category` to narrow results. Use `get_unity_guide` for workflow guidance and tool-chaining recipes.
+> [!Tip]
+> Use `search_tools` with no arguments for a category overview, or pass a `query` or `category` to narrow results. Use `get_unity_guide` for workflow guidance and tool-chaining recipes.
 
 <details>
 <summary>View all 46 built-in tools</summary>
