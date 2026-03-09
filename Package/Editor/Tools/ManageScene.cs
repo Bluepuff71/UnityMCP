@@ -25,7 +25,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Creates a new empty scene at the specified path.
         /// </summary>
-        [MCPTool("scene_create", "Creates a new empty scene at the specified path", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("create_scene", "Creates a new empty scene at the specified path", Category = "Scene", DestructiveHint = true)]
         public static object CreateScene(
             [MCPParam("name", "Name of the scene (without .unity extension)", required: true)] string name,
             [MCPParam("path", "Directory path relative to Assets (default: Scenes)")] string path = null)
@@ -115,7 +115,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Loads a scene by path or build index.
         /// </summary>
-        [MCPTool("scene_load", "Loads a scene by path (relative to Assets) or build index", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("load_scene", "Loads a scene by path (relative to Assets) or build index", Category = "Scene", DestructiveHint = true)]
         public static object LoadScene(
             [MCPParam("name", "Name of the scene (without .unity extension)")] string name = null,
             [MCPParam("path", "Directory path relative to Assets (used with name)")] string path = null,
@@ -239,7 +239,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Saves the current scene, optionally to a new path.
         /// </summary>
-        [MCPTool("scene_save", "Saves the current scene, optionally to a new path", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("save_scene", "Saves the current scene, optionally to a new path", Category = "Scene", DestructiveHint = true)]
         public static object SaveScene(
             [MCPParam("name", "Name for Save As (without .unity extension)")] string name = null,
             [MCPParam("path", "Directory path for Save As (relative to Assets)")] string path = null)
@@ -346,7 +346,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets information about the currently active scene.
         /// </summary>
-        [MCPTool("scene_get_active", "Gets information about the currently active scene", Category = "Scene", ReadOnlyHint = true)]
+        [MCPTool("get_active_scene", "Gets information about the currently active scene", Category = "Scene", ReadOnlyHint = true)]
         public static object GetActiveScene()
         {
             try
@@ -404,7 +404,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets the hierarchy of GameObjects in the current scene.
         /// </summary>
-        [MCPTool("scene_get_hierarchy", "Gets the hierarchy of GameObjects in the current scene", Category = "Scene", ReadOnlyHint = true)]
+        [MCPTool("get_scene_hierarchy", "Gets the hierarchy of GameObjects in the current scene", Category = "Scene", ReadOnlyHint = true)]
         public static object GetHierarchy(
             [MCPParam("parent", "Instance ID or name of parent GameObject to list children of (null for roots)")] string parent = null,
             [MCPParam("max_depth", "Maximum depth to traverse (default: 1, just immediate children)", Minimum = 1)] int maxDepth = 1,
@@ -497,6 +497,26 @@ namespace UnityMCP.Editor.Tools
                     }
                 }
 
+                // Estimate response size — serialize and check against proxy buffer limit
+                // MCPProxy.MaxResponseSize is 256KB, leave margin for JSON-RPC wrapper
+                const int MaxSafeResponseBytes = 200 * 1024; // 200KB safe limit
+
+                string serializedItems = Newtonsoft.Json.JsonConvert.SerializeObject(items);
+                int estimatedBytes = System.Text.Encoding.UTF8.GetByteCount(serializedItems);
+
+                string sizeWarning = null;
+                if (estimatedBytes > MaxSafeResponseBytes)
+                {
+                    // Truncate items until we're under the limit
+                    while (items.Count > 1 && estimatedBytes > MaxSafeResponseBytes)
+                    {
+                        items.RemoveAt(items.Count - 1);
+                        serializedItems = Newtonsoft.Json.JsonConvert.SerializeObject(items);
+                        estimatedBytes = System.Text.Encoding.UTF8.GetByteCount(serializedItems);
+                    }
+                    sizeWarning = $"Response truncated to {items.Count} items to fit within response size limit. Use smaller page_size or max_depth, or query specific parent objects.";
+                }
+
                 bool truncated = endIndex < total;
                 int? nextCursor = truncated ? endIndex : (int?)null;
 
@@ -510,7 +530,8 @@ namespace UnityMCP.Editor.Tools
                     nextCursor,
                     truncated,
                     total,
-                    items
+                    items,
+                    warning = sizeWarning
                 };
             }
             catch (Exception ex)
@@ -530,7 +551,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Captures a screenshot of the Game View or Scene View, with optional target framing and camera angle.
         /// </summary>
-        [MCPTool("scene_screenshot", "Captures a screenshot of the Game View or Scene View with optional target framing and camera angle", Category = "Scene", ReadOnlyHint = true)]
+        [MCPTool("capture_screenshot", "Captures a screenshot of the Game View or Scene View with optional target framing and camera angle", Category = "Scene", ReadOnlyHint = true)]
         public static object CaptureScreenshot(
             [MCPParam("filename", "Filename for the screenshot (without extension)")] string filename = null,
             [MCPParam("super_size", "Multiplier for resolution (1-4, default: 1)", Minimum = 1, Maximum = 4)] int superSize = 1,
@@ -668,7 +689,9 @@ namespace UnityMCP.Editor.Tools
         }
 
         /// <summary>
-        /// Captures a screenshot from the Game View using ScreenCapture.
+        /// Captures a screenshot from the Game View. Uses a hybrid approach:
+        /// Play Mode: CaptureScreenshotAsTexture (synchronous, full composite including Canvas/UITK)
+        /// Edit Mode: GameViewCapture reflection (composited RT), fallback to Camera.Render()
         /// </summary>
         private static object CaptureGameViewScreenshot(string fullPath, string relativePath, int superSize)
         {
@@ -678,36 +701,145 @@ namespace UnityMCP.Editor.Tools
                 EnsureGameView();
             }
 
-            // Capture the screenshot
-            ScreenCapture.CaptureScreenshot(fullPath, superSize);
+            // Get Game View dimensions for capture resolution
+            int baseWidth = 1920;
+            int baseHeight = 1080;
+            var gameViewDimensions = GameViewCapture.GetGameViewDimensions();
+            if (gameViewDimensions.width > 0 && gameViewDimensions.height > 0)
+            {
+                baseWidth = gameViewDimensions.width;
+                baseHeight = gameViewDimensions.height;
+            }
 
-            // Schedule asset import (screenshot capture is async in play mode)
+            int captureWidth = baseWidth * superSize;
+            int captureHeight = baseHeight * superSize;
+            byte[] pngBytes = null;
+            int finalWidth = 0;
+            int finalHeight = 0;
+            string captureMethod = null;
+
+            // Tier 1: Play Mode — CaptureScreenshotAsTexture (full composite, synchronous)
             if (Application.isPlaying)
             {
-                ScheduleAssetImport(relativePath, fullPath, 30.0);
-            }
-            else
-            {
-                // In edit mode, wait for the file to be written then import.
-                // Do NOT use ForceSynchronousImport -- see CaptureSceneViewScreenshot comment.
-                EditorApplication.delayCall += () =>
+                try
                 {
-                    if (File.Exists(fullPath))
+                    Texture2D screenshot = ScreenCapture.CaptureScreenshotAsTexture(superSize);
+                    if (screenshot != null)
                     {
-                        AssetDatabase.ImportAsset(relativePath);
+                        try
+                        {
+                            pngBytes = screenshot.EncodeToPNG();
+                            finalWidth = screenshot.width;
+                            finalHeight = screenshot.height;
+                            captureMethod = "screenshot_api";
+                        }
+                        finally
+                        {
+                            UnityEngine.Object.DestroyImmediate(screenshot);
+                        }
                     }
+                }
+                catch
+                {
+                    // Fall through to next tier
+                }
+            }
+
+            // Tier 2: GameViewCapture composited RT (includes Canvas, UITK)
+            if (pngBytes == null)
+            {
+                if (GameViewCapture.TryCaptureComposited(captureWidth, captureHeight,
+                        out byte[] compositedPng, out int cw, out int ch, out string _diagnostics))
+                {
+                    pngBytes = compositedPng;
+                    finalWidth = cw;
+                    finalHeight = ch;
+                    captureMethod = "gameview_composited";
+                }
+            }
+
+            // Tier 3: Camera.Render() fallback (3D only, no UI overlays)
+            if (pngBytes == null)
+            {
+                Camera camera = Camera.main ?? (Camera.allCameras.Length > 0 ? Camera.allCameras[0] : null);
+                if (camera == null)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = "No camera found in scene. Ensure at least one camera exists."
+                    };
+                }
+
+                RenderTexture previousTargetTexture = camera.targetTexture;
+                RenderTexture previousActiveTexture = RenderTexture.active;
+                RenderTexture renderTexture = null;
+
+                try
+                {
+                    renderTexture = new RenderTexture(captureWidth, captureHeight, 24);
+                    camera.targetTexture = renderTexture;
+                    camera.Render();
+
+                    RenderTexture.active = renderTexture;
+                    var texture = new Texture2D(captureWidth, captureHeight, TextureFormat.RGB24, false);
+                    texture.ReadPixels(new Rect(0, 0, captureWidth, captureHeight), 0, 0);
+                    texture.Apply();
+
+                    pngBytes = texture.EncodeToPNG();
+                    finalWidth = captureWidth;
+                    finalHeight = captureHeight;
+                    captureMethod = "camera_render";
+
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
+                finally
+                {
+                    camera.targetTexture = previousTargetTexture;
+                    RenderTexture.active = previousActiveTexture;
+
+                    if (renderTexture != null)
+                    {
+                        renderTexture.Release();
+                        UnityEngine.Object.DestroyImmediate(renderTexture);
+                    }
+                }
+            }
+
+            if (pngBytes == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = "Failed to capture Game View screenshot."
                 };
             }
+
+            // Write to disk synchronously
+            File.WriteAllBytes(fullPath, pngBytes);
+
+            // Import asset via delayCall (not ForceSynchronousImport to avoid re-entrant dispatch)
+            string capturedRelativePath = relativePath;
+            EditorApplication.delayCall += () =>
+            {
+                if (File.Exists(fullPath))
+                {
+                    AssetDatabase.ImportAsset(capturedRelativePath);
+                }
+            };
 
             return new
             {
                 success = true,
-                message = "Screenshot capture initiated.",
+                message = "Screenshot captured.",
                 path = relativePath,
                 fullPath,
+                width = finalWidth,
+                height = finalHeight,
+                file_size_bytes = pngBytes.Length,
                 superSize,
                 view = "game",
-                isAsync = Application.isPlaying
+                capture_method = captureMethod
             };
         }
 
