@@ -7,8 +7,8 @@ cd /d "%~dp0"
 echo Building UnityMCPProxy for Windows using GCC (MinGW)...
 
 :: Create output directory if it doesn't exist
-if not exist "..\Plugins\Windows\x86_64\" (
-    mkdir "..\Plugins\Windows\x86_64\"
+if not exist "..\Package\Plugins\Windows\x86_64\" (
+    mkdir "..\Package\Plugins\Windows\x86_64\"
     if errorlevel 1 (
         echo ERROR: Failed to create output directory
         exit /b 1
@@ -36,11 +36,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Copy to Plugins folder
-echo Copying to Plugins folder...
-copy /Y UnityMCPProxy.dll "..\Plugins\Windows\x86_64\"
+:: Copy to Package/Plugins folder (this is where Unity actually loads from)
+echo Copying to Package/Plugins folder...
+if not exist "..\Package\Plugins\Windows\x86_64\" (
+    mkdir "..\Package\Plugins\Windows\x86_64\"
+)
+copy /Y UnityMCPProxy.dll "..\Package\Plugins\Windows\x86_64\"
 if errorlevel 1 (
-    echo ERROR: Failed to copy DLL to Plugins folder
+    echo ERROR: Failed to copy DLL to Package/Plugins folder
     exit /b 1
 )
 

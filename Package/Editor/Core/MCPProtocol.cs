@@ -418,6 +418,14 @@ namespace UnityMCP.Editor.Core
         public ToolAnnotations annotations;
         public InputSchema inputSchema;
 
+        /// <summary>
+        /// For action-based tools with mixed destructive/non-destructive actions,
+        /// lists the action names that are destructive. Used by MCPServer to generate
+        /// targeted checkpoint nudge suffixes instead of blanket warnings.
+        /// Null means not an action-based tool or no destructive actions.
+        /// </summary>
+        public List<string> destructiveActions;
+
         public ToolDefinition() { }
 
         public ToolDefinition(string name, string description, InputSchema inputSchema = null)

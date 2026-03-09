@@ -71,6 +71,20 @@ namespace UnityMCP.Editor.Tools
 
             try
             {
+                // Check if Unity is compiling
+                if (EditorApplication.isCompiling)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = "Unity is currently compiling. Menu items cannot be reliably executed during compilation.",
+                        retry_after_ms = 5000
+                    };
+                }
+
+                // Check if menu item is enabled (also returns false if it doesn't exist)
+                bool menuEnabled = Menu.GetEnabled(normalizedMenuPath);
+
                 // Execute the menu item
                 bool executed = EditorApplication.ExecuteMenuItem(normalizedMenuPath);
 
@@ -85,12 +99,15 @@ namespace UnityMCP.Editor.Tools
                 }
                 else
                 {
-                    // ExecuteMenuItem returns false if the menu item doesn't exist or couldn't be executed
                     return new
                     {
                         success = false,
-                        error = $"Failed to execute menu item: '{normalizedMenuPath}'. The menu item may not exist, may be disabled, or may require specific conditions to be met.",
-                        menu_path = normalizedMenuPath
+                        error = $"Failed to execute menu item: '{normalizedMenuPath}'. " +
+                                (menuEnabled
+                                    ? "The menu item exists but could not be executed. It may require specific conditions."
+                                    : "The menu item does not exist or is currently disabled."),
+                        menu_path = normalizedMenuPath,
+                        diagnostics = new { menu_enabled = menuEnabled }
                     };
                 }
             }

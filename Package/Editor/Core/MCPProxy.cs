@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using UnityEditor;
@@ -65,6 +67,24 @@ namespace UnityMCP.Editor.Core
         /// Tracks whether the proxy has been successfully initialized.
         /// </summary>
         private static bool s_initialized = false;
+
+        /// <summary>
+        /// Re-entrancy guard for PollForRequests. Although GetPendingRequest() atomically
+        /// consumes requests (clears s_has_request), this guard provides additional safety
+        /// against re-entrant EditorApplication.update calls during tool execution
+        /// (e.g., from Camera.Render or AssetDatabase operations).
+        /// </summary>
+        private static bool s_isProcessingRequest = false;
+
+        /// <summary>
+        /// Deduplication cache: maps JSON-RPC request ID → cached response.
+        /// The MCP transport may retry requests with the same ID if the first
+        /// attempt times out. Without deduplication, each retry executes the
+        /// tool again (creating duplicate GameObjects, etc.).
+        /// </summary>
+        private static readonly Dictionary<string, string> s_responseCache = new Dictionary<string, string>();
+        private static readonly Queue<string> s_responseCacheOrder = new Queue<string>();
+        private const int ResponseCacheCapacity = 20;
 
         /// <summary>
         /// Gets whether the MCP proxy is currently active.
@@ -303,43 +323,85 @@ namespace UnityMCP.Editor.Core
         /// </summary>
         private static void PollForRequests()
         {
+            // Re-entrancy guard: GetPendingRequest() atomically consumes the request
+            // (clears s_has_request), preventing duplicate processing across editor ticks.
+            // This guard provides additional safety against re-entrant calls during
+            // the same tick (e.g., if tool execution pumps EditorApplication.update
+            // via Camera.Render or AssetDatabase operations).
+            if (s_isProcessingRequest) return;
+
+            // Defer request consumption while Unity is compiling. The request stays in
+            // the native buffer; the HTTP thread blocks with its existing 30s timeout.
+            // If compilation triggers domain reload, OnBeforeReload sets polling inactive
+            // and the native proxy returns a structured domain reload error.
+            if (EditorApplication.isCompiling) return;
+
             IntPtr ptr = GetPendingRequest();
             if (ptr == IntPtr.Zero)
             {
                 return;
             }
 
-            string jsonRequest = Marshal.PtrToStringAnsi(ptr);
-            string requestId = ExtractRequestId(jsonRequest);
-            string toolName = ExtractToolName(jsonRequest);
-
+            s_isProcessingRequest = true;
             try
             {
-                string response = MCPServer.Instance.HandleRequest(jsonRequest);
+                string jsonRequest = Marshal.PtrToStringAnsi(ptr);
+                string requestId = ExtractRequestId(jsonRequest);
+                string toolName = ExtractToolName(jsonRequest);
+                string argumentsSummary = toolName != null ? ExtractArguments(jsonRequest) : null;
 
-                if (response != null && response.Length >= MaxResponseSize)
+                // Deduplication: if we already processed a request with this ID,
+                // return the cached response instead of re-executing the tool.
+                // The MCP transport may retry requests with the same ID on timeout.
+                if (requestId != null && requestId != "null" && s_responseCache.TryGetValue(requestId, out string cachedResponse))
                 {
-                    Debug.LogWarning($"[MCPProxy] Response size ({response.Length} bytes) exceeds maximum ({MaxResponseSize} bytes). Returning error response.");
-                    string errorResponse = BuildErrorResponse(
-                        -32603,
-                        $"Response too large ({response.Length} bytes). Maximum supported size is {MaxResponseSize - 1} bytes. Try reducing max_depth or using more specific queries.",
-                        requestId);
-                    SendResponse(errorResponse);
-                    if (toolName != null)
-                        ActivityLog.Record(toolName, false, "Response too large");
+                    SendResponse(cachedResponse);
                     return;
                 }
 
-                SendResponse(response);
-                if (toolName != null)
-                    ActivityLog.Record(toolName, true);
+                var stopwatch = Stopwatch.StartNew();
+
+                try
+                {
+                    string response = MCPServer.Instance.HandleRequest(jsonRequest);
+
+                    if (response != null && response.Length >= MaxResponseSize)
+                    {
+                        stopwatch.Stop();
+                        Debug.LogWarning($"[MCPProxy] Response size ({response.Length} bytes) exceeds maximum ({MaxResponseSize} bytes). Returning error response.");
+                        string errorResponse = BuildErrorResponse(
+                            -32603,
+                            $"Response too large ({response.Length} bytes). Maximum supported size is {MaxResponseSize - 1} bytes. Try reducing max_depth or using more specific queries.",
+                            requestId);
+                        CacheResponse(requestId, errorResponse);
+                        SendResponse(errorResponse);
+                        if (toolName != null)
+                            ActivityLog.Record(toolName, false, "Response too large",
+                                stopwatch.ElapsedMilliseconds, argumentsSummary, response.Length);
+                        return;
+                    }
+
+                    CacheResponse(requestId, response);
+                    SendResponse(response);
+                    stopwatch.Stop();
+                    if (toolName != null)
+                        ActivityLog.Record(toolName, true, null,
+                            stopwatch.ElapsedMilliseconds, argumentsSummary, response?.Length ?? 0);
+                }
+                catch (Exception exception)
+                {
+                    stopwatch.Stop();
+                    string errorResponse = BuildErrorResponse(-32603, exception.Message, requestId);
+                    CacheResponse(requestId, errorResponse);
+                    SendResponse(errorResponse);
+                    if (toolName != null)
+                        ActivityLog.Record(toolName, false, exception.Message,
+                            stopwatch.ElapsedMilliseconds, argumentsSummary, 0);
+                }
             }
-            catch (Exception exception)
+            finally
             {
-                string errorResponse = BuildErrorResponse(-32603, exception.Message, requestId);
-                SendResponse(errorResponse);
-                if (toolName != null)
-                    ActivityLog.Record(toolName, false, exception.Message);
+                s_isProcessingRequest = false;
             }
         }
 
@@ -496,6 +558,102 @@ namespace UnityMCP.Editor.Core
                 return null;
 
             return json.Substring(valueStart + 1, endQuote - valueStart - 1);
+        }
+
+        /// <summary>
+        /// Extracts a compact summary of tool arguments from a JSON-RPC request.
+        /// Uses brace-matching to find the "arguments" object, then truncates to maxLength.
+        /// Returns null for non-tool-call requests or if arguments not found.
+        /// </summary>
+        private static string ExtractArguments(string json, int maxLength = 120)
+        {
+            if (string.IsNullOrEmpty(json))
+                return null;
+
+            int paramsIndex = json.IndexOf("\"params\"", StringComparison.Ordinal);
+            if (paramsIndex < 0)
+                return null;
+
+            int argsKeyIndex = json.IndexOf("\"arguments\"", paramsIndex, StringComparison.Ordinal);
+            if (argsKeyIndex < 0)
+                return null;
+
+            int colonIndex = json.IndexOf(':', argsKeyIndex + 11);
+            if (colonIndex < 0)
+                return null;
+
+            int valueStart = colonIndex + 1;
+            while (valueStart < json.Length && char.IsWhiteSpace(json[valueStart]))
+                valueStart++;
+
+            if (valueStart >= json.Length || json[valueStart] != '{')
+                return null;
+
+            // Brace-match to find the end of the arguments object
+            int depth = 0;
+            int valueEnd = valueStart;
+            bool inString = false;
+            bool escaped = false;
+
+            for (int i = valueStart; i < json.Length; i++)
+            {
+                char c = json[i];
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+                if (c == '\\' && inString)
+                {
+                    escaped = true;
+                    continue;
+                }
+                if (c == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+                if (inString) continue;
+
+                if (c == '{') depth++;
+                else if (c == '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        valueEnd = i + 1;
+                        break;
+                    }
+                }
+            }
+
+            if (depth != 0)
+                return null;
+
+            string argsJson = json.Substring(valueStart, valueEnd - valueStart);
+            if (argsJson.Length > maxLength)
+                argsJson = argsJson.Substring(0, maxLength) + "...";
+
+            return argsJson;
+        }
+
+        /// <summary>
+        /// Caches a response by request ID for deduplication.
+        /// Maintains a bounded FIFO cache of recent responses.
+        /// </summary>
+        private static void CacheResponse(string requestId, string response)
+        {
+            if (requestId == null || requestId == "null" || response == null)
+                return;
+
+            s_responseCache[requestId] = response;
+            s_responseCacheOrder.Enqueue(requestId);
+
+            while (s_responseCacheOrder.Count > ResponseCacheCapacity)
+            {
+                string oldestRequestId = s_responseCacheOrder.Dequeue();
+                s_responseCache.Remove(oldestRequestId);
+            }
         }
 
         /// <summary>

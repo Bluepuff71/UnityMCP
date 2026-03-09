@@ -1,0 +1,939 @@
+/* ============================================
+   UnityMCP Server Window — "Mission Control" Theme
+   ============================================ */
+
+/* --- Design Tokens --- */
+:root {
+    --umcp-accent: #4ECDC4;
+    --umcp-success: #2ECC71;
+    --umcp-warning: #F39C12;
+    --umcp-error: #E74C3C;
+    --umcp-muted: #888888;
+    --umcp-surface: rgba(0, 0, 0, 0.1);
+    --umcp-border: rgba(128, 128, 128, 0.2);
+    --umcp-card-radius: 4px;
+}
+
+/* --- Window Root --- */
+.window-root {
+    flex-grow: 1;
+}
+
+/* --- Persistent Header --- */
+.header {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom-width: 2px;
+    border-bottom-color: var(--umcp-border);
+    background-color: rgba(0, 0, 0, 0.12);
+    min-height: 36px;
+}
+
+.header__left {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.header__center {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: center;
+}
+
+.header__right {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    border-width: 1px;
+}
+
+.status-dot--running {
+    background-color: var(--umcp-success);
+    border-color: rgba(46, 204, 113, 0.5);
+}
+
+.status-dot--stopped {
+    background-color: var(--umcp-muted);
+    border-color: rgba(128, 128, 128, 0.3);
+}
+
+.status-label {
+    -unity-font-style: bold;
+    font-size: 12px;
+    margin-right: 12px;
+}
+
+.active-tool-label {
+    font-size: 11px;
+    color: var(--umcp-accent);
+    -unity-font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 2px 10px;
+    background-color: rgba(78, 205, 196, 0.08);
+    border-radius: 10px;
+}
+
+.header-button {
+    height: 22px;
+    min-width: 44px;
+    margin-left: 6px;
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 3px;
+}
+
+.header-button--help {
+    min-width: 24px;
+    padding: 2px 6px;
+}
+
+/* --- Tab Bar --- */
+.tab-bar {
+    flex-direction: row;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--umcp-border);
+    padding: 0 4px;
+}
+
+.tab-button {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--umcp-muted);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-bottom-width: 2px;
+    border-bottom-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+    margin: 0;
+    -unity-font-style: normal;
+    cursor: link;
+    flex-grow: 1;
+    flex-basis: 0;
+    -unity-text-align: middle-center;
+}
+
+.tab-button:hover {
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.tab-button--active {
+    color: var(--umcp-accent);
+    border-bottom-color: var(--umcp-accent);
+    -unity-font-style: bold;
+}
+
+/* --- Tab Content --- */
+.tab-content {
+    flex-grow: 1;
+    padding: 8px;
+    overflow: hidden;
+}
+
+/* --- Utility Classes --- */
+.row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.row--spaced {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.gap-4 {
+    margin-bottom: 4px;
+}
+
+.gap-8 {
+    margin-bottom: 8px;
+}
+
+.gap-12 {
+    margin-bottom: 12px;
+}
+
+.flex-grow {
+    flex-grow: 1;
+}
+
+.muted {
+    color: var(--umcp-muted);
+    font-size: 10px;
+}
+
+.mono {
+    -unity-font-style: normal;
+    font-size: 11px;
+}
+
+.bold {
+    -unity-font-style: bold;
+}
+
+.section-header {
+    -unity-font-style: bold;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.scroll-view {
+    flex-grow: 1;
+}
+
+/* --- Card --- */
+.card {
+    background-color: var(--umcp-surface);
+    border-width: 1px;
+    border-color: var(--umcp-border);
+    border-radius: var(--umcp-card-radius);
+    padding: 8px;
+    margin-bottom: 4px;
+}
+
+.card--accent-left {
+    border-left-width: 3px;
+}
+
+.card--running {
+    border-left-color: var(--umcp-success);
+}
+
+.card--stopped {
+    border-left-color: var(--umcp-muted);
+}
+
+/* --- Connection Card (Status Tab hero) --- */
+.connection-card {
+    background-color: var(--umcp-surface);
+    border-width: 1px;
+    border-color: var(--umcp-border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 4px;
+}
+
+.connection-card__section-label {
+    font-size: 9px;
+    color: var(--umcp-muted);
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+.connection-card__endpoint {
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+.connection-card__divider {
+    height: 1px;
+    background-color: var(--umcp-border);
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.connection-card__stats {
+    flex-direction: row;
+}
+
+/* --- Pill / Badge --- */
+.pill {
+    border-radius: 8px;
+    padding: 1px 8px;
+    font-size: 10px;
+    margin-right: 4px;
+    flex-shrink: 0;
+    -unity-text-align: middle-center;
+}
+
+.pill--stat {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-width: 1px;
+    border-color: var(--umcp-border);
+}
+
+.pill--success {
+    background-color: rgba(46, 204, 113, 0.15);
+    color: var(--umcp-success);
+    border-width: 1px;
+    border-color: rgba(46, 204, 113, 0.3);
+}
+
+.pill--error {
+    background-color: rgba(231, 76, 60, 0.15);
+    color: var(--umcp-error);
+    border-width: 1px;
+    border-color: rgba(231, 76, 60, 0.3);
+}
+
+.pill--warning {
+    background-color: rgba(243, 156, 18, 0.15);
+    color: var(--umcp-warning);
+    border-width: 1px;
+    border-color: rgba(243, 156, 18, 0.3);
+}
+
+.pill--readonly {
+    background-color: rgba(78, 205, 196, 0.15);
+    color: var(--umcp-accent);
+    border-width: 1px;
+    border-color: rgba(78, 205, 196, 0.3);
+}
+
+.pill--destructive {
+    background-color: rgba(243, 156, 18, 0.15);
+    color: var(--umcp-warning);
+    border-width: 1px;
+    border-color: rgba(243, 156, 18, 0.3);
+}
+
+.pill--idempotent {
+    background-color: rgba(128, 128, 128, 0.15);
+    color: var(--umcp-muted);
+    border-width: 1px;
+    border-color: rgba(128, 128, 128, 0.3);
+}
+
+/* --- Activity Feed --- */
+.activity-entry {
+    flex-direction: row;
+    align-items: center;
+    padding: 3px 4px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--umcp-border);
+}
+
+.activity-entry--failed {
+    background-color: rgba(231, 76, 60, 0.08);
+}
+
+.activity-timestamp {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    min-width: 56px;
+    flex-shrink: 0;
+    margin-right: 6px;
+}
+
+.activity-tool-name {
+    -unity-font-style: bold;
+    font-size: 11px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.activity-category {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+.activity-arrow {
+    font-size: 8px;
+    color: var(--umcp-muted);
+    min-width: 12px;
+    -unity-text-align: middle-center;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+
+.activity-entry--expandable:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.activity-detail-panel {
+    padding: 4px 8px 6px 26px;
+    background-color: rgba(0, 0, 0, 0.08);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--umcp-border);
+}
+
+.activity-detail-text {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    white-space: normal;
+}
+
+.pill--duration {
+    background-color: rgba(128, 128, 128, 0.15);
+    color: var(--umcp-muted);
+    border-width: 1px;
+    border-color: rgba(128, 128, 128, 0.3);
+    font-size: 9px;
+    padding: 0px 6px;
+}
+
+.activity-args-inline {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    margin-left: 6px;
+    flex-shrink: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- Registry Inner Tab Bar --- */
+.reg-tab-bar {
+    flex-direction: row;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--umcp-border);
+    margin-bottom: 6px;
+}
+
+.reg-tab {
+    padding: 4px 10px;
+    font-size: 10px;
+    color: var(--umcp-muted);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-bottom-width: 2px;
+    border-bottom-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+    margin: 0;
+    cursor: link;
+    flex-grow: 1;
+    flex-basis: 0;
+    -unity-text-align: middle-center;
+}
+
+.reg-tab:hover {
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.reg-tab--active {
+    color: var(--umcp-accent);
+    border-bottom-color: var(--umcp-accent);
+    -unity-font-style: bold;
+}
+
+/* --- Registry Section Headers --- */
+.reg-section-header {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px 4px 8px;
+    margin-top: 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--umcp-border);
+}
+
+.reg-section-header--resource {
+    border-bottom-color: rgba(46, 204, 113, 0.2);
+}
+
+.reg-section-header--prompt {
+    border-bottom-color: rgba(243, 156, 18, 0.2);
+}
+
+.reg-section-header--clickable {
+    cursor: link;
+}
+
+.reg-section-header--clickable:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.reg-section-arrow {
+    font-size: 8px;
+    color: var(--umcp-muted);
+    min-width: 12px;
+    -unity-text-align: middle-center;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.reg-section-label {
+    font-size: 10px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+    color: var(--umcp-muted);
+}
+
+.reg-section-count {
+    font-size: 9px;
+    color: var(--umcp-muted);
+    margin-left: 6px;
+    padding: 0px 5px;
+    border-radius: 6px;
+    background-color: rgba(128, 128, 128, 0.12);
+}
+
+/* --- Registry Card --- */
+.reg-card {
+    padding: 5px 8px 5px 10px;
+    margin: 1px 0;
+    border-radius: 3px;
+    border-left-width: 2px;
+    border-left-color: rgba(0, 0, 0, 0);
+}
+
+.reg-card:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.reg-card--clickable {
+    cursor: link;
+}
+
+.reg-card--clickable:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.reg-card--expanded {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-left-color: var(--umcp-accent);
+}
+
+/* Type accent borders */
+.reg-card--tool {
+    border-left-color: rgba(78, 205, 196, 0.4);
+}
+
+.reg-card--resource {
+    border-left-color: rgba(46, 204, 113, 0.4);
+}
+
+.reg-card--prompt {
+    border-left-color: rgba(243, 156, 18, 0.4);
+}
+
+.reg-card--expanded.reg-card--tool {
+    border-left-color: var(--umcp-accent);
+}
+
+.reg-card--expanded.reg-card--resource {
+    border-left-color: var(--umcp-success);
+}
+
+.reg-card--expanded.reg-card--prompt {
+    border-left-color: var(--umcp-warning);
+}
+
+.reg-card--recipe {
+    border-left-color: rgba(155, 89, 182, 0.4);
+}
+
+.reg-card--expanded.reg-card--recipe {
+    border-left-color: #9B59B6;
+}
+
+/* Card header row */
+.reg-card__header {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.reg-card__name {
+    -unity-font-style: bold;
+    font-size: 11px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.reg-card__desc {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 1px;
+}
+
+.reg-card__uri {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    margin-top: 1px;
+    -unity-font-style: italic;
+}
+
+/* --- Registry Detail Panel --- */
+.reg-detail {
+    margin-top: 4px;
+    padding-top: 0;
+}
+
+.reg-detail__divider {
+    height: 1px;
+    background-color: var(--umcp-border);
+    margin-bottom: 4px;
+}
+
+.reg-detail__header {
+    font-size: 9px;
+    color: var(--umcp-muted);
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+/* Parameter rows */
+.reg-param {
+    padding: 2px 0 2px 4px;
+    margin-bottom: 2px;
+    border-left-width: 1px;
+    border-left-color: rgba(128, 128, 128, 0.15);
+    padding-left: 8px;
+}
+
+.reg-param__header {
+    flex-direction: row;
+    align-items: center;
+}
+
+.reg-param__name {
+    -unity-font-style: bold;
+    font-size: 10px;
+    margin-right: 6px;
+}
+
+.reg-param__type {
+    font-size: 9px;
+    color: var(--umcp-accent);
+    padding: 0px 4px;
+    border-radius: 2px;
+    background-color: rgba(78, 205, 196, 0.08);
+    margin-right: 4px;
+}
+
+.reg-param__required {
+    font-size: 9px;
+    color: var(--umcp-warning);
+    padding: 0px 4px;
+    border-radius: 2px;
+    background-color: rgba(243, 156, 18, 0.08);
+}
+
+.reg-param__desc {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    white-space: normal;
+    margin-top: 1px;
+}
+
+.reg-param__meta {
+    font-size: 9px;
+    color: rgba(128, 128, 128, 0.7);
+    margin-top: 1px;
+    -unity-font-style: italic;
+}
+
+/* --- Checkpoint Entry --- */
+.checkpoint-entry {
+    padding: 6px 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--umcp-border);
+}
+
+.checkpoint-name {
+    -unity-font-style: bold;
+    font-size: 11px;
+}
+
+.checkpoint-scene {
+    font-size: 10px;
+    color: var(--umcp-muted);
+}
+
+.checkpoint-id {
+    font-size: 9px;
+    color: var(--umcp-muted);
+    margin-top: 2px;
+}
+
+.checkpoint-time {
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.checkpoint-actions {
+    flex-direction: row;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.checkpoint-confirm {
+    padding: 4px 8px;
+    margin-top: 4px;
+    border-radius: var(--umcp-card-radius);
+    background-color: var(--umcp-surface);
+    border-width: 1px;
+    border-color: var(--umcp-border);
+}
+
+.checkpoint-diff {
+    padding: 4px 8px;
+    margin-top: 4px;
+    border-radius: var(--umcp-card-radius);
+    background-color: var(--umcp-surface);
+    border-width: 1px;
+    border-color: var(--umcp-border);
+}
+
+.diff-added {
+    color: var(--umcp-success);
+    font-size: 10px;
+}
+
+.diff-removed {
+    color: var(--umcp-error);
+    font-size: 10px;
+}
+
+.diff-changed {
+    color: var(--umcp-warning);
+    font-size: 10px;
+}
+
+/* --- Checkpoint Pending Indicator --- */
+.checkpoint-pending {
+    flex-direction: row;
+    align-items: center;
+    padding: 3px 8px;
+    margin-bottom: 4px;
+    border-radius: var(--umcp-card-radius);
+    background-color: rgba(78, 205, 196, 0.06);
+    border-width: 1px;
+    border-color: rgba(78, 205, 196, 0.15);
+}
+
+.checkpoint-pending__label {
+    font-size: 10px;
+    color: var(--umcp-accent);
+    -unity-font-style: italic;
+}
+
+/* --- Checkpoint Tracked Assets Panel --- */
+.checkpoint-assets {
+    padding: 4px 8px;
+    margin-top: 4px;
+    border-radius: var(--umcp-card-radius);
+    background-color: var(--umcp-surface);
+    border-width: 1px;
+    border-color: var(--umcp-border);
+}
+
+.checkpoint-assets__header {
+    font-size: 9px;
+    color: var(--umcp-muted);
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+    margin-bottom: 3px;
+}
+
+.checkpoint-assets__path {
+    font-size: 10px;
+    color: var(--umcp-accent);
+    padding: 1px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.checkpoint-assets__divider {
+    height: 1px;
+    background-color: var(--umcp-border);
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+/* --- Recipe Card --- */
+.recipe-card {
+    background-color: var(--umcp-surface);
+    border-width: 1px;
+    border-color: var(--umcp-border);
+    border-radius: var(--umcp-card-radius);
+    padding: 10px;
+    margin-bottom: 6px;
+}
+
+.recipe-name {
+    -unity-font-style: bold;
+    font-size: 12px;
+}
+
+.recipe-description {
+    font-size: 11px;
+    white-space: normal;
+    margin-top: 4px;
+    color: var(--umcp-muted);
+}
+
+.recipe-param-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.recipe-param-name {
+    font-size: 10px;
+    -unity-font-style: bold;
+    min-width: 80px;
+}
+
+.recipe-param-type {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    margin-left: 4px;
+}
+
+.recipe-param-default {
+    font-size: 10px;
+    color: var(--umcp-muted);
+    margin-left: 4px;
+}
+
+.recipe-execute-button {
+    align-self: flex-end;
+    margin-top: 6px;
+    padding: 3px 12px;
+    border-radius: 3px;
+    background-color: rgba(78, 205, 196, 0.15);
+    border-width: 1px;
+    border-color: rgba(78, 205, 196, 0.3);
+    color: var(--umcp-accent);
+}
+
+.recipe-execute-button:hover {
+    background-color: rgba(78, 205, 196, 0.25);
+}
+
+/* --- Buttons --- */
+.button--accent {
+    background-color: rgba(78, 205, 196, 0.15);
+    border-width: 1px;
+    border-color: rgba(78, 205, 196, 0.3);
+    color: var(--umcp-accent);
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+.button--accent:hover {
+    background-color: rgba(78, 205, 196, 0.25);
+}
+
+.button--warning {
+    background-color: rgba(243, 156, 18, 0.15);
+    border-width: 1px;
+    border-color: rgba(243, 156, 18, 0.3);
+    color: var(--umcp-warning);
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+.button--warning:hover {
+    background-color: rgba(243, 156, 18, 0.25);
+}
+
+.button--small {
+    height: 18px;
+    padding: 1px 6px;
+    font-size: 10px;
+    border-radius: 2px;
+    margin-left: 4px;
+}
+
+/* --- Filter Pills --- */
+.filter-bar {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.filter-pill {
+    padding: 2px 10px;
+    font-size: 10px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: var(--umcp-border);
+    background-color: rgba(0, 0, 0, 0);
+    margin-right: 4px;
+    color: var(--umcp-muted);
+    cursor: link;
+}
+
+.filter-pill:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.filter-pill--active {
+    background-color: rgba(78, 205, 196, 0.15);
+    border-color: rgba(78, 205, 196, 0.3);
+    color: var(--umcp-accent);
+}
+
+/* --- Search Field --- */
+.search-field {
+    margin-bottom: 6px;
+    font-size: 11px;
+}
+
+/* --- Empty State --- */
+.empty-state {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    flex-grow: 1;
+}
+
+.empty-state-text {
+    color: var(--umcp-muted);
+    font-size: 11px;
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+/* --- Foldout Override --- */
+.category-foldout > .unity-foldout__toggle {
+    -unity-font-style: bold;
+    font-size: 11px;
+}
+
+/* --- Help Box --- */
+.warning-box {
+    background-color: rgba(243, 156, 18, 0.08);
+    border-width: 1px;
+    border-color: rgba(243, 156, 18, 0.2);
+    border-radius: var(--umcp-card-radius);
+    padding: 6px 8px;
+    margin-top: 4px;
+}
+
+.warning-box > Label {
+    font-size: 10px;
+    white-space: normal;
+    color: var(--umcp-warning);
+}
+
+.info-box {
+    background-color: rgba(78, 205, 196, 0.08);
+    border-width: 1px;
+    border-color: rgba(78, 205, 196, 0.2);
+    border-radius: var(--umcp-card-radius);
+    padding: 6px 8px;
+    margin-top: 4px;
+}
+
+.info-box > Label {
+    font-size: 10px;
+    white-space: normal;
+    color: var(--umcp-accent);
+}

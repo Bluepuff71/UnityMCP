@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 echo "Building UnityMCPProxy for macOS..."
 
 # Create output directory if it doesn't exist
-mkdir -p "../Plugins/macOS/"
+mkdir -p "../Package/Plugins/macOS/"
 
 # Check if clang is available
 if ! command -v clang &> /dev/null; then
@@ -29,8 +29,9 @@ if [ ! -f "UnityMCPProxy.bundle" ]; then
     exit 1
 fi
 
-# Copy to Plugins folder
-echo "Copying to Plugins folder..."
-cp UnityMCPProxy.bundle ../Plugins/macOS/
+# Copy to Package/Plugins folder (this is where Unity actually loads from)
+echo "Copying to Package/Plugins folder..."
+mkdir -p "../Package/Plugins/macOS/"
+cp UnityMCPProxy.bundle ../Package/Plugins/macOS/
 
 echo "Build successful: UnityMCPProxy.bundle"

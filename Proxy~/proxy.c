@@ -56,6 +56,7 @@ static volatile int s_has_response = 0;
 /* Flag set by DllMain/destructor to signal the server thread to exit and clean up */
 static volatile int s_unloading = 0;
 
+
 /*
  * Buffer for building dynamic error responses with request ID
  */
@@ -174,6 +175,18 @@ static const char* BuildErrorResponse(int code, const char* message, const char*
     snprintf(s_error_response_buffer, sizeof(s_error_response_buffer),
         "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%d,\"message\":\"%s\"},\"id\":%s}",
         code, message, id);
+    return s_error_response_buffer;
+}
+
+/*
+ * Build a JSON-RPC error response with an additional data object for recovery guidance.
+ * data_json must be a pre-formatted JSON object string (e.g. {"recoverable":true}).
+ */
+static const char* BuildErrorResponseWithData(int code, const char* message, const char* data_json, const char* id)
+{
+    snprintf(s_error_response_buffer, sizeof(s_error_response_buffer),
+        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%d,\"message\":\"%s\",\"data\":%s},\"id\":%s}",
+        code, message, data_json, id);
     return s_error_response_buffer;
 }
 
@@ -338,7 +351,8 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
             if (elapsed_time >= PROXY_REQUEST_TIMEOUT_MS)
             {
                 mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Unity recompilation timed out.", request_id));
+                    BuildErrorResponseWithData(-32000, "Unity recompilation timed out.",
+                        "{\"recoverable\":true,\"retryAfterMs\":5000,\"reason\":\"recompilation\"}", request_id));
                 return;
             }
             if (!s_running)
@@ -366,7 +380,8 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
             {
                 s_has_request = 0;
                 mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Request processing timed out.", request_id));
+                    BuildErrorResponseWithData(-32000, "Request processing timed out.",
+                        "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"timeout\"}", request_id));
                 return;
             }
             if (!s_running)
@@ -380,7 +395,8 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
             {
                 s_has_request = 0;
                 mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Request interrupted by Unity domain reload. Please retry.", request_id));
+                    BuildErrorResponseWithData(-32000, "Request interrupted by Unity domain reload. Please retry.",
+                        "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"domain_reload\"}", request_id));
                 return;
             }
             PROXY_SLEEP_MS(1);
@@ -516,11 +532,15 @@ EXPORT void SetPollingActive(int active)
 
 /*
  * Get the pending request body, if any.
+ * Atomically consumes the request: clears s_has_request so subsequent
+ * polls on the next editor tick won't return the same request while the
+ * HTTP handler thread is still waiting for the response.
  */
 EXPORT const char* GetPendingRequest(void)
 {
     if (s_has_request)
     {
+        s_has_request = 0;
         return s_request_buffer;
     }
     return NULL;

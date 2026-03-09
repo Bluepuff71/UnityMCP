@@ -19,7 +19,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Refreshes the Unity asset database and optionally requests script compilation.
         /// </summary>
-        [MCPTool("unity_refresh", "Refreshes Unity asset database and optionally requests script compilation", Category = "Editor", DestructiveHint = true)]
+        [MCPTool("refresh_unity", "Refreshes Unity asset database and optionally requests script compilation", Category = "Editor")]
         public static object Refresh(
             [MCPParam("mode", "Refresh mode: force or if_dirty (default: if_dirty)")] string mode = "if_dirty",
             [MCPParam("scope", "What to refresh: all or scripts (default: all)")] string scope = "all",
@@ -109,21 +109,36 @@ namespace UnityMCP.Editor.Tools
                 if (compileRequested && waitForReady)
                 {
                     shouldWait = false;
-                    hint = "wait_for_ready skipped on Unity 6+ when compile is requested (domain reload issues). Poll unity_refresh with wait_for_ready=false to check state.";
+                    hint = "wait_for_ready skipped on Unity 6+ when compile is requested (domain reload issues). Poll refresh_unity with wait_for_ready=false to check state.";
                 }
 #endif
 
+                bool timedOut = false;
                 if (shouldWait)
                 {
                     bool isReady = WaitForUnityReady();
                     if (!isReady)
                     {
+                        timedOut = true;
                         hint = "Timed out waiting for Unity to be ready. Unity may still be compiling or importing.";
                     }
                 }
 
                 // Determine resulting state
                 string resultingState = GetCurrentUnityState();
+
+                // Auto-checkpoint: fold tracked asset changes into current bucket
+                try
+                {
+                    if (CheckpointManager.HasPendingTracks)
+                    {
+                        CheckpointManager.SaveCheckpoint();
+                    }
+                }
+                catch (Exception checkpointException)
+                {
+                    Debug.LogWarning($"[RefreshUnity] Auto-checkpoint failed: {checkpointException.Message}");
+                }
 
                 // Build success message
                 string message;
@@ -158,11 +173,12 @@ namespace UnityMCP.Editor.Tools
 
                 return new
                 {
-                    success = true,
+                    success = !timedOut,
                     message,
                     refresh_triggered = refreshTriggered,
                     compile_requested = compileRequested,
                     resulting_state = resultingState,
+                    timed_out = timedOut,
                     hint
                 };
             }

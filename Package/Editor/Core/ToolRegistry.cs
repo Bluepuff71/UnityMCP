@@ -11,10 +11,12 @@ namespace UnityMCP.Editor.Core
 {
     /// <summary>
     /// Registry for discovering and invoking MCP tools marked with [MCPTool] attribute.
+    /// Supports both single-method tools ([MCPTool] on a method) and action-based tools
+    /// ([MCPTool] on a class with [MCPAction] methods).
     /// </summary>
     public static class ToolRegistry
     {
-        private static Dictionary<string, ToolInfo> _tools = new Dictionary<string, ToolInfo>();
+        private static Dictionary<string, IToolInfo> _tools = new Dictionary<string, IToolInfo>();
         private static bool _isInitialized = false;
         private static readonly object _lock = new object();
 
@@ -81,6 +83,22 @@ namespace UnityMCP.Editor.Core
         {
             foreach (var type in assembly.GetTypes())
             {
+                try
+                {
+                    // Check for class-level [MCPTool] (action-based tool)
+                    var classToolAttribute = type.GetCustomAttribute<MCPToolAttribute>();
+                    if (classToolAttribute != null)
+                    {
+                        DiscoverActionTool(type, classToolAttribute);
+                        continue; // Don't also scan methods on this class for method-level tools
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning($"[ToolRegistry] Error processing class {type.FullName}: {exception.Message}");
+                }
+
+                // Check for method-level [MCPTool] (single-method tool)
                 foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public))
                 {
                     try
@@ -94,7 +112,7 @@ namespace UnityMCP.Editor.Core
                                 continue;
                             }
 
-                            var toolInfo = new ToolInfo(toolAttribute, method);
+                            var toolInfo = new MethodToolInfo(toolAttribute, method);
                             _tools[toolAttribute.Name] = toolInfo;
                         }
                     }
@@ -106,13 +124,48 @@ namespace UnityMCP.Editor.Core
             }
         }
 
+        private static void DiscoverActionTool(Type type, MCPToolAttribute classAttribute)
+        {
+            var actionMethods = new Dictionary<string, ActionInfo>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public))
+            {
+                var actionAttribute = method.GetCustomAttribute<MCPActionAttribute>();
+                if (actionAttribute == null) continue;
+
+                string normalizedName = actionAttribute.Name.ToLowerInvariant();
+                if (actionMethods.ContainsKey(normalizedName))
+                {
+                    Debug.LogWarning($"[ToolRegistry] Duplicate action name '{actionAttribute.Name}' in {type.FullName}. Skipping.");
+                    continue;
+                }
+
+                actionMethods[normalizedName] = new ActionInfo(actionAttribute, method);
+            }
+
+            if (actionMethods.Count == 0)
+            {
+                Debug.LogWarning($"[ToolRegistry] Class {type.FullName} has [MCPTool] but no [MCPAction] methods. Skipping.");
+                return;
+            }
+
+            if (_tools.ContainsKey(classAttribute.Name))
+            {
+                Debug.LogWarning($"[ToolRegistry] Duplicate tool name '{classAttribute.Name}' found on class {type.FullName}. Skipping.");
+                return;
+            }
+
+            var actionToolInfo = new ActionToolInfo(classAttribute, actionMethods);
+            _tools[classAttribute.Name] = actionToolInfo;
+        }
+
         /// <summary>
         /// Gets all tool definitions for the MCP tools/list response.
         /// </summary>
         public static IEnumerable<ToolDefinition> GetDefinitions()
         {
             EnsureInitialized();
-            List<ToolInfo> snapshot;
+            List<IToolInfo> snapshot;
             lock (_lock)
             {
                 snapshot = _tools.Values.ToList();
@@ -142,7 +195,7 @@ namespace UnityMCP.Editor.Core
         public static IEnumerable<IGrouping<string, ToolDefinition>> GetDefinitionsByCategory()
         {
             EnsureInitialized();
-            List<ToolInfo> snapshot;
+            List<IToolInfo> snapshot;
             lock (_lock)
             {
                 snapshot = _tools.Values.ToList();
@@ -189,15 +242,11 @@ namespace UnityMCP.Editor.Core
         /// <summary>
         /// Invokes a tool by name with the given arguments.
         /// </summary>
-        /// <param name="name">The name of the tool to invoke.</param>
-        /// <param name="arguments">A dictionary of argument names to their JSON-parsed values.</param>
-        /// <returns>The result of the tool invocation.</returns>
-        /// <exception cref="MCPException">Thrown if the tool is not found or invocation fails.</exception>
         public static object Invoke(string name, Dictionary<string, object> arguments)
         {
             EnsureInitialized();
 
-            ToolInfo toolInfo;
+            IToolInfo toolInfo;
             lock (_lock)
             {
                 if (!_tools.TryGetValue(name, out toolInfo))
@@ -212,9 +261,6 @@ namespace UnityMCP.Editor.Core
         /// <summary>
         /// Invokes a tool by name with arguments parsed from a JSON string.
         /// </summary>
-        /// <param name="name">The name of the tool to invoke.</param>
-        /// <param name="jsonArguments">JSON string containing the arguments.</param>
-        /// <returns>The result of the tool invocation.</returns>
         public static object InvokeWithJson(string name, string jsonArguments)
         {
             Dictionary<string, object> arguments;
@@ -230,7 +276,7 @@ namespace UnityMCP.Editor.Core
             return Invoke(name, arguments);
         }
 
-        private static Dictionary<string, object> ConvertJObjectToDictionary(JObject jObject)
+        internal static Dictionary<string, object> ConvertJObjectToDictionary(JObject jObject)
         {
             var result = new Dictionary<string, object>();
             foreach (var property in jObject.Properties())
@@ -240,7 +286,7 @@ namespace UnityMCP.Editor.Core
             return result;
         }
 
-        private static object ConvertJToken(JToken token)
+        internal static object ConvertJToken(JToken token)
         {
             return token.Type switch
             {
@@ -268,9 +314,21 @@ namespace UnityMCP.Editor.Core
     }
 
     /// <summary>
-    /// Internal class holding metadata and invocation logic for a discovered tool.
+    /// Interface for tool info implementations (method-based and action-based).
     /// </summary>
-    internal class ToolInfo
+    internal interface IToolInfo
+    {
+        string Name { get; }
+        string Description { get; }
+        string Category { get; }
+        ToolDefinition ToDefinition();
+        object Invoke(Dictionary<string, object> arguments);
+    }
+
+    /// <summary>
+    /// Holds metadata and invocation logic for a single-method tool ([MCPTool] on a method).
+    /// </summary>
+    internal class MethodToolInfo : IToolInfo
     {
         private readonly MCPToolAttribute _attribute;
         private readonly MethodInfo _method;
@@ -281,7 +339,7 @@ namespace UnityMCP.Editor.Core
         public string Description => _attribute.Description;
         public string Category => _attribute.Category;
 
-        public ToolInfo(MCPToolAttribute attribute, MethodInfo method)
+        public MethodToolInfo(MCPToolAttribute attribute, MethodInfo method)
         {
             _attribute = attribute;
             _method = method;
@@ -307,22 +365,19 @@ namespace UnityMCP.Editor.Core
                     Description = parameterDescription,
                     Required = isRequired,
                     ParameterInfo = parameter,
-                    JsonType = GetJsonSchemaType(parameter.ParameterType),
+                    JsonType = ToolSchemaUtils.GetJsonSchemaType(parameter.ParameterType),
                     McpParamAttribute = mcpParamAttribute
                 };
             }
         }
 
-        /// <summary>
-        /// Creates a ToolDefinition for the MCP tools/list response.
-        /// </summary>
         public ToolDefinition ToDefinition()
         {
             var inputSchema = new InputSchema();
 
             foreach (var metadata in _parameterMetadata.Values)
             {
-                var propertySchema = CreatePropertySchema(metadata);
+                var propertySchema = ToolSchemaUtils.CreatePropertySchema(metadata);
                 inputSchema.AddProperty(metadata.Name, propertySchema, metadata.Required);
             }
 
@@ -346,7 +401,345 @@ namespace UnityMCP.Editor.Core
             return definition;
         }
 
-        private PropertySchema CreatePropertySchema(ParameterMetadata metadata)
+        public object Invoke(Dictionary<string, object> arguments)
+        {
+            arguments = arguments ?? new Dictionary<string, object>();
+
+            var invokeArguments = new object[_parameters.Length];
+
+            for (int parameterIndex = 0; parameterIndex < _parameters.Length; parameterIndex++)
+            {
+                var parameter = _parameters[parameterIndex];
+                var metadata = _parameterMetadata.Values.FirstOrDefault(m => m.ParameterInfo == parameter);
+
+                if (metadata == null)
+                {
+                    throw new MCPException($"Internal error: Parameter metadata not found for {parameter.Name}", MCPErrorCodes.InternalError);
+                }
+
+                string argumentName = metadata.Name;
+
+                if (arguments.TryGetValue(argumentName, out var argumentValue))
+                {
+                    try
+                    {
+                        invokeArguments[parameterIndex] = ToolSchemaUtils.ConvertValue(argumentValue, parameter.ParameterType);
+                    }
+                    catch (Exception conversionException)
+                    {
+                        throw new MCPException(
+                            $"Failed to convert argument '{argumentName}' to type {parameter.ParameterType.Name}: {conversionException.Message}",
+                            MCPErrorCodes.InvalidParams);
+                    }
+                }
+                else if (metadata.Required)
+                {
+                    throw new MCPException($"Missing required argument: {argumentName}", MCPErrorCodes.InvalidParams);
+                }
+                else if (parameter.HasDefaultValue)
+                {
+                    invokeArguments[parameterIndex] = parameter.DefaultValue;
+                }
+                else
+                {
+                    invokeArguments[parameterIndex] = ToolSchemaUtils.GetDefaultValue(parameter.ParameterType);
+                }
+            }
+
+            try
+            {
+                return _method.Invoke(null, invokeArguments);
+            }
+            catch (TargetInvocationException invocationException)
+            {
+                var innerException = invocationException.InnerException ?? invocationException;
+                if (innerException is MCPException)
+                {
+                    throw innerException;
+                }
+                throw new MCPException($"Tool execution failed: {innerException.Message}", innerException, MCPErrorCodes.InternalError);
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Tool invocation failed: {exception.Message}", exception, MCPErrorCodes.InternalError);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Metadata for a single action within an action-based tool.
+    /// </summary>
+    internal class ActionInfo
+    {
+        public MCPActionAttribute Attribute { get; }
+        public MethodInfo Method { get; }
+        public ParameterInfo[] Parameters { get; }
+        public Dictionary<string, ParameterMetadata> ParameterMetadata { get; }
+
+        public ActionInfo(MCPActionAttribute attribute, MethodInfo method)
+        {
+            Attribute = attribute;
+            Method = method;
+            Parameters = method.GetParameters();
+            ParameterMetadata = new Dictionary<string, ParameterMetadata>();
+
+            foreach (var parameter in Parameters)
+            {
+                var mcpParamAttribute = parameter.GetCustomAttribute<MCPParamAttribute>();
+
+                string parameterName = mcpParamAttribute?.Name ?? parameter.Name;
+                string parameterDescription = mcpParamAttribute?.Description ?? "";
+                bool isRequired = mcpParamAttribute?.Required ?? !parameter.HasDefaultValue;
+
+                ParameterMetadata[parameterName] = new ParameterMetadata
+                {
+                    Name = parameterName,
+                    Description = parameterDescription,
+                    Required = isRequired,
+                    ParameterInfo = parameter,
+                    JsonType = ToolSchemaUtils.GetJsonSchemaType(parameter.ParameterType),
+                    McpParamAttribute = mcpParamAttribute
+                };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Holds metadata and invocation logic for an action-based tool ([MCPTool] on a class).
+    /// </summary>
+    internal class ActionToolInfo : IToolInfo
+    {
+        private readonly MCPToolAttribute _attribute;
+        private readonly Dictionary<string, ActionInfo> _actions;
+
+        public string Name => _attribute.Name;
+        public string Description => _attribute.Description;
+        public string Category => _attribute.Category;
+
+        public ActionToolInfo(MCPToolAttribute attribute, Dictionary<string, ActionInfo> actions)
+        {
+            _attribute = attribute;
+            _actions = actions;
+        }
+
+        public ToolDefinition ToDefinition()
+        {
+            var inputSchema = new InputSchema();
+
+            // Add "action" parameter as required enum
+            var actionNames = _actions.Keys.ToList();
+            var actionDescriptions = new List<string>();
+            foreach (var actionName in actionNames)
+            {
+                var actionInfo = _actions[actionName];
+                if (!string.IsNullOrEmpty(actionInfo.Attribute.Description))
+                {
+                    actionDescriptions.Add($"{actionName}: {actionInfo.Attribute.Description}");
+                }
+            }
+
+            string actionDescription = "Action to perform";
+            if (actionDescriptions.Count > 0)
+            {
+                actionDescription += ": " + string.Join(", ", actionDescriptions);
+            }
+
+            inputSchema.AddProperty("action", new PropertySchema
+            {
+                type = "string",
+                description = actionDescription,
+                @enum = actionNames
+            }, isRequired: true);
+
+            // Collect all parameters from all actions, merging duplicates
+            var allParams = new Dictionary<string, MergedParamInfo>();
+
+            foreach (var kvp in _actions)
+            {
+                string actionName = kvp.Key;
+                var actionInfo = kvp.Value;
+
+                foreach (var paramMeta in actionInfo.ParameterMetadata.Values)
+                {
+                    if (!allParams.TryGetValue(paramMeta.Name, out var merged))
+                    {
+                        merged = new MergedParamInfo
+                        {
+                            Metadata = paramMeta,
+                            UsedByActions = new List<string>()
+                        };
+                        allParams[paramMeta.Name] = merged;
+                    }
+                    merged.UsedByActions.Add(actionName);
+                }
+            }
+
+            int totalActions = _actions.Count;
+
+            foreach (var kvp in allParams)
+            {
+                var merged = kvp.Value;
+                var propertySchema = ToolSchemaUtils.CreatePropertySchema(merged.Metadata);
+
+                // If param is only used by some actions, annotate the description
+                if (merged.UsedByActions.Count < totalActions)
+                {
+                    string actionList = string.Join(", ", merged.UsedByActions.Select(a => $"'{a}'"));
+                    string suffix = merged.UsedByActions.Count == 1
+                        ? $" (for action={actionList})"
+                        : $" (for actions: {actionList})";
+                    propertySchema.description = (propertySchema.description ?? "") + suffix;
+                }
+
+                // In the unified schema, action-specific params are never globally required
+                // (they're validated per-action at invoke time)
+                inputSchema.AddProperty(merged.Metadata.Name, propertySchema, isRequired: false);
+            }
+
+            var definition = new ToolDefinition(_attribute.Name, _attribute.Description, inputSchema);
+            definition.category = _attribute.Category;
+
+            // Resolve tool-level annotations from per-action annotations
+            bool anyDestructive = false;
+            bool allReadOnly = true;
+            bool allIdempotent = true;
+            bool anyOpenWorld = false;
+            var destructiveActionNames = new List<string>();
+
+            foreach (var kvp in _actions)
+            {
+                var actionAttr = kvp.Value.Attribute;
+                if (actionAttr.DestructiveHint)
+                {
+                    anyDestructive = true;
+                    destructiveActionNames.Add(kvp.Key);
+                }
+                if (!actionAttr.ReadOnlyHint) allReadOnly = false;
+                if (!actionAttr.IdempotentHint) allIdempotent = false;
+                if (actionAttr.OpenWorldHint) anyOpenWorld = true;
+            }
+
+            // Also consider class-level defaults
+            if (_attribute.DestructiveHint) anyDestructive = true;
+            if (_attribute.OpenWorldHint) anyOpenWorld = true;
+
+            bool hasAnnotations = anyDestructive || allReadOnly || allIdempotent || anyOpenWorld ||
+                                  _attribute.Title != null;
+            if (hasAnnotations)
+            {
+                definition.annotations = new ToolAnnotations();
+                if (anyDestructive) definition.annotations.destructiveHint = true;
+                if (allReadOnly) definition.annotations.readOnlyHint = true;
+                if (allIdempotent) definition.annotations.idempotentHint = true;
+                if (anyOpenWorld) definition.annotations.openWorldHint = true;
+                if (_attribute.Title != null) definition.annotations.title = _attribute.Title;
+            }
+
+            // Set destructive actions for targeted checkpoint nudge
+            if (destructiveActionNames.Count > 0)
+            {
+                definition.destructiveActions = destructiveActionNames;
+            }
+
+            return definition;
+        }
+
+        public object Invoke(Dictionary<string, object> arguments)
+        {
+            arguments = arguments ?? new Dictionary<string, object>();
+
+            // Extract action name
+            if (!arguments.TryGetValue("action", out var actionValue) || actionValue == null)
+            {
+                throw new MCPException("Missing required argument: action", MCPErrorCodes.InvalidParams);
+            }
+
+            string actionName = actionValue.ToString().ToLowerInvariant().Trim();
+
+            if (!_actions.TryGetValue(actionName, out var actionInfo))
+            {
+                string validActions = string.Join(", ", _actions.Keys);
+                throw new MCPException($"Unknown action: '{actionName}'. Valid actions: {validActions}", MCPErrorCodes.InvalidParams);
+            }
+
+            // Resolve parameters for this specific action
+            var invokeArguments = new object[actionInfo.Parameters.Length];
+
+            for (int parameterIndex = 0; parameterIndex < actionInfo.Parameters.Length; parameterIndex++)
+            {
+                var parameter = actionInfo.Parameters[parameterIndex];
+                var metadata = actionInfo.ParameterMetadata.Values.FirstOrDefault(m => m.ParameterInfo == parameter);
+
+                if (metadata == null)
+                {
+                    throw new MCPException($"Internal error: Parameter metadata not found for {parameter.Name}", MCPErrorCodes.InternalError);
+                }
+
+                string argumentName = metadata.Name;
+
+                if (arguments.TryGetValue(argumentName, out var argumentValue))
+                {
+                    try
+                    {
+                        invokeArguments[parameterIndex] = ToolSchemaUtils.ConvertValue(argumentValue, parameter.ParameterType);
+                    }
+                    catch (Exception conversionException)
+                    {
+                        throw new MCPException(
+                            $"Failed to convert argument '{argumentName}' to type {parameter.ParameterType.Name}: {conversionException.Message}",
+                            MCPErrorCodes.InvalidParams);
+                    }
+                }
+                else if (metadata.Required)
+                {
+                    throw new MCPException($"Missing required argument: {argumentName}", MCPErrorCodes.InvalidParams);
+                }
+                else if (parameter.HasDefaultValue)
+                {
+                    invokeArguments[parameterIndex] = parameter.DefaultValue;
+                }
+                else
+                {
+                    invokeArguments[parameterIndex] = ToolSchemaUtils.GetDefaultValue(parameter.ParameterType);
+                }
+            }
+
+            try
+            {
+                return actionInfo.Method.Invoke(null, invokeArguments);
+            }
+            catch (TargetInvocationException invocationException)
+            {
+                var innerException = invocationException.InnerException ?? invocationException;
+                if (innerException is MCPException)
+                {
+                    throw innerException;
+                }
+                throw new MCPException($"Tool execution failed: {innerException.Message}", innerException, MCPErrorCodes.InternalError);
+            }
+            catch (Exception exception)
+            {
+                throw new MCPException($"Tool invocation failed: {exception.Message}", exception, MCPErrorCodes.InternalError);
+            }
+        }
+
+        /// <summary>
+        /// Helper for tracking merged parameter info across actions.
+        /// </summary>
+        private class MergedParamInfo
+        {
+            public ParameterMetadata Metadata;
+            public List<string> UsedByActions;
+        }
+    }
+
+    /// <summary>
+    /// Shared utilities for building JSON schemas and converting values.
+    /// Used by both MethodToolInfo and ActionToolInfo.
+    /// </summary>
+    internal static class ToolSchemaUtils
+    {
+        public static PropertySchema CreatePropertySchema(ParameterMetadata metadata)
         {
             var schema = new PropertySchema
             {
@@ -395,80 +788,7 @@ namespace UnityMCP.Editor.Core
             return schema;
         }
 
-        /// <summary>
-        /// Invokes the tool with the given arguments.
-        /// </summary>
-        public object Invoke(Dictionary<string, object> arguments)
-        {
-            arguments = arguments ?? new Dictionary<string, object>();
-
-            var invokeArguments = new object[_parameters.Length];
-
-            for (int parameterIndex = 0; parameterIndex < _parameters.Length; parameterIndex++)
-            {
-                var parameter = _parameters[parameterIndex];
-                var metadata = _parameterMetadata.Values.FirstOrDefault(m => m.ParameterInfo == parameter);
-
-                if (metadata == null)
-                {
-                    throw new MCPException($"Internal error: Parameter metadata not found for {parameter.Name}", MCPErrorCodes.InternalError);
-                }
-
-                string argumentName = metadata.Name;
-
-                if (arguments.TryGetValue(argumentName, out var argumentValue))
-                {
-                    try
-                    {
-                        invokeArguments[parameterIndex] = ConvertValue(argumentValue, parameter.ParameterType);
-                    }
-                    catch (Exception conversionException)
-                    {
-                        throw new MCPException(
-                            $"Failed to convert argument '{argumentName}' to type {parameter.ParameterType.Name}: {conversionException.Message}",
-                            MCPErrorCodes.InvalidParams);
-                    }
-                }
-                else if (metadata.Required)
-                {
-                    throw new MCPException($"Missing required argument: {argumentName}", MCPErrorCodes.InvalidParams);
-                }
-                else if (parameter.HasDefaultValue)
-                {
-                    invokeArguments[parameterIndex] = parameter.DefaultValue;
-                }
-                else
-                {
-                    invokeArguments[parameterIndex] = GetDefaultValue(parameter.ParameterType);
-                }
-            }
-
-            try
-            {
-                return _method.Invoke(null, invokeArguments);
-            }
-            catch (TargetInvocationException invocationException)
-            {
-                // Unwrap the inner exception for cleaner error messages
-                var innerException = invocationException.InnerException ?? invocationException;
-
-                if (innerException is MCPException)
-                {
-                    throw innerException;
-                }
-
-                throw new MCPException($"Tool execution failed: {innerException.Message}", innerException, MCPErrorCodes.InternalError);
-            }
-            catch (Exception exception)
-            {
-                throw new MCPException($"Tool invocation failed: {exception.Message}", exception, MCPErrorCodes.InternalError);
-            }
-        }
-
-        /// <summary>
-        /// Converts a JSON-parsed value to the target type.
-        /// </summary>
-        private object ConvertValue(object value, Type targetType)
+        public static object ConvertValue(object value, Type targetType)
         {
             if (value == null)
             {
@@ -499,48 +819,21 @@ namespace UnityMCP.Editor.Core
             // Boolean conversion
             if (targetType == typeof(bool))
             {
-                if (value is bool boolValue)
-                {
-                    return boolValue;
-                }
-                if (value is string stringValue)
-                {
-                    return bool.Parse(stringValue);
-                }
+                if (value is bool boolValue) return boolValue;
+                if (value is string stringValue) return bool.Parse(stringValue);
                 return Convert.ToBoolean(value);
             }
 
             // Integer types
-            if (targetType == typeof(int))
-            {
-                return Convert.ToInt32(value);
-            }
-            if (targetType == typeof(long))
-            {
-                return Convert.ToInt64(value);
-            }
-            if (targetType == typeof(short))
-            {
-                return Convert.ToInt16(value);
-            }
-            if (targetType == typeof(byte))
-            {
-                return Convert.ToByte(value);
-            }
+            if (targetType == typeof(int)) return Convert.ToInt32(value);
+            if (targetType == typeof(long)) return Convert.ToInt64(value);
+            if (targetType == typeof(short)) return Convert.ToInt16(value);
+            if (targetType == typeof(byte)) return Convert.ToByte(value);
 
             // Floating point types
-            if (targetType == typeof(float))
-            {
-                return Convert.ToSingle(value);
-            }
-            if (targetType == typeof(double))
-            {
-                return Convert.ToDouble(value);
-            }
-            if (targetType == typeof(decimal))
-            {
-                return Convert.ToDecimal(value);
-            }
+            if (targetType == typeof(float)) return Convert.ToSingle(value);
+            if (targetType == typeof(double)) return Convert.ToDouble(value);
+            if (targetType == typeof(decimal)) return Convert.ToDecimal(value);
 
             // Enum conversion
             if (targetType.IsEnum)
@@ -568,7 +861,7 @@ namespace UnityMCP.Editor.Core
             return Convert.ChangeType(value, targetType);
         }
 
-        private object ConvertToArrayOrList(object value, Type targetType)
+        private static object ConvertToArrayOrList(object value, Type targetType)
         {
             if (value is not System.Collections.IList sourceList)
             {
@@ -613,7 +906,7 @@ namespace UnityMCP.Editor.Core
             }
         }
 
-        private static object GetDefaultValue(Type type)
+        public static object GetDefaultValue(Type type)
         {
             if (type.IsValueType)
             {
@@ -622,7 +915,7 @@ namespace UnityMCP.Editor.Core
             return null;
         }
 
-        private static string GetJsonSchemaType(Type type)
+        public static string GetJsonSchemaType(Type type)
         {
             // Handle nullable types
             Type underlyingType = Nullable.GetUnderlyingType(type);
@@ -631,31 +924,16 @@ namespace UnityMCP.Editor.Core
                 type = underlyingType;
             }
 
-            if (type == typeof(string))
-            {
-                return "string";
-            }
-            if (type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte))
-            {
-                return "integer";
-            }
-            if (type == typeof(float) || type == typeof(double) || type == typeof(decimal))
-            {
-                return "number";
-            }
-            if (type == typeof(bool))
-            {
-                return "boolean";
-            }
-            if (type.IsArray || (type.IsGenericType && typeof(System.Collections.IEnumerable).IsAssignableFrom(type)))
-            {
-                return "array";
-            }
+            if (type == typeof(string)) return "string";
+            if (type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte)) return "integer";
+            if (type == typeof(float) || type == typeof(double) || type == typeof(decimal)) return "number";
+            if (type == typeof(bool)) return "boolean";
+            if (type.IsArray || (type.IsGenericType && typeof(System.Collections.IEnumerable).IsAssignableFrom(type))) return "array";
 
             return "object";
         }
 
-        private static Type GetArrayElementType(Type arrayType)
+        public static Type GetArrayElementType(Type arrayType)
         {
             if (arrayType.IsArray)
             {

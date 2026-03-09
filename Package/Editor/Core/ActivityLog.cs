@@ -17,6 +17,9 @@ namespace UnityMCP.Editor.Core
             public string toolName;
             public bool success;
             public string detail;
+            public long durationMs;
+            public string argumentsSummary;
+            public int responseBytes;
         }
 
         private static readonly List<Entry> s_entries = new List<Entry>();
@@ -30,7 +33,7 @@ namespace UnityMCP.Editor.Core
         /// <summary>
         /// Records a tool invocation.
         /// </summary>
-        /// <param name="toolName">The MCP tool name (e.g. "gameobject_manage").</param>
+        /// <param name="toolName">The MCP tool name (e.g. "manage_gameobject").</param>
         /// <param name="success">Whether the tool completed without throwing.</param>
         /// <param name="detail">Optional short detail string.</param>
         public static void Record(string toolName, bool success, string detail = null)
@@ -44,6 +47,33 @@ namespace UnityMCP.Editor.Core
                 toolName = toolName,
                 success = success,
                 detail = detail
+            };
+
+            if (s_entries.Count >= MaxEntries)
+                s_entries.RemoveAt(0);
+
+            s_entries.Add(entry);
+            OnEntryAdded?.Invoke();
+        }
+
+        /// <summary>
+        /// Records a tool invocation with enriched data.
+        /// </summary>
+        public static void Record(string toolName, bool success, string detail,
+            long durationMs, string argumentsSummary, int responseBytes)
+        {
+            if (string.IsNullOrEmpty(toolName))
+                return;
+
+            var entry = new Entry
+            {
+                timestamp = DateTime.Now,
+                toolName = toolName,
+                success = success,
+                detail = detail,
+                durationMs = durationMs,
+                argumentsSummary = argumentsSummary,
+                responseBytes = responseBytes
             };
 
             if (s_entries.Count >= MaxEntries)

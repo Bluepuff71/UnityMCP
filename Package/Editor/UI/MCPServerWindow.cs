@@ -1,482 +1,267 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 using UnityMCP.Editor.Core;
+using UnityMCP.Editor.UI.Tabs;
 
 namespace UnityMCP.Editor.UI
 {
     /// <summary>
     /// Editor window for controlling the MCP server and viewing its status.
-    /// Provides start/stop controls, port configuration, and displays registered tools.
+    /// UI Toolkit implementation with tabbed interface.
     /// </summary>
     public class MCPServerWindow : EditorWindow
     {
-        private Vector2 _toolListScrollPosition;
-        private Vector2 _activityScrollPosition;
-        private int _portInput;
-        private string _lastError;
-        private Dictionary<string, bool> _categoryFoldouts = new Dictionary<string, bool>();
-        private bool _remoteAccessFoldout = false;
-        private bool _activityFoldout = true;
-
-        private const string DocumentationUrl = "https://github.com/anthropics/anthropic-cookbook/tree/main/misc/model_context_protocol";
+        private const string DocumentationUrl = "https://github.com/Bluepuff71/UnityMCP";
         private const string VerboseLoggingPrefKey = "UnityMCP_VerboseLogging";
-        private const string ActivityDetailPrefKey = "UnityMCP_ActivityDetail";
+        private const string ActiveTabPrefKey = "UnityMCP_ActiveTab";
+
+        private VisualElement _statusDot;
+        private Label _statusLabel;
+        private Label _activeToolLabel;
+        private Button _toggleButton;
+        private VisualElement _tabContentContainer;
+        private readonly List<Button> _tabButtons = new List<Button>();
+
+        private ITab[] _tabs;
+        private int _activeTabIndex;
 
         [MenuItem("Window/Unity MCP")]
         public static void ShowWindow()
         {
-            var window = GetWindow<MCPServerWindow>("Unity MCP");
-            window.minSize = new Vector2(300, 400);
+            MCPServerWindow window = GetWindow<MCPServerWindow>("Unity MCP");
+            window.minSize = new Vector2(340, 450);
         }
 
-        private void OnEnable()
+        public void CreateGUI()
         {
-            _portInput = MCPServer.Instance.Port;
+            // Load stylesheet
+            StyleSheet styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(
+                "Packages/com.emeryporter.unitymcp/Editor/UI/MCPServerWindow.uss");
+            if (styleSheet != null)
+            {
+                rootVisualElement.styleSheets.Add(styleSheet);
+            }
+
+            rootVisualElement.AddToClassList("window-root");
+
+            // Initialize verbose logging from prefs
             MCPProxy.VerboseLogging = EditorPrefs.GetBool(VerboseLoggingPrefKey, false);
+
+            // Build persistent header
+            VisualElement header = BuildHeader();
+            rootVisualElement.Add(header);
+
+            // Build tab bar
+            VisualElement tabBar = BuildTabBar();
+            rootVisualElement.Add(tabBar);
+
+            // Build tab content container
+            _tabContentContainer = new VisualElement();
+            _tabContentContainer.style.flexGrow = 1;
+            _tabContentContainer.style.overflow = Overflow.Hidden;
+            rootVisualElement.Add(_tabContentContainer);
+
+            // Create tabs
+            _tabs = new ITab[]
+            {
+                new StatusTab(),
+                new ActivityTab(),
+                new ToolsTab(),
+                new CheckpointsTab()
+            };
+
+            foreach (ITab tab in _tabs)
+            {
+                tab.Root.AddToClassList("tab-content");
+                tab.Root.style.display = DisplayStyle.None;
+                _tabContentContainer.Add(tab.Root);
+            }
+
+            // Activate saved tab (or default to Status)
+            int savedTab = EditorPrefs.GetInt(ActiveTabPrefKey, 0);
+            if (savedTab < 0 || savedTab >= _tabs.Length) savedTab = 0;
+            SwitchToTab(savedTab);
+
+            // Subscribe to activity events for active tool indicator
             ActivityLog.OnEntryAdded += OnActivityEntryAdded;
         }
 
-        private void OnDisable()
+        private void OnDestroy()
         {
             ActivityLog.OnEntryAdded -= OnActivityEntryAdded;
+
+            if (_tabs != null)
+            {
+                foreach (ITab tab in _tabs)
+                {
+                    tab.OnDeactivate();
+                    if (tab is IDisposable disposable)
+                        disposable.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Called ~10 times per second. Update status indicators.
+        /// </summary>
+        private void OnInspectorUpdate()
+        {
+            if (_statusDot == null || _tabs == null) return;
+
+            bool isRunning = MCPProxy.IsInitialized;
+
+            // Update status dot
+            _statusDot.EnableInClassList("status-dot--running", isRunning);
+            _statusDot.EnableInClassList("status-dot--stopped", !isRunning);
+
+            // Update status label
+            _statusLabel.text = isRunning ? "Running" : "Stopped";
+
+            // Update toggle button
+            _toggleButton.text = isRunning ? "Stop" : "Start";
+
+            // Let active tab refresh
+            if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Length)
+            {
+                _tabs[_activeTabIndex].Refresh();
+            }
         }
 
         private void OnActivityEntryAdded()
         {
-            Repaint();
-        }
-
-        /// <summary>
-        /// Called 10 times per second while the window is visible.
-        /// Used to refresh the server status display.
-        /// </summary>
-        private void OnInspectorUpdate()
-        {
-            Repaint();
-        }
-
-        private void OnGUI()
-        {
-            DrawToolbar();
-
-            EditorGUILayout.Space(8);
-
-            DrawServerInfo();
-
-            EditorGUILayout.Space(8);
-
-            DrawPortConfiguration();
-
-            if (!string.IsNullOrEmpty(_lastError))
+            // Show the most recent tool name briefly
+            IReadOnlyList<ActivityLog.Entry> entries = ActivityLog.Entries;
+            if (entries.Count > 0 && _activeToolLabel != null)
             {
-                DrawErrorMessage();
+                ActivityLog.Entry latest = entries[entries.Count - 1];
+                _activeToolLabel.text = latest.toolName;
+                _activeToolLabel.style.display = DisplayStyle.Flex;
+
+                // Schedule hide after 2 seconds
+                _activeToolLabel.schedule.Execute(() =>
+                {
+                    if (_activeToolLabel != null)
+                        _activeToolLabel.style.display = DisplayStyle.None;
+                }).StartingIn(2000);
             }
-
-            EditorGUILayout.Space(12);
-
-            DrawRemoteAccessSection();
-
-            EditorGUILayout.Space(12);
-
-            DrawActivitySection();
-
-            EditorGUILayout.Space(12);
-
-            DrawToolsSection();
         }
 
-        private void DrawToolbar()
+        #region Header
+
+        private VisualElement BuildHeader()
         {
-            bool isRunning = MCPProxy.IsInitialized;
+            VisualElement header = new VisualElement();
+            header.AddToClassList("header");
 
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            // Left: status dot + label
+            VisualElement left = new VisualElement();
+            left.AddToClassList("header__left");
 
-            // Status indicator
-            string statusText = isRunning ? "\u25CF Running" : "\u25CB Stopped";
+            _statusDot = new VisualElement();
+            _statusDot.AddToClassList("status-dot");
+            _statusDot.AddToClassList(MCPProxy.IsInitialized ? "status-dot--running" : "status-dot--stopped");
+            left.Add(_statusDot);
 
-            GUI.color = isRunning ? Color.green : Color.gray;
-            GUILayout.Label(statusText, EditorStyles.boldLabel, GUILayout.Width(140));
-            GUI.color = Color.white;
+            _statusLabel = new Label(MCPProxy.IsInitialized ? "Running" : "Stopped");
+            _statusLabel.AddToClassList("status-label");
+            left.Add(_statusLabel);
 
-            GUILayout.FlexibleSpace();
+            header.Add(left);
 
-            // Help button
-            if (GUILayout.Button("?", EditorStyles.toolbarButton, GUILayout.Width(24)))
-            {
-                Application.OpenURL(DocumentationUrl);
-            }
+            // Center: active tool indicator
+            VisualElement center = new VisualElement();
+            center.AddToClassList("header__center");
 
-            // Start/Stop button
-            if (GUILayout.Button(isRunning ? "Stop" : "Start", EditorStyles.toolbarButton, GUILayout.Width(50)))
-            {
-                ToggleServer(isRunning);
-            }
+            _activeToolLabel = new Label("");
+            _activeToolLabel.AddToClassList("active-tool-label");
+            _activeToolLabel.style.display = DisplayStyle.None;
+            center.Add(_activeToolLabel);
 
-            EditorGUILayout.EndHorizontal();
+            header.Add(center);
+
+            // Right: help + start/stop buttons
+            VisualElement right = new VisualElement();
+            right.AddToClassList("header__right");
+
+            Button helpButton = new Button(() => Application.OpenURL(DocumentationUrl)) { text = "?" };
+            helpButton.AddToClassList("header-button");
+            helpButton.AddToClassList("header-button--help");
+            right.Add(helpButton);
+
+            _toggleButton = new Button(OnToggleServer) { text = MCPProxy.IsInitialized ? "Stop" : "Start" };
+            _toggleButton.AddToClassList("header-button");
+            right.Add(_toggleButton);
+
+            header.Add(right);
+
+            return header;
         }
 
-        private void ToggleServer(bool isCurrentlyRunning)
+        private void OnToggleServer()
         {
-            _lastError = null;
-
             try
             {
-                if (isCurrentlyRunning)
-                {
+                if (MCPProxy.IsInitialized)
                     MCPProxy.Stop();
-                }
                 else
-                {
                     MCPProxy.Start();
-                }
             }
             catch (Exception exception)
             {
-                _lastError = exception.Message;
-                Debug.LogError($"[MCPServerWindow] Failed to {(isCurrentlyRunning ? "stop" : "start")} server: {exception.Message}");
+                Debug.LogError($"[MCPServerWindow] Failed to toggle server: {exception.Message}");
             }
         }
 
-        private void DrawServerInfo()
+        #endregion
+
+        #region Tab Bar
+
+        private VisualElement BuildTabBar()
         {
-            bool isRunning = MCPProxy.IsInitialized;
-            int port = MCPServer.Instance?.Port ?? 8080;
+            VisualElement tabBar = new VisualElement();
+            tabBar.AddToClassList("tab-bar");
 
-            string endpoint;
-            if (MCPProxy.RemoteAccessEnabled)
+            string[] tabNames = { "Status", "Activity", "Registry", "Checkpoints" };
+
+            for (int i = 0; i < tabNames.Length; i++)
             {
-                string lanIp = NetworkUtils.GetLanIpAddress();
-                endpoint = $"https://{lanIp}:{port}/";
+                int tabIndex = i; // Capture for closure
+                Button tabButton = new Button(() => SwitchToTab(tabIndex)) { text = tabNames[i] };
+                tabButton.AddToClassList("tab-button");
+                _tabButtons.Add(tabButton);
+                tabBar.Add(tabButton);
             }
-            else
-            {
-                endpoint = $"http://localhost:{port}/";
-            }
 
-            EditorGUILayout.LabelField("Server Information", EditorStyles.boldLabel);
-
-            EditorGUI.indentLevel++;
-
-            // Endpoint with copy button
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Endpoint", endpoint);
-            if (GUILayout.Button("Copy", GUILayout.Width(50)))
-            {
-                EditorGUIUtility.systemCopyBuffer = endpoint;
-                if (MCPProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Copied endpoint to clipboard: {endpoint}");
-            }
-            EditorGUILayout.EndHorizontal();
-
-            // Tool and resource counts
-            int toolCount = ToolRegistry.Count;
-            int resourceCount = ResourceRegistry.Count;
-            EditorGUILayout.LabelField("Tools", toolCount.ToString());
-            EditorGUILayout.LabelField("Resources", resourceCount.ToString());
-
-            EditorGUI.indentLevel--;
+            return tabBar;
         }
 
-        private void DrawPortConfiguration()
+        private void SwitchToTab(int index)
         {
-            bool isRunning = MCPProxy.IsInitialized;
+            if (index < 0 || index >= _tabs.Length) return;
 
-            EditorGUILayout.LabelField("Configuration", EditorStyles.boldLabel);
-
-            EditorGUI.indentLevel++;
-
-            EditorGUI.BeginDisabledGroup(isRunning);
-
-            EditorGUILayout.BeginHorizontal();
-            _portInput = EditorGUILayout.IntField("Port", _portInput);
-
-            bool portChanged = _portInput != MCPServer.Instance.Port;
-            EditorGUI.BeginDisabledGroup(!portChanged || isRunning);
-            if (GUILayout.Button("Apply", GUILayout.Width(50)))
+            // Deactivate current tab
+            if (_activeTabIndex >= 0 && _activeTabIndex < _tabs.Length)
             {
-                if (_portInput > 0 && _portInput <= 65535)
-                {
-                    MCPServer.Instance.Port = _portInput;
-                    if (MCPProxy.VerboseLogging) Debug.Log($"[MCPServerWindow] Port changed to {_portInput}");
-                }
-                else
-                {
-                    _lastError = "Port must be between 1 and 65535";
-                }
-            }
-            EditorGUI.EndDisabledGroup();
-            EditorGUILayout.EndHorizontal();
-
-            if (isRunning)
-            {
-                EditorGUILayout.HelpBox("Stop the server to change the port.", MessageType.Info);
+                _tabs[_activeTabIndex].Root.style.display = DisplayStyle.None;
+                _tabs[_activeTabIndex].OnDeactivate();
+                if (_activeTabIndex < _tabButtons.Count)
+                    _tabButtons[_activeTabIndex].RemoveFromClassList("tab-button--active");
             }
 
-            EditorGUI.EndDisabledGroup();
+            // Activate new tab
+            _activeTabIndex = index;
+            _tabs[index].Root.style.display = DisplayStyle.Flex;
+            _tabs[index].OnActivate();
+            if (index < _tabButtons.Count)
+                _tabButtons[index].AddToClassList("tab-button--active");
 
-            // Verbose logging toggle (always enabled)
-            EditorGUILayout.Space(4);
-            bool verboseLogging = EditorGUILayout.Toggle("Verbose Logging", MCPProxy.VerboseLogging);
-            if (verboseLogging != MCPProxy.VerboseLogging)
-            {
-                MCPProxy.VerboseLogging = verboseLogging;
-                EditorPrefs.SetBool(VerboseLoggingPrefKey, verboseLogging);
-            }
-
-            EditorGUI.indentLevel--;
+            // Persist selection
+            EditorPrefs.SetInt(ActiveTabPrefKey, index);
         }
 
-        private void DrawErrorMessage()
-        {
-            EditorGUILayout.Space(4);
-            EditorGUILayout.HelpBox(_lastError, MessageType.Error);
-        }
-
-        private void DrawRemoteAccessSection()
-        {
-            _remoteAccessFoldout = EditorGUILayout.Foldout(_remoteAccessFoldout, "Remote Access", true, EditorStyles.foldoutHeader);
-
-            if (!_remoteAccessFoldout)
-                return;
-
-            EditorGUI.indentLevel++;
-
-            // Enable toggle
-            bool remoteEnabled = MCPProxy.RemoteAccessEnabled;
-            bool newRemoteEnabled = EditorGUILayout.Toggle("Enable Remote Access", remoteEnabled);
-            if (newRemoteEnabled != remoteEnabled)
-            {
-                MCPProxy.RemoteAccessEnabled = newRemoteEnabled;
-                MCPProxy.Restart();
-            }
-
-            if (MCPProxy.RemoteAccessEnabled)
-            {
-                EditorGUILayout.Space(4);
-
-                // API Key display
-                EditorGUILayout.BeginHorizontal();
-                string apiKey = MCPProxy.ApiKey;
-                string displayKey = string.IsNullOrEmpty(apiKey)
-                    ? "(none)"
-                    : (apiKey.Length > 20 ? apiKey.Substring(0, 20) + "..." : apiKey);
-                EditorGUILayout.LabelField("API Key", displayKey);
-
-                if (GUILayout.Button("Copy", GUILayout.Width(50)))
-                {
-                    EditorGUIUtility.systemCopyBuffer = apiKey;
-                }
-                if (GUILayout.Button("Regenerate", GUILayout.Width(80)))
-                {
-                    MCPProxy.ApiKey = MCPProxy.GenerateApiKey();
-                    MCPProxy.Restart();
-                }
-                EditorGUILayout.EndHorizontal();
-
-                // TLS status
-                string tlsStatus;
-                if (!MCPProxy.IsTlsSupported)
-                {
-                    tlsStatus = "Not available (native proxy compiled without TLS)";
-                }
-                else
-                {
-                    string certDir = CertificateGenerator.GetCertDirectory();
-                    var expiry = CertificateGenerator.GetCertificateExpiry(certDir);
-                    if (expiry.HasValue)
-                        tlsStatus = "Active (self-signed, expires " + expiry.Value.ToString("yyyy-MM-dd") + ")";
-                    else
-                        tlsStatus = "No certificate";
-                }
-                EditorGUILayout.LabelField("TLS", tlsStatus);
-
-                // Endpoint
-                int port = MCPServer.Instance?.Port ?? 8080;
-                string lanIp = NetworkUtils.GetLanIpAddress();
-                EditorGUILayout.LabelField("Endpoint", $"https://{lanIp}:{port}/");
-
-                EditorGUILayout.Space(4);
-
-                // Warning
-                EditorGUILayout.HelpBox(
-                    "Remote access binds to all network interfaces with TLS encryption and API key authentication. " +
-                    "Ensure your firewall is configured appropriately.",
-                    MessageType.Warning);
-            }
-
-            EditorGUI.indentLevel--;
-        }
-
-        private void DrawActivitySection()
-        {
-            EditorGUILayout.BeginHorizontal();
-            _activityFoldout = EditorGUILayout.Foldout(_activityFoldout, "Recent Activity", true, EditorStyles.foldoutHeader);
-
-            GUILayout.FlexibleSpace();
-
-            // Detail toggle
-            bool showDetail = EditorPrefs.GetBool(ActivityDetailPrefKey, false);
-            bool newShowDetail = GUILayout.Toggle(showDetail, "Detail", EditorStyles.miniButton, GUILayout.Width(50));
-            if (newShowDetail != showDetail)
-                EditorPrefs.SetBool(ActivityDetailPrefKey, newShowDetail);
-
-            if (GUILayout.Button("Clear", EditorStyles.miniButton, GUILayout.Width(40)))
-                ActivityLog.Clear();
-
-            EditorGUILayout.EndHorizontal();
-
-            if (!_activityFoldout)
-                return;
-
-            var entries = ActivityLog.Entries;
-            if (entries.Count == 0)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField("No activity recorded yet.", EditorStyles.miniLabel);
-                EditorGUI.indentLevel--;
-                return;
-            }
-
-            _activityScrollPosition = EditorGUILayout.BeginScrollView(
-                _activityScrollPosition, GUILayout.MaxHeight(160));
-
-            // Show newest first
-            for (int i = entries.Count - 1; i >= 0; i--)
-            {
-                var entry = entries[i];
-                string time = entry.timestamp.ToString("HH:mm:ss");
-                string status = entry.success ? "OK" : "FAIL";
-                string line;
-
-                if (newShowDetail && !string.IsNullOrEmpty(entry.detail))
-                    line = $"[{time}] {entry.toolName} ({entry.detail}) \u2192 {status}";
-                else
-                    line = $"[{time}] {entry.toolName} \u2192 {status}";
-
-                if (!entry.success)
-                    GUI.color = new Color(1f, 0.6f, 0.6f);
-
-                EditorGUILayout.LabelField(line, EditorStyles.miniLabel);
-                GUI.color = Color.white;
-            }
-
-            EditorGUILayout.EndScrollView();
-        }
-
-        private void DrawToolsSection()
-        {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Registered Tools", EditorStyles.boldLabel);
-
-            GUILayout.FlexibleSpace();
-
-            if (GUILayout.Button("Refresh", GUILayout.Width(60)))
-            {
-                RefreshTools();
-            }
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space(4);
-
-            // Tool list with scroll view, grouped by category
-            var toolsByCategory = ToolRegistry.GetDefinitionsByCategory().ToList();
-
-            if (toolsByCategory.Count == 0)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField("No tools registered", EditorStyles.miniLabel);
-                EditorGUILayout.HelpBox(
-                    "Create tools by adding [MCPTool] attribute to static methods.\n\n" +
-                    "Example:\n" +
-                    "[MCPTool(\"my_tool\", \"Description of my tool\")]\n" +
-                    "public static string MyTool([MCPParam(\"param\", \"Description\")] string param) { ... }",
-                    MessageType.Info);
-                EditorGUI.indentLevel--;
-            }
-            else
-            {
-                _toolListScrollPosition = EditorGUILayout.BeginScrollView(
-                    _toolListScrollPosition,
-                    GUILayout.ExpandHeight(true));
-
-                foreach (var group in toolsByCategory)
-                {
-                    DrawCategoryFoldout(group.Key, group.ToList());
-                }
-
-                EditorGUILayout.EndScrollView();
-            }
-        }
-
-        private void DrawCategoryFoldout(string category, List<ToolDefinition> tools)
-        {
-            // Initialize foldout state if needed (default to expanded)
-            if (!_categoryFoldouts.ContainsKey(category))
-                _categoryFoldouts[category] = true;
-
-            // Draw foldout header with tool count
-            string header = $"{category} ({tools.Count})";
-            _categoryFoldouts[category] = EditorGUILayout.Foldout(
-                _categoryFoldouts[category], header, true, EditorStyles.foldoutHeader);
-
-            // Draw tools if expanded
-            if (_categoryFoldouts[category])
-            {
-                EditorGUI.indentLevel++;
-                foreach (var tool in tools)
-                    DrawToolEntry(tool);
-                EditorGUI.indentLevel--;
-            }
-        }
-
-        private void DrawToolEntry(ToolDefinition tool)
-        {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-
-            // Tool name
-            EditorGUILayout.LabelField(tool.name, EditorStyles.boldLabel);
-
-            // Tool description
-            if (!string.IsNullOrEmpty(tool.description))
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField(tool.description, EditorStyles.wordWrappedMiniLabel);
-                EditorGUI.indentLevel--;
-            }
-
-            // Parameter count
-            if (tool.inputSchema != null && tool.inputSchema.properties.Count > 0)
-            {
-                EditorGUI.indentLevel++;
-                int requiredCount = tool.inputSchema.required?.Count ?? 0;
-                int totalCount = tool.inputSchema.properties.Count;
-                string paramInfo = requiredCount > 0
-                    ? $"{totalCount} parameter(s), {requiredCount} required"
-                    : $"{totalCount} parameter(s)";
-                EditorGUILayout.LabelField(paramInfo, EditorStyles.miniLabel);
-                EditorGUI.indentLevel--;
-            }
-
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(2);
-        }
-
-        private void RefreshTools()
-        {
-            _lastError = null;
-
-            try
-            {
-                ToolRegistry.RefreshTools();
-                if (MCPProxy.VerboseLogging) Debug.Log("[MCPServerWindow] Tools refreshed");
-            }
-            catch (Exception exception)
-            {
-                _lastError = $"Failed to refresh tools: {exception.Message}";
-                Debug.LogError($"[MCPServerWindow] {_lastError}");
-            }
-        }
+        #endregion
     }
 }

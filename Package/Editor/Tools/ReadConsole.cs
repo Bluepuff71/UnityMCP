@@ -11,6 +11,7 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Provides access to Unity Console log entries using reflection to access internal APIs.
     /// </summary>
+    [MCPTool("read_console", "Reads Unity Console log entries with filtering and pagination. Check after refresh_unity or script changes to catch compile errors. Use types='error,warning' to filter for problems.", Category = "Console")]
     public static class ReadConsole
     {
         #region Constants
@@ -129,14 +130,13 @@ namespace UnityMCP.Editor.Tools
 
         #endregion
 
-        #region Main Tool Entry Point
+        #region Actions
 
         /// <summary>
-        /// Reads Unity Console log entries with filtering and pagination support.
+        /// Reads Unity Console log entries with filtering, pagination, deduplication, and message truncation.
         /// </summary>
-        [MCPTool("console_read", "Reads Unity Console log entries with filtering and pagination", Category = "Console", DestructiveHint = true)]
-        public static object Read(
-            [MCPParam("action", "Action to perform: 'get' to read entries, 'clear' to clear console (default: get)", Enum = new[] { "get", "clear" })] string action = "get",
+        [MCPAction("get", Description = "Read console log entries with filtering and pagination", ReadOnlyHint = true)]
+        public static object Get(
             [MCPParam("types", "Comma-separated log types to include: error, warning, log, all (default: error,warning)")] string types = "error,warning",
             [MCPParam("count", "Maximum entries to return (non-paging mode, overrides page_size if set)")] int? count = null,
             [MCPParam("page_size", "Entries per page (default: 50, max: 500)", Minimum = 1, Maximum = 500)] int pageSize = DefaultPageSize,
@@ -147,7 +147,6 @@ namespace UnityMCP.Editor.Tools
             [MCPParam("deduplicate", "Collapse consecutive identical messages into one with a count (default: true)")] bool deduplicate = true,
             [MCPParam("max_message_length", "Maximum message length before truncation (default: 500, 0 for unlimited)", Minimum = 0)] int maxMessageLength = DefaultMaxMessageLength)
         {
-            // Check if reflection is available
             if (!isReflectionInitialized)
             {
                 return new
@@ -157,19 +156,30 @@ namespace UnityMCP.Editor.Tools
                 };
             }
 
-            string normalizedAction = (action ?? "get").ToLowerInvariant().Trim();
+            return GetEntries(types, count, pageSize, cursor, filterText, format, includeStacktrace, deduplicate, maxMessageLength);
+        }
 
-            return normalizedAction switch
+        /// <summary>
+        /// Clears the Unity Console.
+        /// </summary>
+        [MCPAction("clear", Description = "Clear all console log entries", DestructiveHint = true)]
+        public static object Clear()
+        {
+            if (!isReflectionInitialized)
             {
-                "get" => GetEntries(types, count, pageSize, cursor, filterText, format, includeStacktrace, deduplicate, maxMessageLength),
-                "clear" => ClearConsole(),
-                _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: get, clear")
-            };
+                return new
+                {
+                    success = false,
+                    error = $"Console API not available: {reflectionError}"
+                };
+            }
+
+            return ClearConsole();
         }
 
         #endregion
 
-        #region Actions
+        #region Action Implementations
 
         /// <summary>
         /// Gets console log entries with filtering, pagination, deduplication, and message truncation.
@@ -245,10 +255,10 @@ namespace UnityMCP.Editor.Tools
                             continue;
                         }
 
-                        // Extract the first line as the dedup key
-                        string messageFirstLine = ExtractFirstLine(message);
+                        // Extract the message portion (excluding stacktrace) as the dedup key
+                        string messageForDedup = ExtractMessageForDedup(message);
                         string logType = GetLogType(mode);
-                        string deduplicationKey = deduplicate ? $"{logType}:{messageFirstLine}" : null;
+                        string deduplicationKey = deduplicate ? $"{logType}:{messageForDedup}" : null;
 
                         // Deduplication: if same message as previous, increment count instead of adding new entry
                         if (deduplicate && previousEntry != null && deduplicationKey == previousMessageKey)
@@ -437,12 +447,14 @@ namespace UnityMCP.Editor.Tools
             string messageText = message ?? string.Empty;
             string stacktrace = null;
 
-            // Unity combines message and stacktrace in the message field, separated by newline
-            int newlineIndex = messageText.IndexOf('\n');
-            if (newlineIndex >= 0)
+            // Unity combines message and stacktrace in the message field, separated by newline.
+            // We detect the stacktrace boundary by looking for stacktrace patterns rather than
+            // splitting on the first newline, since user messages can be multiline.
+            int stacktraceStart = FindStacktraceBoundary(messageText);
+            if (stacktraceStart >= 0)
             {
-                stacktrace = messageText.Substring(newlineIndex + 1);
-                messageText = messageText.Substring(0, newlineIndex);
+                stacktrace = messageText.Substring(stacktraceStart);
+                messageText = messageText.Substring(0, stacktraceStart).TrimEnd('\n', '\r');
             }
 
             // Truncate message if needed
@@ -512,17 +524,108 @@ namespace UnityMCP.Editor.Tools
         }
 
         /// <summary>
-        /// Extracts the first line from a message string for deduplication.
+        /// Extracts the message portion (excluding stacktrace) for use as a deduplication key.
+        /// Uses stacktrace boundary detection so multiline messages with the same content
+        /// are correctly deduplicated rather than only comparing the first line.
         /// </summary>
-        private static string ExtractFirstLine(string message)
+        private static string ExtractMessageForDedup(string message)
         {
             if (string.IsNullOrEmpty(message))
             {
                 return string.Empty;
             }
 
-            int newlineIndex = message.IndexOf('\n');
-            return newlineIndex >= 0 ? message.Substring(0, newlineIndex) : message;
+            int stacktraceStart = FindStacktraceBoundary(message);
+            if (stacktraceStart >= 0)
+            {
+                return message.Substring(0, stacktraceStart).TrimEnd('\n', '\r');
+            }
+
+            return message;
+        }
+
+        /// <summary>
+        /// Finds the character index where the stacktrace begins within a combined message string.
+        /// Unity's LogEntry.message field contains both the user message and stacktrace separated by newlines.
+        /// A stacktrace line is identified by patterns like:
+        ///   - "ClassName:MethodName(" (method signature with colon)
+        ///   - Lines containing "(at " (Unity's file reference pattern)
+        ///   - Lines starting with "UnityEngine.", "UnityEditor.", or "System." followed by a method call
+        /// Returns the start index of the first stacktrace line, or -1 if no stacktrace is found.
+        /// </summary>
+        private static int FindStacktraceBoundary(string messageText)
+        {
+            if (string.IsNullOrEmpty(messageText))
+            {
+                return -1;
+            }
+
+            int currentIndex = 0;
+            while (currentIndex < messageText.Length)
+            {
+                // Find the end of the current line
+                int lineEnd = messageText.IndexOf('\n', currentIndex);
+                int lineLength = (lineEnd >= 0 ? lineEnd : messageText.Length) - currentIndex;
+                string line = messageText.Substring(currentIndex, lineLength).TrimEnd('\r');
+
+                if (IsStacktraceLine(line))
+                {
+                    return currentIndex;
+                }
+
+                // Move to the next line
+                if (lineEnd < 0)
+                {
+                    break;
+                }
+                currentIndex = lineEnd + 1;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Determines whether a single line looks like a stacktrace entry.
+        /// </summary>
+        private static bool IsStacktraceLine(string line)
+        {
+            if (string.IsNullOrEmpty(line))
+            {
+                return false;
+            }
+
+            string trimmedLine = line.TrimStart();
+            if (trimmedLine.Length == 0)
+            {
+                return false;
+            }
+
+            // Pattern: contains "(at " which is Unity's file reference format
+            // e.g., "SomeClass:Method() (at Assets/Scripts/Foo.cs:42)"
+            if (trimmedLine.Contains("(at "))
+            {
+                return true;
+            }
+
+            // Pattern: "ClassName:MethodName(" - typical stacktrace method signature
+            // Must have a colon followed eventually by an opening parenthesis
+            int colonIndex = trimmedLine.IndexOf(':');
+            if (colonIndex > 0 && colonIndex < trimmedLine.Length - 1)
+            {
+                int parenIndex = trimmedLine.IndexOf('(', colonIndex);
+                if (parenIndex > colonIndex)
+                {
+                    // Verify the part before the colon looks like a class/namespace name
+                    // (starts with a letter or namespace prefix, no spaces before colon)
+                    string beforeColon = trimmedLine.Substring(0, colonIndex);
+                    if (beforeColon.Length > 0 && !beforeColon.Contains(" ") && char.IsLetter(beforeColon[0]))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         #endregion

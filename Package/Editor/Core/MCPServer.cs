@@ -19,8 +19,26 @@ namespace UnityMCP.Editor.Core
 
         private int _port = 8080;
         private const string ServerName = "UnityMCP";
-        internal const string ServerVersion = "1.6.9";
+        internal const string ServerVersion = "2.0.0";
         private const int MainThreadTimeoutSeconds = 30;
+
+        private const string ServerInstructions =
+@"UnityMCP controls the Unity Editor. Follow these practices:
+
+SAFETY: Save a checkpoint (manage_checkpoint action='save') before destructive operations like deleting objects, modifying materials, or editing scripts. Use manage_checkpoint action='restore' to roll back if something goes wrong.
+
+WORKFLOW: find -> inspect -> modify -> verify. Use find_gameobject or get_scene_hierarchy to locate objects, manage_component action='inspect' to read state, then modify, then verify with capture_screenshot or another inspect call.
+
+DISCOVERY: Call get_unity_guide with topic='getting_started' for workflow recipes and best practices. Call search_tools with no args for a category overview of all tools.
+
+VERIFICATION: Check read_console after refresh_unity or script changes to catch compile errors. Use describe_scene for a quick scene overview. Use diagnose to scan for missing references, shader issues, and build problems.
+
+ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same tool with action='get_job' until status is 'completed' or 'failed'.";
+
+        private const string CheckpointNudgeBlanket =
+            " Save a checkpoint (manage_checkpoint action='save') before making changes.";
+        private const string CheckpointNudgePrefix =
+            " Save a checkpoint (manage_checkpoint action='save') before ";
 
         /// <summary>
         /// Gets the singleton instance of the MCP server.
@@ -170,7 +188,8 @@ namespace UnityMCP.Editor.Core
                 {
                     ["name"] = ServerName,
                     ["version"] = ServerVersion
-                }
+                },
+                ["instructions"] = ServerInstructions
             };
 
             return CreateSuccessResponse(result, requestId);
@@ -183,10 +202,29 @@ namespace UnityMCP.Editor.Core
 
             foreach (var tool in toolDefinitions)
             {
+                var description = tool.description;
+
+                // Auto-inject checkpoint nudge for destructive tools that modify scene/assets
+                bool isDestructive = tool.annotations?.destructiveHint == true;
+                bool isReadOnly = tool.annotations?.readOnlyHint == true;
+                if (isDestructive && !isReadOnly && !description.Contains("checkpoint"))
+                {
+                    if (tool.destructiveActions != null && tool.destructiveActions.Count > 0)
+                    {
+                        // Targeted nudge listing specific destructive actions
+                        string actionList = string.Join(", ", tool.destructiveActions);
+                        description += CheckpointNudgePrefix + actionList + " actions.";
+                    }
+                    else
+                    {
+                        description += CheckpointNudgeBlanket;
+                    }
+                }
+
                 var toolObject = new JObject
                 {
                     ["name"] = tool.name,
-                    ["description"] = tool.description,
+                    ["description"] = description,
                     ["inputSchema"] = SerializeInputSchema(tool.inputSchema)
                 };
 

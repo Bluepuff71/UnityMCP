@@ -1532,7 +1532,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Navigates UI elements like foldouts and tabs in an EditorWindow.
         /// </summary>
-        [MCPTool("uitoolkit_navigate", "Expand/collapse foldouts or select tabs in an EditorWindow", Category = "UIToolkit", DestructiveHint = true)]
+        [MCPTool("uitoolkit_navigate", "Expand/collapse foldouts or select tabs in an EditorWindow", Category = "UIToolkit")]
         public static object Navigate(
             [MCPParam("window_type", "EditorWindow type name", required: true)] string windowType,
             [MCPParam("selector", "USS selector to find element")] string selector = null,

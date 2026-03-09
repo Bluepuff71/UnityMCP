@@ -1,24 +1,35 @@
-# Unity MCP - AI Assistant Integration for Unity Editor
+# Unity MCP — AI Assistant Integration for Unity Editor
 
 ![Unity 2022.3+](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)
 ![Unity 6 Compatible](https://img.shields.io/badge/Unity%206-Compatible-brightgreen?logo=unity)
 ![Release](https://img.shields.io/github/v/tag/Bluepuff71/UnityMCP?label=version)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
-Unity-native [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for AI-powered game development. Connect Claude, Codex, Cursor, and other AI assistants directly to the Unity Editor — no Node.js, Python, or external scripts required. Install the package and start automating.
+Unity-native [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for AI-powered game development. Connect Claude, Codex, Cursor, and other AI assistants directly to the Unity Editor — no Node.js, Python, or external runtimes required. Install the package and start building.
+
+---
+
+### New in v2.0
+
+Vision capture, scene checkpoints, recipes, scene diagnostics, guided workflows, action-based tools, scene export, and a redesigned editor window.
+
+---
 
 ## Features
 
-- **100% Unity-native** - Runs entirely inside the Unity Editor as a single package. No Node.js, Python, or external runtimes to install or maintain.
-- **Zero telemetry** - Completely private Unity automation. No data collection.
-- **45 built-in tools** - Create GameObjects, run tests, build projects, manipulate scenes, and more.
-- **28 built-in resources** - Read-only access to project settings, scene state, console output, and more.
-- **4 workflow prompts** - Pre-built prompt templates for common Unity workflows.
-- **Remote access** - Connect from other devices on your network with TLS encryption and API key authentication.
-- **Activity log** - Monitor MCP requests and responses in real time from the editor window.
-- **Progressive discovery** - Use `search_tools` to explore available tools by category or keyword.
-- **Tool annotations** - Safety hints (readOnlyHint, destructiveHint) help AI assistants make better decisions.
-- **Simple extension API** - Add custom tools, resources, and prompts with a single C# attribute.
+- **100% Unity-native** — Runs entirely inside the Unity Editor as a single package. No sidecar processes to install or maintain.
+- **Zero telemetry** — Completely private. No data leaves your machine.
+- **46 built-in tools** — Create GameObjects, run tests, build projects, manage scenes, capture screenshots, and more.
+- **23 resources + 6 resource templates** — Read-only access to project settings, scene state, console output, and more via URI patterns.
+- **4 workflow prompts** — Pre-built prompt templates for common Unity tasks.
+- **4 built-in recipes** — One-call scene setup templates (FPS prototype, UI canvas, 3D template, physics playground).
+- **Checkpoint system** — Save and restore scene state before destructive operations, with diff support.
+- **Vision capture** — Send Game/Scene View screenshots directly to AI assistants for visual analysis.
+- **Scene diagnostics** — Narrative scene summaries and structured issue scanning in one call.
+- **Remote access** — Connect from other devices on your network with TLS encryption and API key authentication.
+- **Activity log** — Monitor MCP requests and responses in real time from the editor window.
+- **Per-action annotations** — Safety hints (`readOnlyHint`, `destructiveHint`) resolved per action, so AI assistants get accurate signals even for multi-action tools.
+- **Simple extension API** — Add custom tools, resources, prompts, and recipes with a single C# attribute.
 
 ## Requirements
 
@@ -27,22 +38,22 @@ Unity-native [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) se
 
 ## Installation
 
-1. Open Unity Package Manager (Window > Package Manager)
-2. Click `+` > "Add package from git URL"
-3. Enter the URL of whichever version you want
+1. Open Unity Package Manager (**Window > Package Manager**)
+2. Click **+** > **Add package from git URL**
+3. Enter the URL for the version you want
 
-### Latest Version (Recommended)
+### Latest version (recommended)
 
-To install the latest version:
 ```
 https://github.com/Bluepuff71/UnityMCP.git?path=/Package
 ```
 
-### Specific Version (If I messed something up)
+### Specific version
 
-To install a specific version, append `#version` tag:
+Append a `#version` tag to pin to a release:
+
 ```
-https://github.com/Bluepuff71/UnityMCP.git?path=/Package#1.0.0
+https://github.com/Bluepuff71/UnityMCP.git?path=/Package#2.0.0
 ```
 
 See [Releases](https://github.com/Bluepuff71/UnityMCP/releases) for available versions.
@@ -76,182 +87,248 @@ Add this to your Claude Desktop configuration file:
 
 Restart Claude Desktop after saving.
 
-### Other MCP Clients (Codex, Cursor, etc.)
+### Other MCP clients (Codex, Cursor, etc.)
 
-Unity MCP runs a built-in HTTP server at `http://localhost:8080/`. Any MCP-compatible client with HTTP transport support can connect directly. For stdio-only clients, use the mcp-remote bridge as shown above.
+Unity MCP exposes a built-in HTTP server at `http://localhost:8080/`. Any MCP-compatible client with HTTP transport support can connect directly. For stdio-only clients, use the `mcp-remote` bridge as shown above.
 
 *Note: Configurations for clients other than Claude Code have not been tested. Open a PR!*
 
 ## Configuration
 
-### Editor Window
+### Editor window
 
 Open the Unity MCP control panel from **Window > Unity MCP**:
 
-<img src=".github/editor-window.png" alt="Unity MCP Editor Window" width="400">
+<img src=".github/editor-window.png" alt="Unity MCP editor window showing the Status, Activity, Registry, and Checkpoints tabs" width="400">
 
-- **Start/Stop** the MCP server
-- **View registered tools** organized by category with foldout groups
-- **Copy endpoint URL** to clipboard for easy client configuration
-- **View activity log** showing recent MCP requests and responses
+The editor window has four tabs:
+
+- **Status** — Start/stop the server, view the endpoint URL (with copy button), see tool/resource/prompt/recipe counts, configure the port, and manage remote access settings.
+- **Activity** — Live feed of MCP requests with timestamps, status indicators, and expandable detail panels showing arguments and response metadata.
+- **Registry** — Searchable catalog of all registered tools, resources, prompts, and recipes. Organized by category with annotation badges and expandable parameter details.
+- **Checkpoints** — Browse saved checkpoints, restore or diff scene state, view tracked assets, and check bucket status.
 
 ### Port
 
 The default port is `8080`. To change it:
 
-1. Stop the server
-2. Enter a new port number in the editor window
-3. Click **Apply**
-4. Start the server
+1. Stop the server.
+2. Enter a new port number in the **Status** tab.
+3. Click **Apply**.
+4. Start the server.
 
-### Verbose Logging
+### Verbose logging
 
 Toggle **Verbose Logging** in the editor window to enable detailed debug output in the Unity Console. Useful for troubleshooting connection or tool execution issues.
 
-### Remote Access
+### Remote access
 
-Enable remote access to allow AI assistants to connect to Unity MCP from other devices on your network:
+Enable remote access to allow AI assistants to connect from other devices on your network:
 
-- **Toggle remote access** in the editor window to enable binding to all network interfaces (0.0.0.0)
-- **Requires TLS** - Unity MCP automatically generates a self-signed certificate for secure connections
-- **API key authentication** - An API key (prefix `umcp_`) is auto-generated on first enable and required for all requests
-- **Copy or regenerate** the API key directly from the editor window
-- **Endpoint changes** to `https://<LAN_IP>:<port>/` when remote access is enabled
-- **Certificate storage** - Certificate is stored in `LocalApplicationData/UnityMCP/` and auto-regenerates if your LAN IP changes
-- **Firewall configuration** is the user's responsibility - you may need to allow incoming connections on the configured port
+- **Toggle remote access** in the **Status** tab to bind to all network interfaces (`0.0.0.0`).
+- **TLS required** — Unity MCP auto-generates a self-signed certificate for secure connections.
+- **API key authentication** — A key with the prefix `umcp_` is auto-generated on first enable and required for all remote requests.
+- **Copy or regenerate** the API key directly from the editor window.
+- **Endpoint** changes to `https://<LAN_IP>:<port>/` when remote access is enabled.
+- **Certificate storage** — Stored in `LocalApplicationData/UnityMCP/`. Auto-regenerates if your LAN IP changes.
+- **Firewall** — You may need to allow incoming connections on the configured port. This is your responsibility.
 
-#### Claude Code Remote Setup
-
-When remote access is enabled, configure Claude Code on another device using:
+#### Claude Code remote setup
 
 ```bash
 claude mcp add unity-mcp --transport http --header "Authorization: Bearer <API_KEY>" https://<LAN_IP>:8080/
 ```
 
-Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity machine's IP address.
+Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machine's IP address.
 
 ## Available MCP Tools
 
-45 built-in tools organized by category:
+46 built-in tools organized by category:
 
-> **Tip:** Use `search_tools` with no arguments for a quick category overview, or pass a `query` or `category` to explore further.
+> **Tip:** Use `search_tools` with no arguments for a category overview, or pass a `query` or `category` to narrow results. Use `get_unity_guide` for workflow guidance and tool-chaining recipes.
 
 <details>
-<summary>View all 45 built-in tools (click to expand)</summary>
+<summary>View all 46 built-in tools</summary>
 
-### GameObject Management
-- **gameobject_manage** - Create, modify, delete, duplicate GameObjects, or move them relative to other objects
-- **gameobject_find** - Find GameObjects by name, tag, layer, component type, path, or instance ID with pagination
+### Scene (9)
 
-### Component Management
-- **component_manage** - Add, remove, set properties, or inspect components attached to GameObjects
+| Tool | Description |
+|---|---|
+| `create_scene` | Creates a new empty scene at the specified path |
+| `load_scene` | Loads a scene by path or build index |
+| `save_scene` | Saves the current scene, optionally to a new path |
+| `get_active_scene` | Gets information about the currently active scene |
+| `get_scene_hierarchy` | Gets the hierarchy of GameObjects in the current scene |
+| `capture_screenshot` | Captures a screenshot of the Game View or Scene View with optional target framing and camera angle |
+| `describe_scene` | Returns a narrative summary of the active scene including camera, lighting, key objects, and issue detection |
+| `manage_checkpoint` | Save, restore, list, or compare scene checkpoints (`action`: `save`, `list`, `restore`, `diff`) |
+| `vision_capture` | Capture Game/Scene View as a base64 image for AI vision analysis, or save to disk |
 
-### Scene Management
-- **scene_create** - Create a new empty scene at a specified path
-- **scene_load** - Load a scene by path or build index
-- **scene_save** - Save the current scene, optionally to a new path
-- **scene_get_active** - Get information about the currently active scene
-- **scene_get_hierarchy** - Get the hierarchy of GameObjects in the current scene with pagination
-- **scene_screenshot** - Capture a screenshot of the Game View
+### GameObject (2)
 
-### Asset Management
-- **asset_manage** - Create, delete, move, rename, duplicate, import, search, or get info about assets
-- **prefab_manage** - Open/close prefab stage, save prefabs, or create prefabs from GameObjects
-- **manage_material** - Create materials, set properties, assign to renderers, or set colors
-- **manage_texture** - Modify texture import settings (format, compression, size, etc.)
-- **manage_shader** - Create and manage shader assets
-- **manage_script** - Create C# scripts from templates
-- **manage_scriptable_object** - Create and manage ScriptableObject assets
-- **manage_vfx** - Create and configure particle systems, trail renderers, and line renderers
+| Tool | Description |
+|---|---|
+| `manage_gameobject` | Manages GameObjects (`action`: `create`, `modify`, `delete`, `duplicate`, `move_relative`) |
+| `find_gameobject` | Finds GameObjects by name, tag, layer, component, path, or instance ID |
 
-### Build & Testing
-- **build_start** - Start a player build asynchronously, returns job_id for polling
-- **build_get_job** - Get build job status and results
-- **tests_run** - Start Unity Test Runner asynchronously (EditMode or PlayMode)
-- **tests_get_job** - Get test run job status and results
+### Component (1)
 
-### Editor Control
-- **playmode_enter** - Enter play mode
-- **playmode_exit** - Exit play mode
-- **playmode_pause** - Toggle or set pause state
-- **playmode_step** - Advance a single frame while paused
-- **selection_get** - Get currently selected objects in the Unity Editor
-- **selection_set** - Set selection by instance IDs or asset paths
-- **execute_menu_item** - Execute Unity Editor menu items by path (with safety blacklist)
-- **manage_editor** - Manage editor state, tags, layers, and tools
-- **unity_refresh** - Refresh Unity asset database and optionally request script compilation
-- **search_tools** - Search available tools by name, description, or category
+| Tool | Description |
+|---|---|
+| `manage_component` | Manages components (`action`: `add`, `remove`, `set_property`, `inspect`) |
 
-### Console & Profiling
-- **console_read** - Read Unity Console log entries with filtering and pagination
-- **profiler_start** - Start profiler recording, returns job_id for polling
-- **profiler_stop** - Stop profiler recording and finalize job
-- **profiler_get_job** - Poll profiler job status and get captured data
+### Asset (7)
 
-### UI Toolkit
-- **uitoolkit_query** - Query VisualElements in EditorWindows with compact overview and drill-down refs
-- **uitoolkit_get_styles** - Get computed USS styles for a VisualElement
-- **uitoolkit_click** - Click a button, toggle, or clickable element in an EditorWindow
-- **uitoolkit_get_value** - Get the current value from an input field or control
-- **uitoolkit_set_value** - Set the value of an input field or control
-- **uitoolkit_navigate** - Expand/collapse foldouts or select tabs in an EditorWindow
+| Tool | Description |
+|---|---|
+| `manage_asset` | Manages assets (`action`: `create`, `delete`, `move`, `rename`, `duplicate`, `import`, `search`, `get_info`, `create_folder`) |
+| `manage_prefab` | Manages prefab operations (`action`: `open_stage`, `close_stage`, `save_open_stage`, `create_from_gameobject`) |
+| `manage_material` | Manages materials (`action`: `create`, `get_info`, `set_property`, `set_color`, `assign_to_renderer`, `set_renderer_color`) |
+| `manage_texture` | Manages textures: get info, list, find, modify import settings |
+| `manage_shader` | Manages shaders: get info, list, find, manage keywords |
+| `manage_script` | Manages C# scripts (`action`: `create`, `read`, `update`, `delete`, `validate`) |
+| `manage_scriptable_object` | Manages ScriptableObjects: create, modify, get, list |
 
-### Debug & Testing
-- **test_echo** - Echo back input message (connectivity test)
-- **test_add** - Add two numbers (parameter handling test)
-- **test_unity_info** - Get basic Unity editor information
-- **test_list_scenes** - List all scenes in build settings
+### VFX (1)
+
+| Tool | Description |
+|---|---|
+| `manage_vfx` | Manages VFX: particles, lines, trails |
+
+### Build & Testing (2)
+
+| Tool | Description |
+|---|---|
+| `run_build` | Manages player builds (`action`: `start`, `get_job`) |
+| `run_tests` | Runs Unity Test Runner (`action`: `run`, `get_job`) |
+
+### Editor (6)
+
+| Tool | Description |
+|---|---|
+| `manage_playmode` | Manages play mode state (`action`: `enter`, `exit`, `pause`, `step`) |
+| `manage_selection` | Manages editor selection (`action`: `get`, `set`) |
+| `execute_menu_item` | Executes a Unity Editor menu item by path |
+| `manage_editor` | Manages editor state, tags, layers, and tools |
+| `refresh_unity` | Refreshes the Unity asset database and optionally requests script compilation |
+| `focus_editor` | Frames and selects a GameObject in the Scene View |
+
+### Console & Profiling (2)
+
+| Tool | Description |
+|---|---|
+| `read_console` | Reads Unity Console log entries with filtering and pagination |
+| `run_profiler` | Controls profiler recording (`action`: `start`, `stop`, `get_job`) |
+
+### UI Toolkit (6)
+
+| Tool | Description |
+|---|---|
+| `uitoolkit_query` | Queries VisualElements in EditorWindows |
+| `uitoolkit_get_styles` | Gets computed USS styles for a VisualElement |
+| `uitoolkit_click` | Clicks a button, toggle, or clickable element |
+| `uitoolkit_get_value` | Gets the current value from an input field |
+| `uitoolkit_set_value` | Sets the value of an input field |
+| `uitoolkit_navigate` | Expands/collapses foldouts or selects tabs |
+
+### Guide & Diagnostics (2)
+
+| Tool | Description |
+|---|---|
+| `get_unity_guide` | Returns markdown guidance on Unity tools, conventions, and workflow recipes by topic |
+| `diagnose_scene` | Scans for missing references, shader issues, console errors, and build readiness |
+
+### Export (1)
+
+| Tool | Description |
+|---|---|
+| `export_scene` | Exports the active scene as a unitypackage, screenshot gallery, or markdown report |
+
+### Recipes (2)
+
+| Tool | Description |
+|---|---|
+| `list_recipes` | Lists all available scene recipes with descriptions and parameters |
+| `execute_recipe` | Executes a scene recipe by name |
+
+### Search (1)
+
+| Tool | Description |
+|---|---|
+| `search_tools` | Searches available tools by name, description, or category |
+
+### Debug (4)
+
+| Tool | Description |
+|---|---|
+| `test_echo` | Echoes back input message (connectivity test) |
+| `test_add` | Adds two numbers (parameter handling test) |
+| `test_unity_info` | Gets basic Unity editor information |
+| `test_list_scenes` | Lists all scenes in build settings |
 
 </details>
 
 ## Available MCP Resources
 
-28 built-in resources provide read-only access to Unity Editor state via URI patterns:
+23 built-in resources and 6 resource templates provide read-only access to Unity Editor state via URI patterns:
 
 <details>
-<summary>View all 28 built-in resources (click to expand)</summary>
+<summary>View all 29 built-in resources</summary>
 
-### Scene Resources
-- **scene://gameobject/{id}** - GameObject details by instance ID
-- **scene://gameobject/{id}/components** - List components on a GameObject
-- **scene://gameobject/{id}/component/{type}** - Specific component details
-- **scene://loaded** - List of all loaded scenes
+### Scene
 
-### Editor Resources
-- **editor://state** - Current editor state (play mode, compiling, focus, etc.)
-- **editor://selection** - Currently selected objects
-- **editor://windows** - List of open EditorWindows
-- **editor://prefab_stage** - Current prefab editing stage information
-- **editor://active_tool** - Currently active editor tool (Move, Rotate, Scale, etc.)
+- **`scene://loaded`** — All currently loaded scenes and their status
 
-### Project Resources
-- **project://info** - Project path, name, and Unity version
-- **project://tags** - Project tags
-- **project://layers** - Project layers and their indices
-- **project://player_settings** - Comprehensive player settings including icons, resolution, and platform settings
-- **project://quality** - Quality settings including all quality levels and their configurations
-- **project://physics** - Physics settings including gravity, solver iterations, and layer collision matrix
-- **project://audio** - Audio settings including speaker mode, DSP buffer, and sample rate
-- **project://input** - Input system actions, bindings, or legacy input axes
-- **project://rendering** - Rendering settings including render pipeline, ambient lighting, and fog
+### Editor
 
-### Build & Package Resources
-- **build://settings** - Build target, scenes, and configuration
-- **packages://installed** - List of installed packages and their versions
+- **`editor://state`** — Current editor state (play mode, compiling, focus, etc.)
+- **`editor://selection`** — Currently selected objects in the editor
+- **`editor://windows`** — Open editor windows and their states
+- **`editor://prefab_stage`** — Current prefab editing stage information
+- **`editor://active_tool`** — Currently active editor tool (Move, Rotate, Scale, etc.)
+
+### Project
+
+- **`project://info`** — Project path, name, and Unity version
+- **`project://tags`** — Project tags
+- **`project://layers`** — Project layers and their indices
+- **`project://player_settings`** — Player settings including icons, resolution, and platform settings
+- **`project://quality`** — Quality settings and all quality levels
+- **`project://physics`** — Physics settings including gravity, solver iterations, and layer collision matrix
+- **`project://audio`** — Audio settings including speaker mode, DSP buffer, and sample rate
+- **`project://input`** — Input system actions and bindings, or legacy input axes
+- **`project://rendering`** — Rendering settings including render pipeline, ambient lighting, and fog
+
+### Build & Packages
+
+- **`build://settings`** — Build target, scenes, and configuration
+- **`packages://installed`** — Installed packages and their versions
 
 ### Console & Tests
-- **console://summary** - Quick error/warning/info counts from the console
-- **console://errors** - Detailed compilation/runtime errors with file paths and line numbers
-- **tests://list** - Available unit tests
-- **tests://list/{mode}** - Tests filtered by mode (EditMode or PlayMode)
-- **profiler://state** - Profiler recording status and configuration
 
-### Animation & Menu
-- **animation://controller/{path}** - AnimatorController details including layers, parameters, and state machines
-- **menu://items** - Available Unity Editor menu items
+- **`console://summary`** — Error/warning/info counts from the console
+- **`console://errors`** — Detailed compilation/runtime errors with file paths and line numbers
+- **`tests://list`** — Available unit tests
+- **`profiler://state`** — Profiler recording status and configuration
 
-### Asset Resources
-- **assets://dependencies/{path}** - Asset dependencies - what an asset uses and what uses it
+### Menu
+
+- **`menu://items`** — Available Unity Editor menu items
+
+### UI
+
+- **`ui://unitymcp/scene-preview.html`** — Scene preview widget HTML for inline display
+
+### Resource Templates
+
+These use URI parameters to query specific objects:
+
+- **`scene://gameobject/{id}`** — GameObject details by instance ID
+- **`scene://gameobject/{id}/components`** — List of components on a GameObject
+- **`scene://gameobject/{id}/component/{type}`** — Specific component details on a GameObject
+- **`tests://list/{mode}`** — Tests filtered by mode (`EditMode` or `PlayMode`)
+- **`animation://controller/{path}`** — AnimatorController details including layers, parameters, and state machines
+- **`assets://dependencies/{path}`** — Asset dependencies — what an asset uses and what uses it
 
 </details>
 
@@ -260,22 +337,40 @@ Replace `<API_KEY>` with your generated API key and `<LAN_IP>` with your Unity m
 4 built-in prompt templates for common Unity workflows:
 
 <details>
-<summary>View all 4 built-in prompts (click to expand)</summary>
+<summary>View all 4 built-in prompts</summary>
 
-- **read_gameobject** - Inspect a GameObject's transform, components, and optionally its children hierarchy
-  - `name` (required) - Name of the GameObject to inspect
-  - `include_children` - Whether to include children hierarchy (true/false)
+- **`read_gameobject`** — Inspect a GameObject's transform, components, and optionally its children
+  - `name` (required) — Name of the GameObject to inspect
+  - `include_children` — Whether to include the children hierarchy (`true`/`false`)
 
-- **inspect_prefab** - Examine a prefab asset by opening the prefab stage and reading its hierarchy
-  - `path` (required) - Path to the prefab asset (e.g., Assets/Prefabs/Player.prefab)
+- **`inspect_prefab`** — Examine a prefab asset by path
+  - `path` (required) — Path to the prefab asset (e.g., `Assets/Prefabs/Player.prefab`)
 
-- **modify_component** - Step-by-step guide to safely change a component property with verification
-  - `target` (required) - Name or path of the target GameObject
-  - `component` (required) - Component type to modify (e.g., Rigidbody, BoxCollider)
-  - `property` (required) - Property to modify (e.g., mass, isTrigger)
+- **`modify_component`** — Step-by-step guide to safely change a component property
+  - `target` (required) — Name or path of the target GameObject
+  - `component` (required) — Component type to modify (e.g., `Rigidbody`, `BoxCollider`)
+  - `property` (required) — Property to modify (e.g., `mass`, `isTrigger`)
 
-- **setup_scene** - Set up a new scene with appropriate defaults for 3D, 2D, or UI
-  - `scene_type` - Type of scene: 3d, 2d, or ui (default: 3d)
+- **`setup_scene`** — Set up a new scene with appropriate defaults for 3D, 2D, or UI
+  - `scene_type` — Type of scene: `3d`, `2d`, or `ui` (default: `3d`)
+
+</details>
+
+## Available Recipes
+
+4 built-in scene setup recipes:
+
+<details>
+<summary>View all 4 built-in recipes</summary>
+
+- **`fps_prototype`** — Creates a basic FPS prototype scene with player capsule, ground plane, directional light, and camera at eye height
+  - `ground_size` — Ground plane size (10–1000, default: `100`)
+
+- **`ui_canvas`** — Creates a Canvas with EventSystem and a 3-panel layout (header, content, footer)
+
+- **`3d_scene_template`** — Creates a basic 3D scene with directional light, ground plane, and camera positioned at (0, 5, -10)
+
+- **`physics_playground`** — Creates a physics playground with a ground plane, three ramps (15°/30°/45°), five spheres, and three cubes — all with Rigidbodies
 
 </details>
 
@@ -300,23 +395,85 @@ Unity MCP is entirely self-contained within the Unity Editor. A native C plugin 
          │ Polling (EditorApplication.update)
          ▼
 ┌─────────────────────────────────────┐
-│  Unity C# (main thread)            │
-│  - Polls for pending requests       │
+│  Unity C# (main thread)             │
+│  - Compilation gate: defers         │
+│    requests while isCompiling       │
 │  - Routes to MCPServer handlers     │
 │  - Executes tools, reads resources  │
+│                                     │
+│  Services:                          │
+│  - CheckpointManager (scene state)  │
+│  - RecipeRegistry (scene templates) │
+│  - Response dedup cache (defense)   │
 └─────────────────────────────────────┘
 ```
 
-**During script recompilation**, the C# polling stops and the plugin holds incoming requests until the domain reload completes. The AI assistant sees a brief delay rather than a disconnection.
+**During script recompilation**, the C# compilation gate defers request consumption until the domain reload completes. The AI assistant sees a brief delay rather than a disconnection.
 
 ## Extending Unity MCP
 
-### Adding Custom Tools
-
 <details>
-<summary>Click to expand</summary>
+<summary>Adding custom tools</summary>
 
-Create a static method and mark it with `[MCPTool]`:
+There are two ways to define tools: an **action-based tool** for grouping related operations under one tool name, and a **single-method tool** for standalone operations.
+
+### Action-based tools (recommended for related operations)
+
+Place `[MCPTool]` on a static class and `[MCPAction]` on each action method. The framework generates a unified JSON schema with a required `action` enum parameter.
+
+```csharp
+using UnityEditor;
+using UnityMCP.Editor;
+using UnityEngine;
+
+[MCPTool("enemy_manager", "Manage enemies in the scene", Category = "Gameplay")]
+public static class EnemyManagerTool
+{
+    [MCPAction("spawn", Description = "Spawn an enemy at a position",
+        DestructiveHint = true)]
+    public static object Spawn(
+        [MCPParam("type", "Enemy type", required: true,
+            Enum = new[] { "goblin", "skeleton", "dragon" })] string type,
+        [MCPParam("x", "X position", required: true)] float x,
+        [MCPParam("y", "Y position", required: true)] float y,
+        [MCPParam("z", "Z position", required: true)] float z)
+    {
+        GameObject enemy = new GameObject($"Enemy_{type}");
+        enemy.transform.position = new Vector3(x, y, z);
+        return new { instanceID = enemy.GetInstanceID(), type };
+    }
+
+    [MCPAction("list", Description = "List all enemies in the scene",
+        ReadOnlyHint = true)]
+    public static object List()
+    {
+        var enemies = GameObject.FindGameObjectsWithTag("Enemy");
+        return new { count = enemies.Length };
+    }
+
+    [MCPAction("despawn", Description = "Remove an enemy from the scene",
+        DestructiveHint = true)]
+    public static object Despawn(
+        [MCPParam("instance_id", "Instance ID of the enemy to remove",
+            required: true)] int instanceId)
+    {
+        var target = EditorUtility.InstanceIDToObject(instanceId) as GameObject;
+        if (target == null) return new { success = false, error = "Enemy not found." };
+        Object.DestroyImmediate(target);
+        return new { success = true };
+    }
+}
+```
+
+**Annotation resolution for action-based tools:**
+- `destructiveHint = true` if **any** action has `DestructiveHint = true`
+- `readOnlyHint = true` only if **all** actions have `ReadOnlyHint = true`
+
+The server uses per-action metadata to tell AI assistants which specific actions warrant a checkpoint before proceeding, rather than flagging the entire tool.
+
+### Single-method tools (for standalone operations)
+
+Place `[MCPTool]` directly on a static method:
 
 ```csharp
 using UnityMCP.Editor;
@@ -339,7 +496,7 @@ public static class MyCustomTools
         [MCPParam("x", "X position", required: true)] float x,
         [MCPParam("y", "Y position", required: true)] float y,
         [MCPParam("z", "Z position", required: true)] float z,
-        [MCPParam("difficulty", "Difficulty multiplier (1-10)",
+        [MCPParam("difficulty", "Difficulty multiplier (1–10)",
             Minimum = 1, Maximum = 10)] float difficulty = 5)
     {
         GameObject enemy = new GameObject($"Enemy_{enemyType}");
@@ -357,37 +514,35 @@ public static class MyCustomTools
 
 Tools are automatically discovered on domain reload. No registration needed.
 
-#### Tool Annotations
+### Tool annotations
 
-Annotations provide hints to AI assistants about tool behavior:
+Set annotations on `[MCPTool]` for single-method tools, or on `[MCPAction]` for per-action accuracy on action-based tools.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `Category` | string | `"Uncategorized"` | Groups related tools in `search_tools` results |
-| `ReadOnlyHint` | bool | `false` | Tool does not modify any state |
-| `DestructiveHint` | bool | `false` | Tool may perform irreversible operations |
-| `IdempotentHint` | bool | `false` | Same arguments always yield the same result |
-| `OpenWorldHint` | bool | `false` | Tool interacts with systems beyond Unity |
-| `Title` | string | `null` | Human-readable display title |
+| `Category` | `string` | `"Uncategorized"` | Groups related tools in `search_tools` results (set on `[MCPTool]`) |
+| `ReadOnlyHint` | `bool` | `false` | Operation does not modify any state |
+| `DestructiveHint` | `bool` | `false` | Operation may perform irreversible changes |
+| `IdempotentHint` | `bool` | `false` | Same arguments always yield the same result |
+| `OpenWorldHint` | `bool` | `false` | Operation interacts with systems outside Unity |
+| `Title` | `string` | `null` | Human-readable display title (set on `[MCPTool]`) |
 
-#### Parameter Constraints
+### Parameter constraints
 
 Constraints are included in the JSON Schema sent to AI assistants:
 
 | Property | Type | Description |
 |---|---|---|
-| `Enum` | string[] | Valid values for string parameters |
-| `Minimum` | double | Minimum value for numeric parameters |
-| `Maximum` | double | Maximum value for numeric parameters |
+| `Enum` | `string[]` | Valid values for string parameters |
+| `Minimum` | `double` | Minimum value for numeric parameters |
+| `Maximum` | `double` | Maximum value for numeric parameters |
 
 </details>
 
-### Adding Custom Resources
-
 <details>
-<summary>Click to expand</summary>
+<summary>Adding custom resources</summary>
 
-Resources expose read-only data to AI assistants. Use `[MCPResource]`:
+Resources expose read-only data to AI assistants via URI patterns. Use `[MCPResource]`:
 
 ```csharp
 using UnityMCP.Editor;
@@ -412,14 +567,12 @@ public static class MyCustomResources
 }
 ```
 
-Resources use URI patterns (e.g., `unity://player/stats`) and are read via `resources/read`.
+Resources are read via `resources/read` using their URI (e.g., `unity://player/stats`). They are automatically discovered on domain reload.
 
 </details>
 
-### Adding Custom Prompts
-
 <details>
-<summary>Click to expand</summary>
+<summary>Adding custom prompts</summary>
 
 Prompts provide reusable workflow templates for AI assistants. Use `[MCPPrompt]`:
 
@@ -439,13 +592,13 @@ public static class MyCustomPrompts
 
         string instructions = $@"Debug the GameObject ""{name}"" using these steps:
 
-1. Use `gameobject_find` with search_term=""{name}"" to locate it
-2. Use `component_manage` with action=""inspect"" to check each component";
+1. Use `find_gameobject` with search_term=""{name}"" to locate it
+2. Use `manage_component` with action=""inspect"" to check each component";
 
         if (isVerbose)
         {
             instructions += $@"
-3. Use `console_read` with filter=""{name}"" to check for related log messages";
+3. Use `read_console` with filter=""{name}"" to check for related log messages";
         }
 
         return new PromptResult
@@ -468,10 +621,32 @@ public static class MyCustomPrompts
 }
 ```
 
-Prompts are automatically discovered on domain reload, just like tools and resources.
+</details>
+
+<details>
+<summary>Adding custom recipes</summary>
+
+Recipes are reusable scene setup templates invoked via `execute_recipe`. Use `[MCPRecipe]` on a static method:
+
+```csharp
+using UnityMCP.Editor;
+
+public static class MyRecipes
+{
+    [MCPRecipe("my_scene_setup", "Creates a custom scene layout")]
+    public static object MySceneSetup(
+        [MCPParam("size", "World size", Minimum = 10, Maximum = 500)] float size = 50)
+    {
+        // Create your scene objects here...
+        return new { success = true, summary = "Scene created" };
+    }
+}
+```
+
+Recipes are automatically discovered on domain reload and appear in `list_recipes` output.
 
 </details>
 
 ## License
 
-GPLv3 - see LICENSE file for details.
+GPLv3 — see the LICENSE file for details.

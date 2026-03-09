@@ -1,6 +1,6 @@
 {
   "name": "com.emeryporter.unitymcp",
-  "version": "1.6.9",
+  "version": "2.0.0",
   "displayName": "Unity MCP",
   "description": "Pure C# MCP server for Unity 6 with attribute-based tool extensions. Enables AI assistants like Claude to interact with the Unity Editor.",
   "unity": "2022.3",
@@ -17,6 +17,7 @@
     "name": "Emery Porter"
   },
   "dependencies": {
-    "com.unity.nuget.newtonsoft-json": "3.2.2"
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.ugui": "1.0.0"
   }
 }

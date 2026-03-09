@@ -9,95 +9,22 @@ namespace UnityMCP.Editor.Tools
     /// <summary>
     /// Tool for managing VFX components: ParticleSystem, LineRenderer, and TrailRenderer.
     /// </summary>
+    [MCPTool("manage_vfx", "Manage VFX: particles (play/pause/stop/restart/get/set), lines (create/get/set), trails (get/set/clear)", Category = "VFX")]
     public static class ManageVFX
     {
+        #region Particle Actions
+
         /// <summary>
-        /// Manages VFX components: particles, lines, and trails.
+        /// Plays a particle system.
         /// </summary>
-        /// <param name="action">The action to perform (see description for valid actions)</param>
-        /// <param name="target">GameObject path or instance ID for finding the target</param>
-        /// <param name="particleSettings">Dict of main module settings for particle_set</param>
-        /// <param name="positions">Array of Vector3 positions for line_set</param>
-        /// <param name="width">Width curve or single value for line/trail</param>
-        /// <param name="color">Color gradient or single color for line/trail</param>
-        /// <param name="time">Trail time for trail_set</param>
-        /// <param name="withChildren">Apply to child particle systems (default: true)</param>
-        /// <param name="clearOnPlay">Clear particles when stopping (default: true)</param>
-        /// <param name="useWorldSpace">Use world space for line positions</param>
-        /// <param name="loop">Whether line should loop</param>
-        /// <param name="materialPath">Path to material asset</param>
-        /// <param name="minVertexDistance">Min distance between trail vertices</param>
-        /// <param name="emitting">Whether trail is emitting</param>
-        /// <returns>Result object indicating success or failure with appropriate data.</returns>
-        [MCPTool("manage_vfx", "Manage VFX: particles (play/pause/stop/restart/get/set), lines (create/get/set), trails (get/set/clear)", Category = "VFX", DestructiveHint = true)]
-        public static object Execute(
-            [MCPParam("action", "Action: particle_play, particle_pause, particle_stop, particle_restart, particle_get, particle_set, line_create, line_get, line_set, trail_get, trail_set, trail_clear", required: true, Enum = new[] { "particle_play", "particle_pause", "particle_stop", "particle_restart", "particle_get", "particle_set", "line_create", "line_get", "line_set", "trail_get", "trail_set", "trail_clear" })] string action,
-            [MCPParam("target", "GameObject path or instance ID")] string target = null,
-            [MCPParam("particle_settings", "Dict of main module settings for particle_set")] object particleSettings = null,
-            [MCPParam("positions", "Array of Vector3 positions for line_set/line_create")] List<object> positions = null,
-            [MCPParam("width", "Width curve or single value for line/trail")] object width = null,
-            [MCPParam("color", "Color gradient or single color for line/trail")] object color = null,
-            [MCPParam("time", "Trail time for trail_set")] float? time = null,
-            [MCPParam("with_children", "Apply to child particle systems (default: true)")] bool withChildren = true,
-            [MCPParam("clear_on_play", "Clear particles when stopping (default: true)")] bool clearOnPlay = true,
-            [MCPParam("use_world_space", "Use world space for line positions")] bool? useWorldSpace = null,
-            [MCPParam("loop", "Whether line should loop")] bool? loop = null,
-            [MCPParam("material_path", "Path to material asset")] string materialPath = null,
-            [MCPParam("min_vertex_distance", "Min distance between trail vertices")] float? minVertexDistance = null,
-            [MCPParam("emitting", "Whether trail is emitting")] bool? emitting = null,
-            [MCPParam("corner_vertices", "Number of corner vertices for line/trail")] int? cornerVertices = null,
-            [MCPParam("cap_vertices", "Number of cap vertices for line/trail")] int? capVertices = null,
-            [MCPParam("alignment", "Line/trail alignment: view, transformz")] string alignment = null,
-            [MCPParam("texture_mode", "Line/trail texture mode: stretch, tile, distribute_per_segment, repeat_per_segment, static")] string textureMode = null,
-            [MCPParam("autodestruct", "Whether trail should autodestruct")] bool? autodestruct = null,
-            [MCPParam("generate_lighting_data", "Whether trail generates lighting data")] bool? generateLightingData = null,
-            [MCPParam("shadow_bias", "Trail shadow bias")] float? shadowBias = null)
+        [MCPAction("particle_play", Description = "Play a particle system")]
+        public static object ParticlePlay(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("with_children", "Apply to child particle systems (default: true)")] bool withChildren = true)
         {
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                throw MCPException.InvalidParams("The 'action' parameter is required.");
-            }
-
-            string normalizedAction = action.Trim().ToLowerInvariant();
-
             try
             {
-                // Parse positions if provided
-                List<Vector3> parsedPositions = null;
-                if (positions != null && positions.Count > 0)
-                {
-                    parsedPositions = VFXCommon.ParsePositions(positions);
-                }
-
-                // Parse particle settings if provided
-                Dictionary<string, object> parsedSettings = null;
-                if (particleSettings != null)
-                {
-                    parsedSettings = VFXCommon.ConvertToDictionary(particleSettings);
-                }
-
-                return normalizedAction switch
-                {
-                    // Particle actions
-                    "particle_play" => ParticleOps.Play(target, withChildren),
-                    "particle_pause" => ParticleOps.Pause(target, withChildren),
-                    "particle_stop" => ParticleOps.Stop(target, withChildren, clearOnPlay),
-                    "particle_restart" => ParticleOps.Restart(target, withChildren),
-                    "particle_get" => ParticleOps.Get(target),
-                    "particle_set" => ParticleOps.Set(target, parsedSettings),
-
-                    // Line actions
-                    "line_create" => LineOps.Create(target, parsedPositions, width, color, materialPath),
-                    "line_get" => LineOps.Get(target),
-                    "line_set" => LineOps.Set(target, parsedPositions, width, color, useWorldSpace, loop, materialPath, cornerVertices, capVertices, alignment, textureMode),
-
-                    // Trail actions
-                    "trail_get" => TrailOps.Get(target),
-                    "trail_set" => TrailOps.Set(target, time, width, color, minVertexDistance, autodestruct, emitting, materialPath, cornerVertices, capVertices, alignment, textureMode, generateLightingData, shadowBias),
-                    "trail_clear" => TrailOps.Clear(target),
-
-                    _ => throw MCPException.InvalidParams($"Unknown action: '{action}'. Valid actions: particle_play, particle_pause, particle_stop, particle_restart, particle_get, particle_set, line_create, line_get, line_set, trail_get, trail_set, trail_clear")
-                };
+                return ParticleOps.Play(target, withChildren);
             }
             catch (MCPException)
             {
@@ -105,13 +32,356 @@ namespace UnityMCP.Editor.Tools
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[ManageVFX] Error executing action '{action}': {exception.Message}");
+                Debug.LogWarning($"[ManageVFX] Error executing action 'particle_play': {exception.Message}");
                 return new
                 {
                     success = false,
-                    error = $"Error executing action '{action}': {exception.Message}"
+                    error = $"Error executing action 'particle_play': {exception.Message}"
                 };
             }
         }
+
+        /// <summary>
+        /// Pauses a particle system.
+        /// </summary>
+        [MCPAction("particle_pause", Description = "Pause a particle system")]
+        public static object ParticlePause(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("with_children", "Apply to child particle systems (default: true)")] bool withChildren = true)
+        {
+            try
+            {
+                return ParticleOps.Pause(target, withChildren);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'particle_pause': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'particle_pause': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Stops a particle system.
+        /// </summary>
+        [MCPAction("particle_stop", Description = "Stop a particle system")]
+        public static object ParticleStop(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("with_children", "Apply to child particle systems (default: true)")] bool withChildren = true,
+            [MCPParam("clear_on_play", "Clear particles when stopping (default: true)")] bool clearOnPlay = true)
+        {
+            try
+            {
+                return ParticleOps.Stop(target, withChildren, clearOnPlay);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'particle_stop': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'particle_stop': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Restarts a particle system (stop + clear + play).
+        /// </summary>
+        [MCPAction("particle_restart", Description = "Restart a particle system (stop + clear + play)")]
+        public static object ParticleRestart(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("with_children", "Apply to child particle systems (default: true)")] bool withChildren = true)
+        {
+            try
+            {
+                return ParticleOps.Restart(target, withChildren);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'particle_restart': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'particle_restart': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Gets information about a particle system.
+        /// </summary>
+        [MCPAction("particle_get", Description = "Get particle system information", ReadOnlyHint = true)]
+        public static object ParticleGet(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target)
+        {
+            try
+            {
+                return ParticleOps.Get(target);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'particle_get': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'particle_get': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Sets properties on a particle system's main module.
+        /// </summary>
+        [MCPAction("particle_set", Description = "Set particle system main module properties")]
+        public static object ParticleSet(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("particle_settings", "Dict of main module settings for particle_set", required: true)] object particleSettings)
+        {
+            try
+            {
+                Dictionary<string, object> parsedSettings = VFXCommon.ConvertToDictionary(particleSettings);
+                return ParticleOps.Set(target, parsedSettings);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'particle_set': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'particle_set': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
+
+        #region Line Actions
+
+        /// <summary>
+        /// Creates a LineRenderer on a GameObject.
+        /// </summary>
+        [MCPAction("line_create", Description = "Create a LineRenderer on a GameObject")]
+        public static object LineCreate(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("positions", "Array of Vector3 positions for line_create")] List<object> positions = null,
+            [MCPParam("material_path", "Path to material asset")] string materialPath = null,
+            [MCPParam("width", "Width curve or single value for line")] object width = null,
+            [MCPParam("color", "Color gradient or single color for line")] object color = null,
+            [MCPParam("use_world_space", "Use world space for line positions")] bool? useWorldSpace = null,
+            [MCPParam("loop", "Whether line should loop")] bool? loop = null)
+        {
+            try
+            {
+                List<Vector3> parsedPositions = null;
+                if (positions != null && positions.Count > 0)
+                {
+                    parsedPositions = VFXCommon.ParsePositions(positions);
+                }
+
+                return LineOps.Create(target, parsedPositions, width, color, materialPath);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'line_create': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'line_create': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Gets information about a LineRenderer.
+        /// </summary>
+        [MCPAction("line_get", Description = "Get LineRenderer information", ReadOnlyHint = true)]
+        public static object LineGet(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target)
+        {
+            try
+            {
+                return LineOps.Get(target);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'line_get': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'line_get': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Sets properties on a LineRenderer.
+        /// </summary>
+        [MCPAction("line_set", Description = "Set LineRenderer properties")]
+        public static object LineSet(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("positions", "Array of Vector3 positions for line_set")] List<object> positions = null,
+            [MCPParam("width", "Width curve or single value for line")] object width = null,
+            [MCPParam("color", "Color gradient or single color for line")] object color = null,
+            [MCPParam("use_world_space", "Use world space for line positions")] bool? useWorldSpace = null,
+            [MCPParam("loop", "Whether line should loop")] bool? loop = null,
+            [MCPParam("material_path", "Path to material asset")] string materialPath = null,
+            [MCPParam("alignment", "Line alignment: view, transformz")] string alignment = null,
+            [MCPParam("texture_mode", "Line texture mode: stretch, tile, distribute_per_segment, repeat_per_segment, static")] string textureMode = null,
+            [MCPParam("corner_vertices", "Number of corner vertices for line")] int? cornerVertices = null,
+            [MCPParam("cap_vertices", "Number of cap vertices for line")] int? capVertices = null)
+        {
+            try
+            {
+                List<Vector3> parsedPositions = null;
+                if (positions != null && positions.Count > 0)
+                {
+                    parsedPositions = VFXCommon.ParsePositions(positions);
+                }
+
+                return LineOps.Set(target, parsedPositions, width, color, useWorldSpace, loop, materialPath, cornerVertices, capVertices, alignment, textureMode);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'line_set': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'line_set': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
+
+        #region Trail Actions
+
+        /// <summary>
+        /// Gets information about a TrailRenderer.
+        /// </summary>
+        [MCPAction("trail_get", Description = "Get TrailRenderer information", ReadOnlyHint = true)]
+        public static object TrailGet(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target)
+        {
+            try
+            {
+                return TrailOps.Get(target);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'trail_get': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'trail_get': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Sets properties on a TrailRenderer.
+        /// </summary>
+        [MCPAction("trail_set", Description = "Set TrailRenderer properties")]
+        public static object TrailSet(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target,
+            [MCPParam("time", "Trail time for trail_set")] float? time = null,
+            [MCPParam("width", "Width curve or single value for trail")] object width = null,
+            [MCPParam("color", "Color gradient or single color for trail")] object color = null,
+            [MCPParam("min_vertex_distance", "Min distance between trail vertices")] float? minVertexDistance = null,
+            [MCPParam("autodestruct", "Whether trail should autodestruct")] bool? autodestruct = null,
+            [MCPParam("emitting", "Whether trail is emitting")] bool? emitting = null,
+            [MCPParam("generate_lighting_data", "Whether trail generates lighting data")] bool? generateLightingData = null,
+            [MCPParam("material_path", "Path to material asset")] string materialPath = null,
+            [MCPParam("alignment", "Trail alignment: view, transformz")] string alignment = null,
+            [MCPParam("texture_mode", "Trail texture mode: stretch, tile, distribute_per_segment, repeat_per_segment, static")] string textureMode = null,
+            [MCPParam("shadow_bias", "Trail shadow bias")] float? shadowBias = null,
+            [MCPParam("corner_vertices", "Number of corner vertices for trail")] int? cornerVertices = null,
+            [MCPParam("cap_vertices", "Number of cap vertices for trail")] int? capVertices = null)
+        {
+            try
+            {
+                return TrailOps.Set(target, time, width, color, minVertexDistance, autodestruct, emitting, materialPath, cornerVertices, capVertices, alignment, textureMode, generateLightingData, shadowBias);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'trail_set': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'trail_set': {exception.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// Clears the trail path.
+        /// </summary>
+        [MCPAction("trail_clear", Description = "Clear the trail path")]
+        public static object TrailClear(
+            [MCPParam("target", "GameObject path or instance ID", required: true)] string target)
+        {
+            try
+            {
+                return TrailOps.Clear(target);
+            }
+            catch (MCPException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ManageVFX] Error executing action 'trail_clear': {exception.Message}");
+                return new
+                {
+                    success = false,
+                    error = $"Error executing action 'trail_clear': {exception.Message}"
+                };
+            }
+        }
+
+        #endregion
     }
 }

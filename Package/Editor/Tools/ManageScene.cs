@@ -8,6 +8,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityMCP.Editor;
 using UnityMCP.Editor.Core;
+using UnityMCP.Editor.Services;
 using UnityMCP.Editor.Utilities;
 
 #pragma warning disable CS0618 // EditorUtility.InstanceIDToObject is deprecated but still functional
@@ -24,7 +25,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Creates a new empty scene at the specified path.
         /// </summary>
-        [MCPTool("scene_create", "Creates a new empty scene at the specified path", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("create_scene", "Creates a new empty scene at the specified path", Category = "Scene", DestructiveHint = true)]
         public static object CreateScene(
             [MCPParam("name", "Name of the scene (without .unity extension)", required: true)] string name,
             [MCPParam("path", "Directory path relative to Assets (default: Scenes)")] string path = null)
@@ -114,7 +115,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Loads a scene by path or build index.
         /// </summary>
-        [MCPTool("scene_load", "Loads a scene by path (relative to Assets) or build index", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("load_scene", "Loads a scene by path (relative to Assets) or build index", Category = "Scene", DestructiveHint = true)]
         public static object LoadScene(
             [MCPParam("name", "Name of the scene (without .unity extension)")] string name = null,
             [MCPParam("path", "Directory path relative to Assets (used with name)")] string path = null,
@@ -238,7 +239,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Saves the current scene, optionally to a new path.
         /// </summary>
-        [MCPTool("scene_save", "Saves the current scene, optionally to a new path", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("save_scene", "Saves the current scene, optionally to a new path", Category = "Scene", DestructiveHint = true)]
         public static object SaveScene(
             [MCPParam("name", "Name for Save As (without .unity extension)")] string name = null,
             [MCPParam("path", "Directory path for Save As (relative to Assets)")] string path = null)
@@ -297,6 +298,20 @@ namespace UnityMCP.Editor.Tools
                 if (saved)
                 {
                     AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+                    // Auto-checkpoint: fold tracked asset changes into current bucket
+                    try
+                    {
+                        if (CheckpointManager.HasPendingTracks)
+                        {
+                            CheckpointManager.SaveCheckpoint();
+                        }
+                    }
+                    catch (Exception checkpointException)
+                    {
+                        Debug.LogWarning($"[ManageScene] Auto-checkpoint failed: {checkpointException.Message}");
+                    }
+
                     return new
                     {
                         success = true,
@@ -331,7 +346,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets information about the currently active scene.
         /// </summary>
-        [MCPTool("scene_get_active", "Gets information about the currently active scene", Category = "Scene", ReadOnlyHint = true)]
+        [MCPTool("get_active_scene", "Gets information about the currently active scene", Category = "Scene", ReadOnlyHint = true)]
         public static object GetActiveScene()
         {
             try
@@ -389,7 +404,7 @@ namespace UnityMCP.Editor.Tools
         /// <summary>
         /// Gets the hierarchy of GameObjects in the current scene.
         /// </summary>
-        [MCPTool("scene_get_hierarchy", "Gets the hierarchy of GameObjects in the current scene", Category = "Scene", ReadOnlyHint = true)]
+        [MCPTool("get_scene_hierarchy", "Gets the hierarchy of GameObjects in the current scene", Category = "Scene", ReadOnlyHint = true)]
         public static object GetHierarchy(
             [MCPParam("parent", "Instance ID or name of parent GameObject to list children of (null for roots)")] string parent = null,
             [MCPParam("max_depth", "Maximum depth to traverse (default: 1, just immediate children)", Minimum = 1)] int maxDepth = 1,
@@ -482,6 +497,26 @@ namespace UnityMCP.Editor.Tools
                     }
                 }
 
+                // Estimate response size — serialize and check against proxy buffer limit
+                // MCPProxy.MaxResponseSize is 256KB, leave margin for JSON-RPC wrapper
+                const int MaxSafeResponseBytes = 200 * 1024; // 200KB safe limit
+
+                string serializedItems = Newtonsoft.Json.JsonConvert.SerializeObject(items);
+                int estimatedBytes = System.Text.Encoding.UTF8.GetByteCount(serializedItems);
+
+                string sizeWarning = null;
+                if (estimatedBytes > MaxSafeResponseBytes)
+                {
+                    // Truncate items until we're under the limit
+                    while (items.Count > 1 && estimatedBytes > MaxSafeResponseBytes)
+                    {
+                        items.RemoveAt(items.Count - 1);
+                        serializedItems = Newtonsoft.Json.JsonConvert.SerializeObject(items);
+                        estimatedBytes = System.Text.Encoding.UTF8.GetByteCount(serializedItems);
+                    }
+                    sizeWarning = $"Response truncated to {items.Count} items to fit within response size limit. Use smaller page_size or max_depth, or query specific parent objects.";
+                }
+
                 bool truncated = endIndex < total;
                 int? nextCursor = truncated ? endIndex : (int?)null;
 
@@ -495,7 +530,8 @@ namespace UnityMCP.Editor.Tools
                     nextCursor,
                     truncated,
                     total,
-                    items
+                    items,
+                    warning = sizeWarning
                 };
             }
             catch (Exception ex)
@@ -513,17 +549,98 @@ namespace UnityMCP.Editor.Tools
         #region Screenshot
 
         /// <summary>
-        /// Captures a screenshot of the Game View.
+        /// Captures a screenshot of the Game View or Scene View, with optional target framing and camera angle.
         /// </summary>
-        [MCPTool("scene_screenshot", "Captures a screenshot of the Game View", Category = "Scene", DestructiveHint = true)]
+        [MCPTool("capture_screenshot", "Captures a screenshot of the Game View or Scene View with optional target framing and camera angle", Category = "Scene", ReadOnlyHint = true)]
         public static object CaptureScreenshot(
             [MCPParam("filename", "Filename for the screenshot (without extension)")] string filename = null,
-            [MCPParam("super_size", "Multiplier for resolution (1-4, default: 1)", Minimum = 1, Maximum = 4)] int superSize = 1)
+            [MCPParam("super_size", "Multiplier for resolution (1-4, default: 1)", Minimum = 1, Maximum = 4)] int superSize = 1,
+            [MCPParam("target", "GameObject name, path, or instance ID to frame in the shot (auto-positions Scene View camera)")] string target = null,
+            [MCPParam("angle", "Camera angle for Scene View capture", Enum = new[] { "current", "top", "front", "right", "isometric" })] string angle = "current",
+            [MCPParam("view", "Which view to capture: 'game' (Game View, default) or 'scene' (Scene View)", Enum = new[] { "scene", "game" })] string view = "game")
         {
             try
             {
                 // Validate super size
                 int resolvedSuperSize = Mathf.Clamp(superSize, 1, 4);
+
+                // Normalize view and angle parameters
+                string resolvedView = string.IsNullOrEmpty(view) ? "game" : view.ToLowerInvariant();
+                string resolvedAngle = string.IsNullOrEmpty(angle) ? "current" : angle.ToLowerInvariant();
+
+                // Validate view parameter
+                if (resolvedView != "game" && resolvedView != "scene")
+                {
+                    return new
+                    {
+                        success = false,
+                        error = $"Invalid view '{view}'. Must be 'game' or 'scene'."
+                    };
+                }
+
+                // Validate angle parameter
+                string[] validAngles = { "current", "top", "front", "right", "isometric" };
+                if (Array.IndexOf(validAngles, resolvedAngle) < 0)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = $"Invalid angle '{angle}'. Must be one of: current, top, front, right, isometric."
+                    };
+                }
+
+                // If target or non-current angle is specified, we need the Scene View
+                bool needsSceneViewSetup = !string.IsNullOrEmpty(target) || resolvedAngle != "current";
+
+                // Position the Scene View camera if needed
+                if (needsSceneViewSetup)
+                {
+                    SceneView sceneView = SceneView.lastActiveSceneView;
+                    if (sceneView == null)
+                    {
+                        return new
+                        {
+                            success = false,
+                            error = "No active Scene View found. Open a Scene View window first."
+                        };
+                    }
+
+                    // If target specified, resolve and frame it
+                    if (!string.IsNullOrEmpty(target))
+                    {
+                        Scene activeScene = EditorSceneManager.GetActiveScene();
+                        GameObject targetGameObject = ResolveGameObject(target, activeScene);
+                        if (targetGameObject == null)
+                        {
+                            return new
+                            {
+                                success = false,
+                                error = $"Target GameObject '{target}' not found."
+                            };
+                        }
+
+                        // Set the angle before framing if not "current"
+                        if (resolvedAngle != "current")
+                        {
+                            Vector3 lookAtPoint = targetGameObject.transform.position;
+                            Quaternion angleRotation = GetAngleRotation(resolvedAngle);
+                            sceneView.LookAt(lookAtPoint, angleRotation);
+                        }
+
+                        // Select and frame the target
+                        Selection.activeGameObject = targetGameObject;
+                        sceneView.FrameSelected();
+                    }
+                    else if (resolvedAngle != "current")
+                    {
+                        // No target but angle specified: rotate around current pivot
+                        Quaternion angleRotation = GetAngleRotation(resolvedAngle);
+                        sceneView.LookAt(sceneView.pivot, angleRotation);
+                    }
+
+                    // Force the Scene View to repaint so the camera is updated
+                    sceneView.Repaint();
+                }
 
                 // Generate filename if not provided
                 string screenshotFileName = string.IsNullOrEmpty(filename)
@@ -540,51 +657,26 @@ namespace UnityMCP.Editor.Tools
                 // Generate unique filename
                 string basePath = Path.Combine(screenshotsFolder, screenshotFileName);
                 string finalPath = basePath + ".png";
-                int counter = 1;
+                int fileCounter = 1;
                 while (File.Exists(finalPath))
                 {
-                    finalPath = $"{basePath}_{counter}.png";
-                    counter++;
+                    finalPath = $"{basePath}_{fileCounter}.png";
+                    fileCounter++;
                 }
-
-                // Best effort: ensure Game View exists and repaints before capture
-                if (!Application.isBatchMode)
-                {
-                    EnsureGameView();
-                }
-
-                // Capture the screenshot
-                ScreenCapture.CaptureScreenshot(finalPath, resolvedSuperSize);
 
                 // Calculate relative path
                 string relativePath = "Assets/Screenshots/" + Path.GetFileName(finalPath);
 
-                // Schedule asset import (screenshot capture is async in play mode)
-                if (Application.isPlaying)
+                if (resolvedView == "scene")
                 {
-                    ScheduleAssetImport(relativePath, finalPath, 30.0);
+                    // Capture from Scene View camera
+                    return CaptureSceneViewScreenshot(finalPath, relativePath, resolvedSuperSize, resolvedAngle);
                 }
                 else
                 {
-                    // In edit mode, we need to wait a bit for the file to be written
-                    EditorApplication.delayCall += () =>
-                    {
-                        if (File.Exists(finalPath))
-                        {
-                            AssetDatabase.ImportAsset(relativePath, ImportAssetOptions.ForceSynchronousImport);
-                        }
-                    };
+                    // Existing Game View capture behavior
+                    return CaptureGameViewScreenshot(finalPath, relativePath, resolvedSuperSize);
                 }
-
-                return new
-                {
-                    success = true,
-                    message = "Screenshot capture initiated.",
-                    path = relativePath,
-                    fullPath = finalPath,
-                    superSize = resolvedSuperSize,
-                    isAsync = Application.isPlaying
-                };
             }
             catch (Exception ex)
             {
@@ -593,6 +685,281 @@ namespace UnityMCP.Editor.Tools
                     success = false,
                     error = $"Error capturing screenshot: {ex.Message}"
                 };
+            }
+        }
+
+        /// <summary>
+        /// Captures a screenshot from the Game View. Uses a hybrid approach:
+        /// Play Mode: CaptureScreenshotAsTexture (synchronous, full composite including Canvas/UITK)
+        /// Edit Mode: GameViewCapture reflection (composited RT), fallback to Camera.Render()
+        /// </summary>
+        private static object CaptureGameViewScreenshot(string fullPath, string relativePath, int superSize)
+        {
+            // Best effort: ensure Game View exists and repaints before capture
+            if (!Application.isBatchMode)
+            {
+                EnsureGameView();
+            }
+
+            // Get Game View dimensions for capture resolution
+            int baseWidth = 1920;
+            int baseHeight = 1080;
+            var gameViewDimensions = GameViewCapture.GetGameViewDimensions();
+            if (gameViewDimensions.width > 0 && gameViewDimensions.height > 0)
+            {
+                baseWidth = gameViewDimensions.width;
+                baseHeight = gameViewDimensions.height;
+            }
+
+            int captureWidth = baseWidth * superSize;
+            int captureHeight = baseHeight * superSize;
+            byte[] pngBytes = null;
+            int finalWidth = 0;
+            int finalHeight = 0;
+            string captureMethod = null;
+
+            // Tier 1: Play Mode — CaptureScreenshotAsTexture (full composite, synchronous)
+            if (Application.isPlaying)
+            {
+                try
+                {
+                    Texture2D screenshot = ScreenCapture.CaptureScreenshotAsTexture(superSize);
+                    if (screenshot != null)
+                    {
+                        try
+                        {
+                            pngBytes = screenshot.EncodeToPNG();
+                            finalWidth = screenshot.width;
+                            finalHeight = screenshot.height;
+                            captureMethod = "screenshot_api";
+                        }
+                        finally
+                        {
+                            UnityEngine.Object.DestroyImmediate(screenshot);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fall through to next tier
+                }
+            }
+
+            // Tier 2: GameViewCapture composited RT (includes Canvas, UITK)
+            if (pngBytes == null)
+            {
+                if (GameViewCapture.TryCaptureComposited(captureWidth, captureHeight,
+                        out byte[] compositedPng, out int cw, out int ch, out string _diagnostics))
+                {
+                    pngBytes = compositedPng;
+                    finalWidth = cw;
+                    finalHeight = ch;
+                    captureMethod = "gameview_composited";
+                }
+            }
+
+            // Tier 3: Camera.Render() fallback (3D only, no UI overlays)
+            if (pngBytes == null)
+            {
+                Camera camera = Camera.main ?? (Camera.allCameras.Length > 0 ? Camera.allCameras[0] : null);
+                if (camera == null)
+                {
+                    return new
+                    {
+                        success = false,
+                        error = "No camera found in scene. Ensure at least one camera exists."
+                    };
+                }
+
+                RenderTexture previousTargetTexture = camera.targetTexture;
+                RenderTexture previousActiveTexture = RenderTexture.active;
+                RenderTexture renderTexture = null;
+
+                try
+                {
+                    renderTexture = new RenderTexture(captureWidth, captureHeight, 24);
+                    camera.targetTexture = renderTexture;
+                    camera.Render();
+
+                    RenderTexture.active = renderTexture;
+                    var texture = new Texture2D(captureWidth, captureHeight, TextureFormat.RGB24, false);
+                    texture.ReadPixels(new Rect(0, 0, captureWidth, captureHeight), 0, 0);
+                    texture.Apply();
+
+                    pngBytes = texture.EncodeToPNG();
+                    finalWidth = captureWidth;
+                    finalHeight = captureHeight;
+                    captureMethod = "camera_render";
+
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
+                finally
+                {
+                    camera.targetTexture = previousTargetTexture;
+                    RenderTexture.active = previousActiveTexture;
+
+                    if (renderTexture != null)
+                    {
+                        renderTexture.Release();
+                        UnityEngine.Object.DestroyImmediate(renderTexture);
+                    }
+                }
+            }
+
+            if (pngBytes == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = "Failed to capture Game View screenshot."
+                };
+            }
+
+            // Write to disk synchronously
+            File.WriteAllBytes(fullPath, pngBytes);
+
+            // Import asset via delayCall (not ForceSynchronousImport to avoid re-entrant dispatch)
+            string capturedRelativePath = relativePath;
+            EditorApplication.delayCall += () =>
+            {
+                if (File.Exists(fullPath))
+                {
+                    AssetDatabase.ImportAsset(capturedRelativePath);
+                }
+            };
+
+            return new
+            {
+                success = true,
+                message = "Screenshot captured.",
+                path = relativePath,
+                fullPath,
+                width = finalWidth,
+                height = finalHeight,
+                file_size_bytes = pngBytes.Length,
+                superSize,
+                view = "game",
+                capture_method = captureMethod
+            };
+        }
+
+        /// <summary>
+        /// Captures a screenshot from the Scene View by rendering its camera to a RenderTexture.
+        /// </summary>
+        private static object CaptureSceneViewScreenshot(string fullPath, string relativePath, int superSize, string angle)
+        {
+            SceneView sceneView = SceneView.lastActiveSceneView;
+            if (sceneView == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = "No active Scene View found. Open a Scene View window first."
+                };
+            }
+
+            Camera sceneCamera = sceneView.camera;
+            if (sceneCamera == null)
+            {
+                return new
+                {
+                    success = false,
+                    error = "Scene View camera is not available."
+                };
+            }
+
+            // Calculate resolution based on Scene View size and super size multiplier
+            int captureWidth = (int)sceneView.position.width * superSize;
+            int captureHeight = (int)sceneView.position.height * superSize;
+
+            if (captureWidth <= 0 || captureHeight <= 0)
+            {
+                return new
+                {
+                    success = false,
+                    error = "Scene View has invalid dimensions. Ensure it is visible and has a non-zero size."
+                };
+            }
+
+            RenderTexture renderTexture = null;
+            RenderTexture previousTargetTexture = sceneCamera.targetTexture;
+            RenderTexture previousActiveRenderTexture = RenderTexture.active;
+
+            try
+            {
+                // Create a temporary RenderTexture for the capture
+                renderTexture = new RenderTexture(captureWidth, captureHeight, 24);
+                sceneCamera.targetTexture = renderTexture;
+                sceneCamera.Render();
+
+                // Read pixels from the RenderTexture into a Texture2D
+                RenderTexture.active = renderTexture;
+                Texture2D screenshotTexture = new Texture2D(captureWidth, captureHeight, TextureFormat.RGB24, false);
+                screenshotTexture.ReadPixels(new Rect(0, 0, captureWidth, captureHeight), 0, 0);
+                screenshotTexture.Apply();
+
+                // Encode to PNG and write to disk
+                byte[] pngBytes = screenshotTexture.EncodeToPNG();
+                File.WriteAllBytes(fullPath, pngBytes);
+
+                // Clean up the temporary texture
+                UnityEngine.Object.DestroyImmediate(screenshotTexture);
+
+                // Import the asset so it appears in the Asset Database.
+                // IMPORTANT: Do NOT use ForceSynchronousImport here. It processes the entire import
+                // pipeline synchronously, which can pump EditorApplication.update and cause re-entrant
+                // PollForRequests dispatch -- leading to duplicate screenshot files with parallel captures.
+                EditorApplication.delayCall += () =>
+                {
+                    if (File.Exists(fullPath))
+                    {
+                        AssetDatabase.ImportAsset(relativePath);
+                    }
+                };
+
+                return new
+                {
+                    success = true,
+                    message = "Scene View screenshot captured.",
+                    path = relativePath,
+                    fullPath,
+                    superSize,
+                    view = "scene",
+                    angle,
+                    resolution = new { width = captureWidth, height = captureHeight }
+                };
+            }
+            finally
+            {
+                // Restore camera and RenderTexture state
+                sceneCamera.targetTexture = previousTargetTexture;
+                RenderTexture.active = previousActiveRenderTexture;
+
+                if (renderTexture != null)
+                {
+                    renderTexture.Release();
+                    UnityEngine.Object.DestroyImmediate(renderTexture);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns the Quaternion rotation for a named camera angle.
+        /// </summary>
+        private static Quaternion GetAngleRotation(string angle)
+        {
+            switch (angle)
+            {
+                case "top":
+                    return Quaternion.Euler(90, 0, 0);
+                case "front":
+                    return Quaternion.Euler(0, 0, 0);
+                case "right":
+                    return Quaternion.Euler(0, -90, 0);
+                case "isometric":
+                    return Quaternion.Euler(30, -45, 0);
+                default:
+                    return Quaternion.identity;
             }
         }
 

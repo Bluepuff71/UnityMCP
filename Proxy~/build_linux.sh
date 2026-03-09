@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 echo "Building UnityMCPProxy for Linux..."
 
 # Create output directory if it doesn't exist
-mkdir -p "../Plugins/Linux/x86_64/"
+mkdir -p "../Package/Plugins/Linux/x86_64/"
 
 # Check if gcc is available
 if ! command -v gcc &> /dev/null; then
@@ -28,8 +28,9 @@ if [ ! -f "libUnityMCPProxy.so" ]; then
     exit 1
 fi
 
-# Copy to Plugins folder
-echo "Copying to Plugins folder..."
-cp libUnityMCPProxy.so ../Plugins/Linux/x86_64/
+# Copy to Package/Plugins folder (this is where Unity actually loads from)
+echo "Copying to Package/Plugins folder..."
+mkdir -p "../Package/Plugins/Linux/x86_64/"
+cp libUnityMCPProxy.so ../Package/Plugins/Linux/x86_64/
 
 echo "Build successful: libUnityMCPProxy.so"
