@@ -178,7 +178,7 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 |---|---|
 | `manage_component` | Manages components (`action`: `add`, `remove`, `set_property`, `inspect`) |
 
-### Asset (7)
+### Asset (6)
 
 | Tool | Description |
 |---|---|
@@ -187,7 +187,6 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 | `manage_material` | Manages materials (`action`: `create`, `get_info`, `set_property`, `set_color`, `assign_to_renderer`, `set_renderer_color`) |
 | `manage_texture` | Manages textures: get info, list, find, modify import settings |
 | `manage_shader` | Manages shaders: get info, list, find, manage keywords |
-| `manage_script` | Manages C# scripts (`action`: `create`, `read`, `update`, `delete`, `validate`) |
 | `manage_scriptable_object` | Manages ScriptableObjects: create, modify, get, list |
 
 ### VFX (1)
