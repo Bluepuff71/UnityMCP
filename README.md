@@ -78,8 +78,7 @@ Add this to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "unity-mcp": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "http://localhost:8080/"]
+      "url": "http://localhost:8080/"
     }
   }
 }
@@ -89,7 +88,7 @@ Restart Claude Desktop after saving.
 
 ### Other MCP clients (Codex, Cursor, etc.)
 
-Unity MCP exposes a built-in HTTP server at `http://localhost:8080/`. Any MCP-compatible client with HTTP transport support can connect directly. For stdio-only clients, use the `mcp-remote` bridge as shown above.
+Unity MCP exposes a built-in HTTP server at `http://localhost:8080/`. Any MCP-compatible client with Streamable HTTP transport support can connect directly using the URL.
 
 *Note: Configurations for clients other than Claude Code have not been tested. Open a PR!*
 
