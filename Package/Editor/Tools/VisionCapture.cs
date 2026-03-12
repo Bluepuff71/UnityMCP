@@ -3,6 +3,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityMCP.Editor.Core;
+using UnityMCP.Editor.Utilities;
 
 namespace UnityMCP.Editor.Tools
 {
@@ -103,30 +104,94 @@ namespace UnityMCP.Editor.Tools
 
         private static (byte[] bytes, int width, int height) CaptureGameView(int targetWidth, string format, int quality)
         {
-            Camera camera = Camera.main;
-            if (camera == null)
+            // Determine target dimensions from Game View or camera aspect ratio
+            int targetHeight;
+            var gameViewDimensions = GameViewCapture.GetGameViewDimensions();
+            if (gameViewDimensions.width > 0 && gameViewDimensions.height > 0)
             {
-                // Fallback: find any enabled camera
-                var allCameras = Camera.allCameras;
-                if (allCameras.Length > 0)
-                    camera = allCameras[0];
+                float aspectRatio = (float)gameViewDimensions.width / gameViewDimensions.height;
+                targetHeight = Mathf.RoundToInt(targetWidth / aspectRatio);
             }
-            if (camera == null)
+            else
+            {
+                Camera camera = Camera.main ?? (Camera.allCameras.Length > 0 ? Camera.allCameras[0] : null);
+                float aspectRatio = camera != null && camera.aspect > 0f ? camera.aspect : 16f / 9f;
+                targetHeight = Mathf.RoundToInt(targetWidth / aspectRatio);
+            }
+
+            // Tier 1: Play Mode — ScreenCapture (full composite including Canvas/UITK)
+            if (Application.isPlaying)
+            {
+                try
+                {
+                    Texture2D screenshot = ScreenCapture.CaptureScreenshotAsTexture();
+                    if (screenshot != null)
+                    {
+                        try
+                        {
+                            // Resize if needed
+                            if (screenshot.width != targetWidth || screenshot.height != targetHeight)
+                            {
+                                var resizedRT = RenderTexture.GetTemporary(targetWidth, targetHeight, 0, RenderTextureFormat.ARGB32);
+                                Graphics.Blit(screenshot, resizedRT);
+                                var resizedTex = new Texture2D(targetWidth, targetHeight, TextureFormat.RGB24, false);
+                                var previousActive = RenderTexture.active;
+                                RenderTexture.active = resizedRT;
+                                resizedTex.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+                                resizedTex.Apply();
+                                RenderTexture.active = previousActive;
+                                RenderTexture.ReleaseTemporary(resizedRT);
+                                UnityEngine.Object.DestroyImmediate(screenshot);
+                                screenshot = resizedTex;
+                            }
+
+                            byte[] encodedBytes = EncodeTexture(screenshot, format, quality);
+                            int finalWidth = screenshot.width;
+                            int finalHeight = screenshot.height;
+                            return (encodedBytes, finalWidth, finalHeight);
+                        }
+                        finally
+                        {
+                            UnityEngine.Object.DestroyImmediate(screenshot);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fall through to next tier
+                }
+            }
+
+            // Tier 2: GameViewCapture composited RT (includes Canvas, UITK overlays)
+            if (GameViewCapture.TryCaptureComposited(targetWidth, targetHeight,
+                    out byte[] compositedPng, out int cw, out int ch, out string _diagnostics))
+            {
+                // TryCaptureComposited returns PNG; re-encode if JPEG requested
+                if (format == "jpeg")
+                {
+                    var tempTex = new Texture2D(cw, ch, TextureFormat.RGBA32, false);
+                    tempTex.LoadImage(compositedPng);
+                    byte[] encodedBytes = tempTex.EncodeToJPG(quality);
+                    UnityEngine.Object.DestroyImmediate(tempTex);
+                    return (encodedBytes, cw, ch);
+                }
+                return (compositedPng, cw, ch);
+            }
+
+            // Tier 3: Camera.Render() fallback (3D only, no UI overlays)
+            Camera fallbackCamera = Camera.main ?? (Camera.allCameras.Length > 0 ? Camera.allCameras[0] : null);
+            if (fallbackCamera == null)
                 return (null, 0, 0);
 
-            float aspectRatio = camera.aspect;
-            if (aspectRatio <= 0f) aspectRatio = 16f / 9f;
-            int targetHeight = Mathf.RoundToInt(targetWidth / aspectRatio);
-
-            RenderTexture previousTargetTexture = camera.targetTexture;
+            RenderTexture previousTargetTexture = fallbackCamera.targetTexture;
             RenderTexture previousActiveTexture = RenderTexture.active;
             RenderTexture renderTexture = null;
 
             try
             {
                 renderTexture = new RenderTexture(targetWidth, targetHeight, 24);
-                camera.targetTexture = renderTexture;
-                camera.Render();
+                fallbackCamera.targetTexture = renderTexture;
+                fallbackCamera.Render();
 
                 RenderTexture.active = renderTexture;
                 var texture = new Texture2D(targetWidth, targetHeight, TextureFormat.RGB24, false);
@@ -140,7 +205,7 @@ namespace UnityMCP.Editor.Tools
             }
             finally
             {
-                camera.targetTexture = previousTargetTexture;
+                fallbackCamera.targetTexture = previousTargetTexture;
                 RenderTexture.active = previousActiveTexture;
 
                 if (renderTexture != null)

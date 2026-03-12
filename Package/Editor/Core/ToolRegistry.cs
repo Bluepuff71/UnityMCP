@@ -851,6 +851,13 @@ namespace UnityMCP.Editor.Core
                 return ConvertToArrayOrList(value, targetType);
             }
 
+            // Dictionary<string, object> conversion from JSON string
+            if (targetType == typeof(Dictionary<string, object>) && value is string dictJsonString)
+            {
+                var parsedObject = JObject.Parse(dictJsonString);
+                return ToolRegistry.ConvertJObjectToDictionary(parsedObject);
+            }
+
             // For complex objects, try JSON serialization via Unity
             if (value is string jsonString)
             {
@@ -928,6 +935,7 @@ namespace UnityMCP.Editor.Core
             if (type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte)) return "integer";
             if (type == typeof(float) || type == typeof(double) || type == typeof(decimal)) return "number";
             if (type == typeof(bool)) return "boolean";
+            if (type.IsGenericType && typeof(System.Collections.IDictionary).IsAssignableFrom(type)) return "object";
             if (type.IsArray || (type.IsGenericType && typeof(System.Collections.IEnumerable).IsAssignableFrom(type))) return "array";
 
             return "object";

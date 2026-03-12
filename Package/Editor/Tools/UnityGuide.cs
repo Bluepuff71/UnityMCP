@@ -349,6 +349,85 @@ When writing new tools that modify **project assets** (materials, scripts, prefa
 - **Do NOT** call Track() on scene GameObjects or components — they have no asset path and the call is a no-op. Scene changes are captured by the scene file copy.
 - Import `using UnityMCP.Editor.Services;` to access CheckpointManager.",
 
+            ["canvas_ui"] = @"# Canvas UI Building Guide
+
+## AI Workflow (Recommended Loop)
+1. `build_ui` action='read_schema' → get the element format reference (types, properties, anchors).
+2. Design a UI tree JSON from the user's description using the schema.
+3. `manage_checkpoint` action='save' → create a safety checkpoint before building.
+4. `build_ui` action='from_tree' with the tree JSON → complete UI created in one call.
+5. `capture_screenshot` → see the result in Game View.
+6. `manage_ui_element` action='modify' → tweak individual elements (position, style, text).
+7. `capture_screenshot` → verify the adjustment.
+8. Repeat steps 6-7 until satisfied.
+
+## Quick-Start with Templates
+Use `build_ui` action='apply_template' with a template_name to scaffold common layouts instantly:
+- **inventory_grid** - Grid of item slots with optional header.
+- **dialog_box** - NPC dialog panel with speaker name, body text, and choice buttons.
+- **hud_bars** - Health/mana/stamina bars anchored to screen edges.
+- **settings_menu** - Tabbed settings panel with sliders, toggles, and dropdowns.
+- **list_view** - Scrollable vertical list with item prefab.
+- **tab_panel** - Horizontal tab bar with switchable content pages.
+
+## Anchor Preset Reference
+Anchor presets control how an element is positioned and stretched relative to its parent:
+
+| Row          | Left          | Center          | Right          | Stretch          |
+|--------------|---------------|-----------------|----------------|------------------|
+| **Top**      | top_left      | top_center      | top_right      | top_stretch      |
+| **Middle**   | middle_left   | middle_center   | middle_right   | middle_stretch   |
+| **Bottom**   | bottom_left   | bottom_center   | bottom_right   | bottom_stretch   |
+| **Stretch**  | stretch_left  | stretch_center  | stretch_right  | stretch_full     |
+
+- Use `_stretch` presets when the element should resize with its parent.
+- `stretch_full` fills the entire parent (good for backgrounds and overlays).
+- `middle_center` is the default; element stays centered with fixed size.
+
+## Common Style Properties Cheat Sheet
+
+### Text (TextMeshProUGUI)
+- **font_size** (float) - Size in points, e.g. 24.
+- **alignment** (string) - 'TopLeft', 'Center', 'BottomRight', etc.
+- **font_style** (string) - 'Normal', 'Bold', 'Italic', 'BoldAndItalic'.
+
+### Image
+- **sprite_path** (string) - Asset path to a Sprite, e.g. 'Assets/Sprites/icon.png'.
+- **image_type** (string) - 'Simple', 'Sliced', 'Tiled', 'Filled'.
+- **preserve_aspect** (bool) - Keep the sprite's aspect ratio.
+
+### Button / Selectable Colors
+- **normal_color** (array) - [r, g, b, a] idle state color.
+- **highlighted_color** (array) - Hover state color.
+- **pressed_color** (array) - Click state color.
+- **disabled_color** (array) - Greyed-out state color.
+
+### Layout (LayoutGroup / GridLayoutGroup)
+- **padding** (object) - { left, right, top, bottom } in pixels.
+- **spacing** (float or array) - Gap between children.
+- **child_alignment** (string) - 'UpperLeft', 'MiddleCenter', 'LowerRight', etc.
+- **cell_size** (array) - [width, height] for GridLayoutGroup.
+- **constraint** (string) - 'Flexible', 'FixedColumnCount', 'FixedRowCount'.
+
+### ScrollRect
+- **horizontal** (bool) - Enable horizontal scrolling.
+- **vertical** (bool) - Enable vertical scrolling.
+- **movement_type** (string) - 'Unrestricted', 'Elastic', 'Clamped'.
+
+## Key Tools
+- `manage_canvas` - Canvas lifecycle: create, configure, list, delete canvases.
+- `manage_ui_element` - Individual element CRUD: create, modify, delete, plus visual effects.
+- `build_ui` - Batch tree builder: read_schema, from_tree, apply_template for bulk creation.
+- `inspect_ui` - Hierarchy inspection and querying of canvas element trees.
+
+## Best Practices
+- Always call `build_ui` action='read_schema' first if you are unsure about element types or property names.
+- Build the full UI tree in one `from_tree` call rather than creating elements one by one — it is faster and keeps the hierarchy clean.
+- Use templates as a starting point, then modify individual elements to customize.
+- Checkpoint before and after large UI builds so you can roll back mistakes.
+- Use `inspect_ui` to verify the hierarchy matches your intent before screenshotting.
+- Prefer anchor presets over manual anchor values — they are less error-prone and more readable.",
+
             ["getting_started"] = @"# Getting Started with UnityMCP
 
 ## First Steps
@@ -369,7 +448,7 @@ When writing new tools that modify **project assets** (materials, scripts, prefa
 
 ## Discovering More Tools
 - `search_tools` with no args for a full category listing.
-- `get_unity_guide` with a topic for detailed guidance: scene, gameobjects, scripting, materials, debugging, building, ui, workflows.
+- `get_unity_guide` with a topic for detailed guidance: scene, gameobjects, scripting, materials, debugging, building, ui, canvas_ui, workflows.
 - `diagnose_scene` to scan for missing references, shader issues, and build problems."
         };
 
@@ -386,6 +465,7 @@ Call get_unity_guide with a topic parameter for detailed guidance on each area:
 - **debugging** - Console reading, diagnostic workflows, profiler usage, and common error fixes.
 - **building** - Build pipeline, test execution, platform targeting, and async job polling.
 - **ui** - UI Toolkit querying, Canvas setup, and EventSystem requirements.
+- **canvas_ui** - Canvas UI building tools: AI workflow loop, templates, anchor presets, style properties, and best practices.
 - **workflows** - Multi-step tool chaining recipes for common tasks, plus checkpoint and asset tracking conventions.
 
 ## Universal Conventions
@@ -405,7 +485,7 @@ Call get_unity_guide with a topic parameter for detailed guidance on each area:
         /// </summary>
         [MCPTool("get_unity_guide", "Returns guidance on Unity tools, conventions, and workflow recipes. New session? Start with topic='getting_started'. Use topic='workflows' for tool chaining recipes.", Category = "Guide", ReadOnlyHint = true)]
         public static object Guide(
-            [MCPParam("topic", "Topic to get guidance on", Enum = new[] { "getting_started", "scene", "gameobjects", "scripting", "materials", "debugging", "building", "ui", "workflows" })] string topic = null)
+            [MCPParam("topic", "Topic to get guidance on", Enum = new[] { "getting_started", "scene", "gameobjects", "scripting", "materials", "debugging", "building", "ui", "canvas_ui", "workflows" })] string topic = null)
         {
             try
             {
