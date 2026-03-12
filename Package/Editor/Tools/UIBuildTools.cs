@@ -275,6 +275,10 @@ namespace UnityMCP.Editor.Tools
                 throw MCPException.InvalidParams("Root tree node must have a 'type' property.");
             }
 
+            // Set up undo group first so all operations are atomic
+            Undo.SetCurrentGroupName("Build UI Tree");
+            int undoGroup = Undo.GetCurrentGroup();
+
             // Resolve or create canvas
             Transform parentTransform = ResolveCanvasParent(canvasTarget, canvasConfig);
 
@@ -283,10 +287,6 @@ namespace UnityMCP.Editor.Tools
             {
                 ClearChildren(parentTransform);
             }
-
-            // Set up undo group
-            Undo.SetCurrentGroupName("Build UI Tree");
-            int undoGroup = Undo.GetCurrentGroup();
 
             var manifest = new List<object>();
             var warnings = new List<string>();
@@ -473,7 +473,6 @@ namespace UnityMCP.Editor.Tools
                 return;
             }
 
-            Undo.RegisterCreatedObjectUndo(go, $"Create UI Element '{name}'");
             elementCount++;
 
             RectTransform rt = go.GetComponent<RectTransform>();
@@ -541,12 +540,19 @@ namespace UnityMCP.Editor.Tools
             // Apply interactable
             if (node.ContainsKey("interactable"))
             {
-                bool interactable = Convert.ToBoolean(node["interactable"]);
-                var selectable = go.GetComponent<Selectable>();
-                if (selectable != null)
+                try
                 {
-                    Undo.RecordObject(selectable, "Set Interactable");
-                    selectable.interactable = interactable;
+                    bool interactable = Convert.ToBoolean(node["interactable"]);
+                    var selectable = go.GetComponent<Selectable>();
+                    if (selectable != null)
+                    {
+                        Undo.RecordObject(selectable, "Set Interactable");
+                        selectable.interactable = interactable;
+                    }
+                }
+                catch (Exception)
+                {
+                    warnings.Add($"Invalid 'interactable' value on '{name}', skipping.");
                 }
             }
 
@@ -1111,6 +1117,11 @@ namespace UnityMCP.Editor.Tools
                     {
                         throw MCPException.InvalidParams($"Target '{canvasTarget}' is not a Canvas and is not under a Canvas.");
                     }
+                }
+
+                if (canvasGO.GetComponent<RectTransform>() == null)
+                {
+                    throw MCPException.InvalidParams($"Target '{canvasTarget}' does not have a RectTransform.");
                 }
 
                 return canvasGO.transform;
