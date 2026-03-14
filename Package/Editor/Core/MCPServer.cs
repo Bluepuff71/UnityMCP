@@ -290,10 +290,11 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
 
         private JObject SerializePropertySchema(PropertySchema propertySchema)
         {
-            var schemaObject = new JObject
+            var schemaObject = new JObject();
+            if (!string.IsNullOrEmpty(propertySchema.type))
             {
-                ["type"] = propertySchema.type
-            };
+                schemaObject["type"] = propertySchema.type;
+            }
 
             if (!string.IsNullOrEmpty(propertySchema.description))
             {
