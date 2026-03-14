@@ -640,18 +640,41 @@ namespace UnityMCP.Editor.Tools
         private static object HandleRemoveMap(string path, string mapName)
         {
             var asset = LoadInputActionAsset(path);
-            var map = FindMap(asset, mapName);
+            FindMap(asset, mapName); // validate the map exists
 
             Undo.RecordObject(asset, $"Remove Action Map '{mapName}'");
-            asset.RemoveActionMap(map);
-            SaveAsset(asset);
+
+            // Avoid asset.RemoveActionMap() — it uses LINQ on internal collections
+            // that may be null after action removals, causing ArgumentNullException.
+            // Instead, manipulate the on-disk JSON directly.
+            string assetPath = AssetDatabase.GetAssetPath(asset);
+            string json = System.IO.File.ReadAllText(assetPath);
+            var jObject = Newtonsoft.Json.Linq.JObject.Parse(json);
+            var maps = jObject["maps"] as Newtonsoft.Json.Linq.JArray;
+
+            if (maps != null)
+            {
+                for (int i = maps.Count - 1; i >= 0; i--)
+                {
+                    if (string.Equals(maps[i]["name"]?.ToString(), mapName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        maps.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+
+            System.IO.File.WriteAllText(assetPath, jObject.ToString(Newtonsoft.Json.Formatting.Indented));
+            AssetDatabase.ImportAsset(assetPath);
+
+            var reloaded = AssetDatabase.LoadAssetAtPath<InputActionAsset>(assetPath);
 
             return new
             {
                 success = true,
                 message = $"Action map '{mapName}' removed.",
-                asset_name = asset.name,
-                map_count = asset.actionMaps.Count
+                asset_name = reloaded != null ? reloaded.name : asset.name,
+                map_count = reloaded != null ? reloaded.actionMaps.Count : 0
             };
         }
 
