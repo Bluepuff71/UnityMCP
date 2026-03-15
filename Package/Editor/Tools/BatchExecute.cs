@@ -18,9 +18,9 @@ namespace UnityMCP.Editor.Tools
             "A checkpoint is automatically saved before execution for safety.",
             Category = "Utility", IdempotentHint = false)]
         public static object Execute(
-            [MCPParam("tool", Description = "Name of the tool to execute repeatedly", Required = true)]
+            [MCPParam("tool", "Name of the tool to execute repeatedly", required: true)]
             string toolName,
-            [MCPParam("calls", Description = "Array of argument objects, one per invocation", Required = true)]
+            [MCPParam("calls", "Array of argument objects, one per invocation", required: true)]
             List<object> calls)
         {
             // Validate tool exists
