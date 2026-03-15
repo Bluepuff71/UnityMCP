@@ -297,6 +297,7 @@ namespace UnityMCP.Editor.Core
         public string description;
         public List<string> @enum;
         public PropertySchema items;
+        public PropertySchema additionalProperties;
         public object @default;
         public double? minimum;
         public double? maximum;

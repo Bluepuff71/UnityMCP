@@ -361,10 +361,12 @@ namespace UnityMCP.Editor.Core
                 return value;
             }
 
-            // String conversion
+            // String conversion — extract raw value from JValue to avoid JSON-serialized quotes
             if (targetType == typeof(string))
             {
-                return value.ToString();
+                return value is Newtonsoft.Json.Linq.JValue jv
+                    ? jv.Value?.ToString() ?? ""
+                    : value.ToString();
             }
 
             // Boolean conversion

@@ -428,6 +428,111 @@ Anchor presets control how an element is positioned and stretched relative to it
 - Use `inspect_ui` to verify the hierarchy matches your intent before screenshotting.
 - Prefer anchor presets over manual anchor values — they are less error-prone and more readable.",
 
+            ["input_actions"] = @"# Input Action Management Guide
+
+## AI Workflow (Recommended Loop)
+1. `manage_input_actions` action='list' → find existing .inputactions assets.
+2. `manage_input_actions` action='inspect' → dump full structure of an asset.
+3. `manage_checkpoint` action='save' → create a safety checkpoint before changes.
+4. Modify maps, actions, or bindings as needed.
+5. `manage_input_actions` action='inspect' → verify the result.
+
+## Creating an Input Action Asset from Scratch
+1. `manage_input_actions` action='create' path='Assets/Input/PlayerControls.inputactions'
+2. `manage_input_actions` action='add_map' map_name='Player'
+3. `manage_input_actions` action='add_action' map_name='Player' action_name='Move' action_type='value' control_type='Vector2'
+4. `manage_input_actions` action='add_composite' map_name='Player' action_name='Move' composite_type='2DVector' parts={""up"":""<Keyboard>/w"",""down"":""<Keyboard>/s"",""left"":""<Keyboard>/a"",""right"":""<Keyboard>/d""}
+5. `manage_input_actions` action='add_action' map_name='Player' action_name='Jump' action_type='button' binding='<Keyboard>/space'
+6. `manage_input_actions` action='inspect' → verify complete structure.
+
+## Composite Binding Reference
+| Composite Type | Parts | Use Case |
+|----------------|-------|----------|
+| 1DAxis | negative, positive | Single-axis input (e.g., zoom in/out) |
+| 2DVector | up, down, left, right | WASD / arrow key movement |
+| ButtonWithOneModifier | modifier, button | Ctrl+S style shortcuts |
+| ButtonWithTwoModifiers | modifier1, modifier2, button | Ctrl+Shift+S style shortcuts |
+
+## Common Binding Paths Cheat Sheet
+### Keyboard
+- `<Keyboard>/w`, `<Keyboard>/space`, `<Keyboard>/escape`
+- `<Keyboard>/leftShift`, `<Keyboard>/leftCtrl`, `<Keyboard>/leftAlt`
+- `<Keyboard>/1` through `<Keyboard>/0` (number keys)
+
+### Mouse
+- `<Mouse>/leftButton`, `<Mouse>/rightButton`, `<Mouse>/middleButton`
+- `<Mouse>/delta` (Vector2 movement), `<Mouse>/scroll` (Vector2)
+- `<Mouse>/position` (Vector2 screen position)
+
+### Gamepad
+- `<Gamepad>/leftStick` (Vector2), `<Gamepad>/rightStick` (Vector2)
+- `<Gamepad>/buttonSouth` (A/Cross), `<Gamepad>/buttonNorth` (Y/Triangle)
+- `<Gamepad>/buttonEast` (B/Circle), `<Gamepad>/buttonWest` (X/Square)
+- `<Gamepad>/leftTrigger`, `<Gamepad>/rightTrigger` (float 0-1)
+- `<Gamepad>/leftShoulder`, `<Gamepad>/rightShoulder`
+- `<Gamepad>/dpad` (Vector2), `<Gamepad>/start`, `<Gamepad>/select`
+
+## Action Types
+- **Value** — Continuous input (movement, look). Fires on every change.
+- **Button** — Discrete press/release. Has press point threshold.
+- **PassThrough** — Like Value but does not perform conflict resolution across devices.
+
+## Key Tools
+- `manage_input_actions` — Full CRUD on assets, maps, actions, bindings, and composites.
+- `manage_component` — Attach PlayerInput component and assign the asset.
+- `get_unity_guide` topic='project_settings' — For configuring Input System settings.",
+
+            ["project_settings"] = @"# Project Settings Management Guide
+
+## AI Workflow (Recommended Loop)
+1. `manage_settings` action='list' → discover all ProjectSettings/*.asset files.
+2. `manage_settings` action='inspect' settings_file='DynamicsManager' → read all properties.
+3. `manage_settings` action='set' settings_file='DynamicsManager' property_path='m_Gravity.y' value=-15 → modify a property.
+4. `manage_settings` action='inspect' → verify the change.
+
+## Common Settings Files & Useful Properties
+
+### Physics (DynamicsManager)
+- `m_Gravity` (Vector3) — World gravity, default (0, -9.81, 0).
+- `m_DefaultContactOffset` (float) — Default contact offset for colliders.
+- `m_BounceThreshold` (float) — Minimum velocity for a bounce.
+- `m_LayerCollisionMatrix` — Which layers collide with each other.
+
+### Time (TimeManager)
+- `Fixed Timestep` (float) — Physics update interval, default 0.02 (50 Hz).
+- `Maximum Allowed Timestep` (float) — Max time a frame can process.
+- `Time Scale` (float) — Global time multiplier (1 = normal, 0 = paused).
+
+### Quality (QualitySettings)
+- Use `manage_settings` action='inspect' with property_filter='shadow' to find shadow settings.
+- Use property_filter='antiAliasing' for anti-aliasing settings.
+
+### Tags & Layers (TagManager)
+- `tags` — Array of user-defined tags.
+- `layers` — Array of layer names (32 layers total, first 8 are built-in).
+- `m_SortingLayers` — Sorting layers for 2D rendering.
+
+## Searching Across All Settings
+Use `manage_settings` action='search' query='gravity' to find properties matching a keyword across ALL settings files. This is useful when you don't know which file contains a setting.
+
+## EditorPrefs (Editor Preferences)
+EditorPrefs are per-machine editor settings, NOT project settings. They persist across projects.
+
+### Round-Trip Example
+1. `manage_settings` action='set_preference' key='MyTool.AutoSave' value='true' type='bool'
+2. `manage_settings` action='get_preference' key='MyTool.AutoSave' type='bool'
+3. `manage_settings` action='delete_preference' key='MyTool.AutoSave'
+
+### Common EditorPrefs Patterns
+- Tools typically prefix keys with their tool name: 'MyTool.SettingName'.
+- Types: string (default), int, float, bool.
+- Use get_preference to read, set_preference to write, delete_preference to clean up.
+
+## Key Tools
+- `manage_settings` — Dynamic read/write for all Project Settings and EditorPrefs.
+- `manage_component` — For per-object settings (physics materials, etc.).
+- `get_unity_guide` topic='input_actions' — For Input System asset management.",
+
             ["getting_started"] = @"# Getting Started with UnityMCP
 
 ## First Steps
@@ -448,7 +553,7 @@ Anchor presets control how an element is positioned and stretched relative to it
 
 ## Discovering More Tools
 - `search_tools` with no args for a full category listing.
-- `get_unity_guide` with a topic for detailed guidance: scene, gameobjects, scripting, materials, debugging, building, ui, canvas_ui, workflows.
+- `get_unity_guide` with a topic for detailed guidance: scene, gameobjects, scripting, materials, debugging, building, ui, canvas_ui, input_actions, project_settings, workflows.
 - `diagnose_scene` to scan for missing references, shader issues, and build problems."
         };
 
@@ -466,6 +571,8 @@ Call get_unity_guide with a topic parameter for detailed guidance on each area:
 - **building** - Build pipeline, test execution, platform targeting, and async job polling.
 - **ui** - UI Toolkit querying, Canvas setup, and EventSystem requirements.
 - **canvas_ui** - Canvas UI building tools: AI workflow loop, templates, anchor presets, style properties, and best practices.
+- **input_actions** - Input Action Asset management: create assets, maps, actions, bindings, composites, and common binding paths.
+- **project_settings** - Project Settings and Editor Preferences: discover, inspect, and modify settings dynamically.
 - **workflows** - Multi-step tool chaining recipes for common tasks, plus checkpoint and asset tracking conventions.
 
 ## Universal Conventions
@@ -485,7 +592,7 @@ Call get_unity_guide with a topic parameter for detailed guidance on each area:
         /// </summary>
         [MCPTool("get_unity_guide", "Returns guidance on Unity tools, conventions, and workflow recipes. New session? Start with topic='getting_started'. Use topic='workflows' for tool chaining recipes.", Category = "Guide", ReadOnlyHint = true)]
         public static object Guide(
-            [MCPParam("topic", "Topic to get guidance on", Enum = new[] { "getting_started", "scene", "gameobjects", "scripting", "materials", "debugging", "building", "ui", "canvas_ui", "workflows" })] string topic = null)
+            [MCPParam("topic", "Topic to get guidance on", Enum = new[] { "getting_started", "scene", "gameobjects", "scripting", "materials", "debugging", "building", "ui", "canvas_ui", "input_actions", "project_settings", "workflows" })] string topic = null)
         {
             try
             {
