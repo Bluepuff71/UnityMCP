@@ -27,7 +27,7 @@ namespace UnityMCP.Editor.Core
 
 SAFETY: Save a checkpoint (manage_checkpoint action='save') before destructive operations like deleting objects, modifying materials, or editing scripts. Use manage_checkpoint action='restore' to roll back if something goes wrong.
 
-WORKFLOW: find -> inspect -> modify -> verify. Use find_gameobject or get_scene_hierarchy to locate objects, manage_component action='inspect' to read state, then modify, then verify with capture_screenshot or another inspect call.
+WORKFLOW: find -> inspect -> modify -> verify. Use find_gameobject or get_scene_hierarchy to locate objects, manage_component action='inspect' to read state, then modify, then verify with vision_capture or another inspect call.
 
 DISCOVERY: Call get_unity_guide with topic='getting_started' for workflow recipes and best practices. Call search_tools with no args for a category overview of all tools.
 

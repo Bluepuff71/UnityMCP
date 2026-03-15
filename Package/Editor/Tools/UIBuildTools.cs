@@ -272,7 +272,9 @@ namespace UnityMCP.Editor.Tools
 
             if (!tree.ContainsKey("type"))
             {
-                throw MCPException.InvalidParams("Root tree node must have a 'type' property.");
+                string debugKeys = string.Join(", ", tree.Keys);
+                string debugTypes = string.Join(", ", tree.Keys.Select(k => $"{k}={tree[k]?.GetType().Name ?? "null"}"));
+                throw MCPException.InvalidParams($"Root tree node must have a 'type' property. Found keys: [{debugKeys}]. Types: [{debugTypes}]");
             }
 
             // Set up undo group first so all operations are atomic

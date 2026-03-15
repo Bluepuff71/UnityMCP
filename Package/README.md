@@ -160,10 +160,9 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 | `save_scene` | Saves the current scene, optionally to a new path |
 | `get_active_scene` | Gets information about the currently active scene |
 | `get_scene_hierarchy` | Gets the hierarchy of GameObjects in the current scene |
-| `capture_screenshot` | Captures a screenshot of the Game View or Scene View with optional target framing and camera angle |
 | `describe_scene` | Returns a narrative summary of the active scene including camera, lighting, key objects, and issue detection |
 | `manage_checkpoint` | Save, restore, list, or compare scene checkpoints (`action`: `save`, `list`, `restore`, `diff`) |
-| `vision_capture` | Capture Game/Scene View as a base64 image for AI vision analysis, or save to disk |
+| `vision_capture` | Capture Game/Scene View as base64 for AI vision analysis, with optional target framing and camera angles |
 
 ### GameObject (2)
 

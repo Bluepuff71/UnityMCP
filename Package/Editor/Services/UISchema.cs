@@ -903,11 +903,9 @@ namespace UnityMCP.Editor.Services
         /// Applies an action to the Text or TMP component on the given GO (or its children for composite elements).
         /// </summary>
         private static void ApplyTextProperty(GameObject go, string elementType,
-            TextAction textAction,
+            TextAction textAction
 #if UNITY_MCP_TMP
-            TMPAction tmpAction = null
-#else
-            object tmpAction = null
+            , TMPAction tmpAction = null
 #endif
         )
         {
@@ -1072,6 +1070,16 @@ namespace UnityMCP.Editor.Services
                 float g = dict.ContainsKey("g") ? Convert.ToSingle(dict["g"]) : 0;
                 float b = dict.ContainsKey("b") ? Convert.ToSingle(dict["b"]) : 0;
                 float a = dict.ContainsKey("a") ? Convert.ToSingle(dict["a"]) : 1;
+                return new Color(r, g, b, a);
+            }
+
+            // Handle [r, g, b] or [r, g, b, a] arrays (arrive as List<object> from JSON deserialization)
+            if (value is List<object> list && list.Count >= 3)
+            {
+                float r = Convert.ToSingle(list[0]);
+                float g = Convert.ToSingle(list[1]);
+                float b = Convert.ToSingle(list[2]);
+                float a = list.Count >= 4 ? Convert.ToSingle(list[3]) : 1f;
                 return new Color(r, g, b, a);
             }
 

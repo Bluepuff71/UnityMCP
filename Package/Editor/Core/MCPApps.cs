@@ -66,7 +66,7 @@ namespace UnityMCP.Editor.Core
     function refreshScreenshot() {
       if (window.callServerTool) {
         document.getElementById('status').textContent = 'Capturing...';
-        window.callServerTool('capture_screenshot', {})
+        window.callServerTool('vision_capture', {})
           .then(function(result) {
             updatePreview(result);
           })

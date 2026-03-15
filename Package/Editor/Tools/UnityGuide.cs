@@ -43,7 +43,7 @@ namespace UnityMCP.Editor.Tools
 ## Key Tools
 - `create_scene` / `load_scene` / `save_scene` - Scene lifecycle management.
 - `get_scene_hierarchy` - Inspect full object tree (use max_depth to limit output).
-- `capture_screenshot` - Capture the current Game or Scene view for visual verification.",
+- `vision_capture` - Capture the current Game or Scene view for visual verification.",
 
             ["gameobjects"] = @"# GameObject Management Guide
 
@@ -178,7 +178,7 @@ namespace UnityMCP.Editor.Tools
 1. Use `get_scene_hierarchy` to verify scene structure is correct.
 2. Use `manage_component` action='inspect' to inspect component state and field values.
 3. Use `find_gameobject` to verify objects exist with expected names/tags/components.
-4. Use `capture_screenshot` to visually verify the scene state.
+4. Use `vision_capture` to visually verify the scene state.
 5. Use `manage_selection` action='set' then action='get' to focus on specific objects.
 
 ## Profiler Workflow (Performance)
@@ -197,7 +197,7 @@ namespace UnityMCP.Editor.Tools
 ## Key Tools
 - `read_console` - Read and filter Unity Console log entries.
 - `run_profiler` action='start' / action='get_job' - Performance profiling (async).
-- `capture_screenshot` - Visual verification of scene state.
+- `vision_capture` - Visual verification of scene state.
 - `get_scene_hierarchy` - Structural verification of scene objects.",
 
             ["building"] = @"# Build Pipeline Guide
@@ -304,7 +304,7 @@ All long-running operations (build, test, profiler) follow the same pattern:
 3. `manage_material` action='set_property' / action='set_color' -> set color, texture, and value properties.
 4. `find_gameobject` -> find target objects.
 5. `manage_material` action='assign_to_renderer' -> assign material to each object's renderer.
-6. `capture_screenshot` -> visually verify the result.
+6. `vision_capture` -> visually verify the result.
 
 ## Iterative Script Development
 1. `manage_script` action='create' -> create initial script.
@@ -327,7 +327,7 @@ All long-running operations (build, test, profiler) follow the same pattern:
 ## Tool Chaining Tips
 - Always check `read_console` after `refresh_unity` to catch compilation errors.
 - Use `get_scene_hierarchy` before and after bulk operations to verify changes.
-- Use `capture_screenshot` after visual changes to confirm the result.
+- Use `vision_capture` after visual changes to confirm the result.
 - Save frequently with `save_scene` to avoid losing work.
 - Use `find_gameobject` to locate objects by name/tag instead of hardcoding instance IDs.
 - For async operations (build, test, profiler), always use the poll pattern: start -> get_job -> check status.
@@ -356,9 +356,9 @@ When writing new tools that modify **project assets** (materials, scripts, prefa
 2. Design a UI tree JSON from the user's description using the schema.
 3. `manage_checkpoint` action='save' → create a safety checkpoint before building.
 4. `build_ui` action='from_tree' with the tree JSON → complete UI created in one call.
-5. `capture_screenshot` → see the result in Game View.
+5. `vision_capture` → see the result in Game View.
 6. `manage_ui_element` action='modify' → tweak individual elements (position, style, text).
-7. `capture_screenshot` → verify the adjustment.
+7. `vision_capture` → verify the adjustment.
 8. Repeat steps 6-7 until satisfied.
 
 ## Quick-Start with Templates
@@ -544,7 +544,7 @@ EditorPrefs are per-machine editor settings, NOT project settings. They persist 
 - `find_gameobject` or `get_scene_hierarchy` to locate objects (returns instance IDs).
 - `manage_component` action='inspect' to read component properties.
 - `manage_gameobject` or `manage_component` to make changes.
-- `capture_screenshot` or `manage_component` action='inspect' to verify results.
+- `vision_capture` or `manage_component` action='inspect' to verify results.
 
 ## Safety Practices
 - Save checkpoints before destructive operations (delete, bulk modify, script edits).

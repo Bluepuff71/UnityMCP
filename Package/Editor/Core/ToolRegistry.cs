@@ -868,6 +868,13 @@ namespace UnityMCP.Editor.Core
                 return ConvertToArrayOrList(value, targetType);
             }
 
+            // Dictionary<string, object> conversion from JSON string
+            if (targetType == typeof(Dictionary<string, object>) && value is string dictJsonString)
+            {
+                var parsedObject = JObject.Parse(dictJsonString);
+                return ToolRegistry.ConvertJObjectToDictionary(parsedObject);
+            }
+
             // For complex objects, try JSON serialization via Unity
             if (value is string jsonString)
             {
