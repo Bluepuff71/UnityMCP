@@ -9,9 +9,9 @@ Unity-native [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) se
 
 ---
 
-### New in v2.0
+### New in v2.2
 
-Vision capture, scene checkpoints, recipes, scene diagnostics, guided workflows, action-based tools, scene export, and a redesigned editor window.
+Canvas UI building tools, Input Action management, Project Settings management, batch execution, and merged vision capture.
 
 ---
 
@@ -19,7 +19,7 @@ Vision capture, scene checkpoints, recipes, scene diagnostics, guided workflows,
 
 - **100% Unity-native** — Runs entirely inside the Unity Editor as a single package. No sidecar processes to install or maintain.
 - **Zero telemetry** — Completely private. No data leaves your machine.
-- **46 built-in tools** — Create GameObjects, run tests, build projects, manage scenes, capture screenshots, and more.
+- **51 built-in tools** — Create GameObjects, run tests, build projects, manage scenes, build Canvas UIs, manage input actions, and more.
 - **23 resources + 6 resource templates** — Read-only access to project settings, scene state, console output, and more via URI patterns.
 - **4 workflow prompts** — Pre-built prompt templates for common Unity tasks.
 - **4 built-in recipes** — One-call scene setup templates (FPS prototype, UI canvas, 3D template, physics playground).
@@ -53,7 +53,7 @@ https://github.com/Bluepuff71/UnityMCP.git?path=/Package
 Append a `#version` tag to pin to a release:
 
 ```
-https://github.com/Bluepuff71/UnityMCP.git?path=/Package#2.0.0
+https://github.com/Bluepuff71/UnityMCP.git?path=/Package#2.2.0
 ```
 
 See [Releases](https://github.com/Bluepuff71/UnityMCP/releases) for available versions.
@@ -143,15 +143,15 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 
 ## Available MCP Tools
 
-46 built-in tools organized by category:
+51 built-in tools organized by category:
 
 > [!Tip]
 > Use `search_tools` with no arguments for a category overview, or pass a `query` or `category` to narrow results. Use `get_unity_guide` for workflow guidance and tool-chaining recipes.
 
 <details>
-<summary>View all 46 built-in tools</summary>
+<summary>View all 51 built-in tools</summary>
 
-### Scene (9)
+### Scene (8)
 
 | Tool | Description |
 |---|---|
@@ -162,7 +162,7 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 | `get_scene_hierarchy` | Gets the hierarchy of GameObjects in the current scene |
 | `describe_scene` | Returns a narrative summary of the active scene including camera, lighting, key objects, and issue detection |
 | `manage_checkpoint` | Save, restore, list, or compare scene checkpoints (`action`: `save`, `list`, `restore`, `diff`) |
-| `vision_capture` | Capture Game/Scene View as base64 for AI vision analysis, with optional target framing and camera angles |
+| `vision_capture` | Capture Game/Scene View as base64 or save to disk, with optional target framing, camera angles, and format control |
 
 ### GameObject (2)
 
@@ -201,7 +201,7 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 | `run_build` | Manages player builds (`action`: `start`, `get_job`) |
 | `run_tests` | Runs Unity Test Runner (`action`: `run`, `get_job`) |
 
-### Editor (6)
+### Editor (7)
 
 | Tool | Description |
 |---|---|
@@ -211,6 +211,7 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 | `manage_editor` | Manages editor state, tags, layers, and tools |
 | `refresh_unity` | Refreshes the Unity asset database and optionally requests script compilation |
 | `focus_editor` | Frames and selects a GameObject in the Scene View |
+| `manage_settings` | Manages Project Settings and Editor Preferences: discover settings files, inspect/set properties, and read/write EditorPrefs |
 
 ### Console & Profiling (2)
 
@@ -250,11 +251,32 @@ Replace `<API_KEY>` with your generated key and `<LAN_IP>` with your Unity machi
 | `list_recipes` | Lists all available scene recipes with descriptions and parameters |
 | `execute_recipe` | Executes a scene recipe by name |
 
+### Canvas UI (4)
+
+| Tool | Description |
+|---|---|
+| `manage_canvas` | Manages Canvas objects: create, configure, list, or delete Canvas UIs with CanvasScaler and EventSystem |
+| `manage_ui_element` | Manages individual uGUI elements: create, modify, delete, duplicate, reorder, or add effects |
+| `inspect_ui` | Inspects Canvas UI hierarchies: view element trees, deep-inspect elements, find by type/name, or get summaries |
+| `build_ui` | Batch-builds complete Canvas UIs from JSON tree descriptions, applies templates, or configures anchors in bulk |
+
+### Input (1)
+
+| Tool | Description |
+|---|---|
+| `manage_input_actions` | Manages Input Action Assets: full CRUD on assets, maps, actions, bindings, and composites |
+
 ### Search (1)
 
 | Tool | Description |
 |---|---|
 | `search_tools` | Searches available tools by name, description, or category |
+
+### Utility (1)
+
+| Tool | Description |
+|---|---|
+| `batch_execute` | Execute a tool multiple times with different arguments in one call, with auto-checkpointing and safety guardrails |
 
 ### Debug (4)
 
@@ -403,6 +425,7 @@ Unity MCP is entirely self-contained within the Unity Editor. A native C plugin 
 │  Services:                          │
 │  - CheckpointManager (scene state)  │
 │  - RecipeRegistry (scene templates) │
+│  - UISchema (Canvas UI definitions) │
 │  - Response dedup cache (defense)   │
 └─────────────────────────────────────┘
 ```
