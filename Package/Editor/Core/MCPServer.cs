@@ -19,7 +19,7 @@ namespace UnityMCP.Editor.Core
 
         private int _port = 8080;
         private const string ServerName = "UnityMCP";
-        internal const string ServerVersion = "2.2.0";
+        internal const string ServerVersion = "2.3.0";
         private const int MainThreadTimeoutSeconds = 30;
 
         private const string ServerInstructions =
@@ -33,7 +33,11 @@ DISCOVERY: Call get_unity_guide with topic='getting_started' for workflow recipe
 
 VERIFICATION: Check read_console after refresh_unity or script changes to catch compile errors. Use describe_scene for a quick scene overview. Use diagnose to scan for missing references, shader issues, and build problems.
 
-ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same tool with action='get_job' until status is 'completed' or 'failed'.";
+ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same tool with action='get_job' until status is 'completed' or 'failed'.
+
+MULTI-AGENT: You may be sharing this Unity Editor with other agents. Call agent_list to see who is connected. Destructive tool calls automatically lock target resources to your session — if another agent already locked a resource, your call will be rejected with details about who holds the lock. When rejected, work on a different resource or call agent_lock_query to check status. Release locks you no longer need with agent_lock_release. Use agent_set_name to identify yourself to other agents.
+
+COORDINATION: Locks are per-resource (individual GameObjects, files, components), not global. Multiple agents can safely modify different objects in the same scene simultaneously. Before starting a multi-step operation on a resource, consider pre-locking it with agent_lock_acquire to prevent interruption.";
 
         private const string CheckpointNudgeBlanket =
             " Save a checkpoint (manage_checkpoint action='save') before making changes.";
@@ -127,8 +131,23 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
         /// <returns>The JSON-RPC response string.</returns>
         public string HandleRequest(string jsonRequest)
         {
+            return HandleRequest(jsonRequest, null);
+        }
+
+        /// <summary>
+        /// Handles a raw JSON-RPC request with session context. Called from MCPProxy.
+        /// This method is synchronous and runs on Unity's main thread.
+        /// </summary>
+        /// <param name="jsonRequest">The raw JSON-RPC request string.</param>
+        /// <param name="sessionId">The MCP session ID for this request.</param>
+        /// <returns>The JSON-RPC response string.</returns>
+        public string HandleRequest(string jsonRequest, string sessionId)
+        {
             try
             {
+                // Set ambient session context for tool invocations
+                RequestContext.CurrentSessionId = sessionId;
+
                 var requestObject = JObject.Parse(jsonRequest);
                 string requestId = requestObject["id"]?.ToString();
                 string method = requestObject["method"]?.ToString();
@@ -143,9 +162,9 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
 
                 JObject response = method switch
                 {
-                    "initialize" => HandleInitialize(requestId),
+                    "initialize" => HandleInitialize(requestId, sessionId),
                     "tools/list" => HandleToolsList(requestId),
-                    "tools/call" => HandleToolsCall(paramsToken, requestId),
+                    "tools/call" => HandleToolsCall(paramsToken, requestId, sessionId),
                     "resources/list" => HandleResourcesList(requestId),
                     "resources/templates/list" => HandleResourcesTemplatesList(requestId),
                     "resources/read" => HandleResourcesRead(paramsToken, requestId),
@@ -167,14 +186,24 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
                 return CreateErrorResponse(MCPErrorCodes.InternalError, $"Internal error: {exception.Message}", null)
                     .ToString(Formatting.None);
             }
+            finally
+            {
+                RequestContext.CurrentSessionId = null;
+            }
         }
 
         #endregion
 
         #region MCP Method Handlers
 
-        private JObject HandleInitialize(string requestId)
+        private JObject HandleInitialize(string requestId, string sessionId = null)
         {
+            // Create session for this agent if session ID is available
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                SessionManager.CreateSession(sessionId);
+            }
+
             var result = new JObject
             {
                 ["protocolVersion"] = "2025-03-26",
@@ -191,6 +220,11 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
                 },
                 ["instructions"] = ServerInstructions
             };
+
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                result["sessionId"] = sessionId;
+            }
 
             return CreateSuccessResponse(result, requestId);
         }
@@ -341,7 +375,7 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
             return schemaObject;
         }
 
-        private JObject HandleToolsCall(JToken paramsToken, string requestId)
+        private JObject HandleToolsCall(JToken paramsToken, string requestId, string sessionId = null)
         {
             if (paramsToken == null)
             {
@@ -363,6 +397,20 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
 
             try
             {
+                // Lock enforcement: check and auto-lock for destructive tools
+                var toolDefinition = ToolRegistry.GetDefinitions()
+                    .FirstOrDefault(t => t.name == toolName);
+
+                if (toolDefinition?.annotations?.destructiveHint == true && !string.IsNullOrEmpty(sessionId))
+                {
+                    var argumentsDictionary = ConvertJObjectToDictionary(argumentsObject);
+                    string lockError = LockManager.CheckAndAutoLock(toolName, argumentsDictionary, sessionId);
+                    if (lockError != null)
+                    {
+                        return CreateSuccessResponse(BuildToolErrorResult(lockError), requestId);
+                    }
+                }
+
                 object result = InvokeToolOnMainThread(toolName, argumentsObject);
 
                 var contentArray = new JArray();
@@ -382,38 +430,28 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
             }
             catch (MCPException mcpException)
             {
-                var contentArray = new JArray();
-                contentArray.Add(new JObject
-                {
-                    ["type"] = "text",
-                    ["text"] = mcpException.Message
-                });
-
-                var toolResult = new JObject
-                {
-                    ["content"] = contentArray,
-                    ["isError"] = true
-                };
-
-                return CreateSuccessResponse(toolResult, requestId);
+                return CreateSuccessResponse(BuildToolErrorResult(mcpException.Message), requestId);
             }
             catch (Exception exception)
             {
-                var contentArray = new JArray();
-                contentArray.Add(new JObject
-                {
-                    ["type"] = "text",
-                    ["text"] = $"Tool execution failed: {exception.Message}"
-                });
-
-                var toolResult = new JObject
-                {
-                    ["content"] = contentArray,
-                    ["isError"] = true
-                };
-
-                return CreateSuccessResponse(toolResult, requestId);
+                return CreateSuccessResponse(BuildToolErrorResult($"Tool execution failed: {exception.Message}"), requestId);
             }
+        }
+
+        private static JObject BuildToolErrorResult(string errorMessage)
+        {
+            var contentArray = new JArray();
+            contentArray.Add(new JObject
+            {
+                ["type"] = "text",
+                ["text"] = errorMessage
+            });
+
+            return new JObject
+            {
+                ["content"] = contentArray,
+                ["isError"] = true
+            };
         }
 
         private string SerializeToolResult(object result)

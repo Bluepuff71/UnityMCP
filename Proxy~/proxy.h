@@ -3,8 +3,9 @@
  *
  * HTTP server plugin that survives Unity domain reloads.
  * Acts as a proxy between external MCP clients and Unity's C# code.
+ * Supports up to PROXY_MAX_SLOTS concurrent HTTP connections.
  *
- * C# polls for pending requests via GetPendingRequest() on EditorApplication.update,
+ * C# polls for pending requests via GetNextRequest() on EditorApplication.update,
  * eliminating ThreadAbortException by keeping all managed code on the main thread.
  *
  * License: GPLv2 (compatible with Mongoose library)
@@ -14,6 +15,7 @@
 #define UNITY_MCP_PROXY_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef _WIN32
     #define EXPORT __declspec(dllexport)
@@ -32,6 +34,33 @@ extern "C" {
 #define PROXY_MAX_REQUEST_SIZE 262144   /* 256KB */
 #define PROXY_REQUEST_TIMEOUT_MS 30000
 #define PROXY_RECOMPILE_POLL_INTERVAL_MS 50
+#define PROXY_MAX_SLOTS 32
+#define PROXY_MAX_SESSIONS 10
+#define PROXY_SESSION_ID_SIZE 64
+
+/*
+ * Slot states for the request pipeline.
+ * Transitions: empty -> pending (Mongoose thread) -> processing (C# thread)
+ *              -> responded (C# thread) -> empty (Mongoose thread)
+ */
+#define SLOT_STATE_EMPTY      0
+#define SLOT_STATE_PENDING    1
+#define SLOT_STATE_PROCESSING 2
+#define SLOT_STATE_RESPONDED  3
+
+/*
+ * A request slot holds one in-flight HTTP request/response pair.
+ * The volatile state field synchronizes between the Mongoose thread
+ * and the C# main thread.
+ */
+typedef struct {
+    volatile int state;
+    char request[PROXY_MAX_REQUEST_SIZE];
+    char response[PROXY_MAX_RESPONSE_SIZE];
+    char session_id[PROXY_SESSION_ID_SIZE];
+    uint64_t enqueue_time;
+    int slot_id;
+} RequestSlot;
 
 /*
  * Start the HTTP server on the specified port.
@@ -52,28 +81,47 @@ EXPORT void StopServer(void);
  * Call with 1 after registering EditorApplication.update handler.
  * Call with 0 before domain reload to prevent request delivery.
  *
+ * When deactivating, any pending/processing slots receive a domain-reload
+ * error response so their HTTP connections can be completed.
+ *
  * @param active 1 to activate, 0 to deactivate
  */
 EXPORT void SetPollingActive(int active);
 
 /*
- * Get the pending request body, if any.
- * Returns a pointer to a static buffer containing the request JSON,
- * or NULL if no request is pending.
- * The returned pointer is valid until the next call to GetPendingRequest()
- * or until the request is cleared by the next incoming request.
+ * Get the next pending request, if any.
+ * Atomically transitions the slot from pending to processing.
  *
- * @return Pointer to request body string, or NULL if no pending request
+ * @param outJson        Buffer to receive the request JSON body
+ * @param outJsonSize    Size of the outJson buffer
+ * @param outSessionId   Buffer to receive the session ID
+ * @param outSessionIdSize Size of the outSessionId buffer
+ * @return The slot ID (0..PROXY_MAX_SLOTS-1) on success, -1 if no pending request
  */
-EXPORT const char* GetPendingRequest(void);
+EXPORT int GetNextRequest(char* outJson, int outJsonSize, char* outSessionId, int outSessionIdSize);
 
 /*
- * Send a response back to the waiting HTTP request.
- * Must be called from C# after receiving a request via GetPendingRequest().
+ * Send a response for a specific slot.
+ * The Mongoose poll loop will pick up the response and send the HTTP reply.
  *
- * @param json The JSON-RPC response string
+ * @param slotId The slot ID returned by GetNextRequest
+ * @param json   The JSON-RPC response string
  */
-EXPORT void SendResponse(const char* json);
+EXPORT void SendResponseForSlot(int slotId, const char* json);
+
+/*
+ * Get the number of active (non-empty) slots.
+ *
+ * @return The count of slots with state != empty
+ */
+EXPORT int GetQueueDepth(void);
+
+/*
+ * Get the number of distinct session IDs across active slots.
+ *
+ * @return The count of unique sessions
+ */
+EXPORT int GetActiveSessionCount(void);
 
 /*
  * Check if the server is currently running.

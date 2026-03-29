@@ -9,6 +9,9 @@ namespace UnityMCP.Editor.Tools
     /// Executes a single batchable tool multiple times with different arguments.
     /// Automatically saves a checkpoint before execution and provides restore hints on failure.
     /// Destructive tools are never allowed regardless of BatchableHint setting.
+    /// Note: batch_execute calls ToolRegistry.Invoke directly, bypassing MCPServer.HandleToolsCall
+    /// lock enforcement. This is safe because destructive tools are always rejected (line 32-33).
+    /// If destructive tools are ever allowed in batch, lock enforcement must be added here.
     /// </summary>
     public static class BatchExecute
     {

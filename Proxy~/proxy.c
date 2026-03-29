@@ -4,8 +4,14 @@
  * HTTP server plugin that survives Unity domain reloads.
  * Acts as a proxy between external MCP clients and Unity's C# code.
  *
- * When C# is unavailable (during recompile), it blocks until polling is re-activated.
- * When C# is available, it stores the request in a buffer and poll-waits for the response.
+ * Supports up to PROXY_MAX_SLOTS concurrent HTTP connections using a
+ * non-blocking poll-check model. Each incoming request is assigned a slot,
+ * and the Mongoose poll loop checks for completed responses to send back.
+ *
+ * Threading model:
+ *   - Mongoose thread: runs the event loop, handles HTTP I/O, checks slot states
+ *   - C# main thread: calls GetNextRequest/SendResponseForSlot
+ *   - Synchronization: volatile int state field on each slot
  *
  * License: GPLv2 (compatible with Mongoose library)
  */
@@ -21,12 +27,14 @@
     typedef HANDLE ThreadHandle;
     #define PROXY_SLEEP_MS(ms) Sleep((DWORD)(ms))
     #define GET_PROCESS_ID() ((unsigned long)GetCurrentProcessId())
+    #define MEMORY_BARRIER() MemoryBarrier()
 #else
     #include <pthread.h>
     #include <unistd.h>
     typedef pthread_t ThreadHandle;
     #define PROXY_SLEEP_MS(ms) usleep((ms) * 1000)
     #define GET_PROCESS_ID() ((unsigned long)getpid())
+    #define MEMORY_BARRIER() __sync_synchronize()
 #endif
 
 /*
@@ -45,20 +53,17 @@ static char s_tls_cert[8192] = "";
 static char s_tls_key[8192] = "";
 static int  s_tls_enabled = 0;
 
-/* Request buffer for C# polling */
-static char s_request_buffer[PROXY_MAX_REQUEST_SIZE];
-static volatile int s_has_request = 0;
-
-/* Response buffer for synchronous C# response */
-static char s_response_buffer[PROXY_MAX_RESPONSE_SIZE];
-static volatile int s_has_response = 0;
+/* Request slots for concurrent connection handling */
+static RequestSlot s_slots[PROXY_MAX_SLOTS];
+static int s_session_counter = 0;
 
 /* Flag set by DllMain/destructor to signal the server thread to exit and clean up */
 static volatile int s_unloading = 0;
 
 
 /*
- * Buffer for building dynamic error responses with request ID
+ * Buffer for building dynamic error responses with request ID.
+ * Only used within the Mongoose thread.
  */
 static char s_error_response_buffer[1024];
 
@@ -66,6 +71,7 @@ static char s_error_response_buffer[1024];
  * Extract the "id" field from a JSON-RPC request.
  * Returns a pointer to a static buffer containing the id value (including quotes for strings),
  * or "null" if not found or on parse error.
+ * Only used within the Mongoose thread.
  */
 static char s_id_buffer[256];
 static const char* ExtractJsonRpcId(const char* json, size_t json_len)
@@ -191,6 +197,29 @@ static const char* BuildErrorResponseWithData(int code, const char* message, con
 }
 
 /*
+ * Build an error response directly into a slot's response buffer.
+ * Used when we need to write errors for slots without clobbering the shared s_error_response_buffer.
+ */
+static void BuildSlotErrorResponse(RequestSlot* slot, int code, const char* message, const char* data_json)
+{
+    /* Extract request ID from the slot's request body */
+    const char* request_id = ExtractJsonRpcId(slot->request, strlen(slot->request));
+
+    if (data_json != NULL)
+    {
+        snprintf(slot->response, PROXY_MAX_RESPONSE_SIZE,
+            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%d,\"message\":\"%s\",\"data\":%s},\"id\":%s}",
+            code, message, data_json, request_id);
+    }
+    else
+    {
+        snprintf(slot->response, PROXY_MAX_RESPONSE_SIZE,
+            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%d,\"message\":\"%s\"},\"id\":%s}",
+            code, message, request_id);
+    }
+}
+
+/*
  * CORS headers: local mode includes Access-Control-Allow-Origin: *,
  * remote mode omits it to prevent cross-origin requests from arbitrary websites.
  */
@@ -198,12 +227,12 @@ static const char* CORS_HEADERS_LOCAL =
     "Content-Type: application/json\r\n"
     "Access-Control-Allow-Origin: *\r\n"
     "Access-Control-Allow-Methods: POST, OPTIONS\r\n"
-    "Access-Control-Allow-Headers: Content-Type, Authorization\r\n";
+    "Access-Control-Allow-Headers: Content-Type, Authorization, Mcp-Session-Id\r\n";
 
 static const char* CORS_HEADERS_REMOTE =
     "Content-Type: application/json\r\n"
     "Access-Control-Allow-Methods: POST, OPTIONS\r\n"
-    "Access-Control-Allow-Headers: Content-Type, Authorization\r\n";
+    "Access-Control-Allow-Headers: Content-Type, Authorization, Mcp-Session-Id\r\n";
 
 static const char* GetCorsHeaders(void)
 {
@@ -211,58 +240,80 @@ static const char* GetCorsHeaders(void)
 }
 
 /*
- * Server thread function.
- * Polls the Mongoose event manager in a loop until s_running is cleared.
- * When s_unloading is set (DLL being unloaded), the thread cleans up
- * sockets itself since StopServer can't wait for the thread from DllMain.
+ * Generate a unique session ID for a new MCP session.
+ * Format: umcp_{pid}_{counter}_{timestamp}
  */
-#ifdef _WIN32
-static DWORD WINAPI ServerThreadFunc(LPVOID param)
+static void GenerateSessionId(char* out, size_t out_size)
 {
-    (void)param;
-    while (s_running)
-    {
-        mg_mgr_poll(&s_mgr, 10);
-    }
-    /* If DLL is being unloaded, thread must clean up (StopServer can't wait from DllMain) */
-    if (s_unloading)
-    {
-        s_listener = NULL;
-        s_poller_active = 0;
-        s_has_request = 0;
-        mg_mgr_free(&s_mgr);
-    }
-    return 0;
+    snprintf(out, out_size, "umcp_%lu_%d_%lu",
+        GET_PROCESS_ID(), ++s_session_counter, (unsigned long)mg_millis());
 }
-#else
-static void* ServerThreadFunc(void* param)
+
+/*
+ * Find a free slot (state == SLOT_STATE_EMPTY).
+ * Returns a pointer to the slot, or NULL if all slots are occupied.
+ * Only called from the Mongoose thread.
+ */
+static RequestSlot* FindFreeSlot(void)
 {
-    (void)param;
-    while (s_running)
+    int i;
+    for (i = 0; i < PROXY_MAX_SLOTS; i++)
     {
-        mg_mgr_poll(&s_mgr, 10);
-    }
-    /* If DLL is being unloaded, thread must clean up (StopServer can't wait from destructor) */
-    if (s_unloading)
-    {
-        s_listener = NULL;
-        s_poller_active = 0;
-        s_has_request = 0;
-        mg_mgr_free(&s_mgr);
+        if (s_slots[i].state == SLOT_STATE_EMPTY)
+        {
+            return &s_slots[i];
+        }
     }
     return NULL;
 }
-#endif
 
 /*
- * Handle an incoming HTTP request.
+ * Clear all slots to empty state.
+ */
+static void ClearAllSlots(void)
+{
+    int i;
+    for (i = 0; i < PROXY_MAX_SLOTS; i++)
+    {
+        s_slots[i].state = SLOT_STATE_EMPTY;
+    }
+}
+
+/*
+ * Initialize all slots with their IDs.
+ */
+static void InitSlots(void)
+{
+    int i;
+    for (i = 0; i < PROXY_MAX_SLOTS; i++)
+    {
+        memset(&s_slots[i], 0, sizeof(RequestSlot));
+        s_slots[i].slot_id = i;
+    }
+}
+
+/*
+ * Build response headers including the session ID.
+ * Returns a pointer to a static buffer (only used from Mongoose thread).
+ */
+static char s_response_headers[512];
+static const char* BuildResponseHeaders(const char* session_id)
+{
+    snprintf(s_response_headers, sizeof(s_response_headers),
+        "%sMcp-Session-Id: %s\r\n", GetCorsHeaders(), session_id);
+    return s_response_headers;
+}
+
+/*
+ * Handle an incoming HTTP request (non-blocking).
  *
  * This function processes the HTTP request:
  * 1. CORS preflight (OPTIONS) -> 204 No Content
  * 2. Non-POST methods -> 405 Method Not Allowed
- * 3. Request too large -> 413 error
- * 4. If poller not active -> Block and poll until poller becomes active
- * 5. Copy request to buffer, set s_has_request, poll-wait for s_has_response
+ * 3. Validate auth, body size
+ * 4. Find a free slot, copy request + session ID, set state=pending
+ * 5. Store slot pointer in connection->fn_data for poll-check
+ * 6. Return immediately (do NOT block)
  */
 static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_message* http_message)
 {
@@ -287,17 +338,17 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
     /* Validate API key if configured */
     if (s_api_key[0] != '\0')
     {
-        struct mg_str *auth = mg_http_get_header(http_message, "Authorization");
+        struct mg_str *auth_header = mg_http_get_header(http_message, "Authorization");
         size_t key_len = strlen(s_api_key);
         int valid = 0;
 
-        if (auth != NULL && auth->len >= 7 + key_len &&
-            strncmp(auth->buf, "Bearer ", 7) == 0 &&
-            (auth->len - 7) == key_len)
+        if (auth_header != NULL && auth_header->len >= 7 + key_len &&
+            strncmp(auth_header->buf, "Bearer ", 7) == 0 &&
+            (auth_header->len - 7) == key_len)
         {
             /* Constant-time comparison to prevent timing attacks */
             volatile unsigned char result = 0;
-            const char *a = auth->buf + 7;
+            const char *a = auth_header->buf + 7;
             const char *b = s_api_key;
             size_t i;
             for (i = 0; i < key_len; i++)
@@ -334,78 +385,131 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
         return;
     }
 
-    /* Copy request body to static buffer (no malloc) */
-    memcpy(s_request_buffer, http_message->body.buf, body_length);
-    s_request_buffer[body_length] = '\0';
-
-    /* Extract the request ID for use in error responses */
-    const char* request_id = ExtractJsonRpcId(s_request_buffer, body_length);
-
-    /* Block and poll until poller becomes active (handles domain reload) */
-    if (!s_poller_active)
+    /* Find a free slot */
+    RequestSlot* slot = FindFreeSlot();
+    if (slot == NULL)
     {
-        uint64_t poll_start_time = mg_millis();
-        while (!s_poller_active)
-        {
-            uint64_t elapsed_time = mg_millis() - poll_start_time;
-            if (elapsed_time >= PROXY_REQUEST_TIMEOUT_MS)
-            {
-                mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponseWithData(-32000, "Unity recompilation timed out.",
-                        "{\"recoverable\":true,\"retryAfterMs\":5000,\"reason\":\"recompilation\"}", request_id));
-                return;
-            }
-            if (!s_running)
-            {
-                mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Server is shutting down.", request_id));
-                return;
-            }
-            PROXY_SLEEP_MS(PROXY_RECOMPILE_POLL_INTERVAL_MS);
-        }
+        /* Extract request ID for the error response */
+        /* We need a temporary buffer since we can't use the slot */
+        char temp_body[512];
+        size_t copy_len = body_length < sizeof(temp_body) - 1 ? body_length : sizeof(temp_body) - 1;
+        memcpy(temp_body, http_message->body.buf, copy_len);
+        temp_body[copy_len] = '\0';
+        const char* request_id = ExtractJsonRpcId(temp_body, copy_len);
+
+        mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
+            BuildErrorResponse(-32000, "Server busy: max concurrent requests reached", request_id));
+        return;
     }
 
-    /* Clear response state and signal request available */
-    s_has_response = 0;
-    s_response_buffer[0] = '\0';
-    s_has_request = 1;
+    /* Copy request body into slot */
+    memcpy(slot->request, http_message->body.buf, body_length);
+    slot->request[body_length] = '\0';
 
-    /* Poll-wait for C# to process the request and call SendResponse() */
+    /* Extract or generate session ID */
+    struct mg_str *session_header = mg_http_get_header(http_message, "Mcp-Session-Id");
+    if (session_header != NULL && session_header->len > 0 && session_header->len < PROXY_SESSION_ID_SIZE)
     {
-        uint64_t wait_start_time = mg_millis();
-        while (!s_has_response)
-        {
-            uint64_t elapsed_time = mg_millis() - wait_start_time;
-            if (elapsed_time >= PROXY_REQUEST_TIMEOUT_MS)
-            {
-                s_has_request = 0;
-                mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponseWithData(-32000, "Request processing timed out.",
-                        "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"timeout\"}", request_id));
-                return;
-            }
-            if (!s_running)
-            {
-                s_has_request = 0;
-                mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponse(-32000, "Server is shutting down.", request_id));
-                return;
-            }
-            if (!s_poller_active)
-            {
-                s_has_request = 0;
-                mg_http_reply(connection, 200, GetCorsHeaders(), "%s",
-                    BuildErrorResponseWithData(-32000, "Request interrupted by Unity domain reload. Please retry.",
-                        "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"domain_reload\"}", request_id));
-                return;
-            }
-            PROXY_SLEEP_MS(1);
-        }
+        memcpy(slot->session_id, session_header->buf, session_header->len);
+        slot->session_id[session_header->len] = '\0';
+    }
+    else
+    {
+        GenerateSessionId(slot->session_id, sizeof(slot->session_id));
     }
 
-    /* Send the response */
-    s_has_request = 0;
-    mg_http_reply(connection, 200, GetCorsHeaders(), "%s", s_response_buffer);
+    /* Initialize slot timing */
+    slot->enqueue_time = mg_millis();
+    slot->response[0] = '\0';
+
+    /* Memory barrier: ensure all slot data is written before state becomes visible */
+    MEMORY_BARRIER();
+
+    /* Mark slot as pending — C# can now pick it up */
+    slot->state = SLOT_STATE_PENDING;
+
+    /* Store slot pointer in connection for poll-check */
+    connection->fn_data = slot;
+}
+
+/*
+ * Check pending responses on poll events (non-blocking).
+ * Called from the Mongoose thread on every MG_EV_POLL (~10ms).
+ *
+ * For each connection with a pending slot (fn_data != NULL), checks:
+ * - Response ready (state == responded): send HTTP reply, free slot
+ * - Timeout: write timeout error, send it, free slot
+ * - Poller inactive (domain reload): write error, send it, free slot
+ * - Server shutting down: write error, send it, free slot
+ */
+static void CheckPendingResponse(struct mg_connection* connection)
+{
+    RequestSlot* slot = (RequestSlot*)connection->fn_data;
+    if (slot == NULL)
+    {
+        return;
+    }
+
+    /* Read state with barrier to see latest value from C# thread */
+    MEMORY_BARRIER();
+    int current_state = slot->state;
+
+    if (current_state == SLOT_STATE_RESPONDED)
+    {
+        /* Response is ready — send it back */
+        mg_http_reply(connection, 200, BuildResponseHeaders(slot->session_id), "%s", slot->response);
+        slot->state = SLOT_STATE_EMPTY;
+        connection->fn_data = NULL;
+    }
+    else if (!s_running)
+    {
+        /* Server is shutting down */
+        BuildSlotErrorResponse(slot, -32000, "Server is shutting down.", NULL);
+        mg_http_reply(connection, 200, BuildResponseHeaders(slot->session_id), "%s", slot->response);
+        slot->state = SLOT_STATE_EMPTY;
+        connection->fn_data = NULL;
+    }
+    else if (!s_poller_active && current_state == SLOT_STATE_PENDING)
+    {
+        /* Poller deactivated (domain reload) and C# hasn't picked it up yet */
+        BuildSlotErrorResponse(slot, -32000, "Request interrupted by Unity domain reload. Please retry.",
+            "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"domain_reload\"}");
+        mg_http_reply(connection, 200, BuildResponseHeaders(slot->session_id), "%s", slot->response);
+        slot->state = SLOT_STATE_EMPTY;
+        connection->fn_data = NULL;
+    }
+    else if (mg_millis() - slot->enqueue_time >= PROXY_REQUEST_TIMEOUT_MS)
+    {
+        /* Request timed out */
+        if (current_state == SLOT_STATE_PENDING)
+        {
+            BuildSlotErrorResponse(slot, -32000, "Unity recompilation timed out.",
+                "{\"recoverable\":true,\"retryAfterMs\":5000,\"reason\":\"recompilation\"}");
+        }
+        else
+        {
+            BuildSlotErrorResponse(slot, -32000, "Request processing timed out.",
+                "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"timeout\"}");
+        }
+        mg_http_reply(connection, 200, BuildResponseHeaders(slot->session_id), "%s", slot->response);
+        slot->state = SLOT_STATE_EMPTY;
+        connection->fn_data = NULL;
+    }
+}
+
+/*
+ * Handle connection close.
+ * If the connection had an assigned slot that hasn't been responded to yet,
+ * free the slot so it can be reused.
+ */
+static void HandleConnectionClose(struct mg_connection* connection)
+{
+    RequestSlot* slot = (RequestSlot*)connection->fn_data;
+    if (slot != NULL)
+    {
+        slot->state = SLOT_STATE_EMPTY;
+        connection->fn_data = NULL;
+    }
 }
 
 /*
@@ -426,7 +530,59 @@ static void EventHandler(struct mg_connection* connection, int event, void* even
         struct mg_http_message* http_message = (struct mg_http_message*)event_data;
         HandleHttpRequest(connection, http_message);
     }
+    else if (event == MG_EV_POLL)
+    {
+        CheckPendingResponse(connection);
+    }
+    else if (event == MG_EV_CLOSE)
+    {
+        HandleConnectionClose(connection);
+    }
 }
+
+/*
+ * Server thread function.
+ * Polls the Mongoose event manager in a loop until s_running is cleared.
+ * When s_unloading is set (DLL being unloaded), the thread cleans up
+ * sockets itself since StopServer can't wait for the thread from DllMain.
+ */
+#ifdef _WIN32
+static DWORD WINAPI ServerThreadFunc(LPVOID param)
+{
+    (void)param;
+    while (s_running)
+    {
+        mg_mgr_poll(&s_mgr, 10);
+    }
+    /* If DLL is being unloaded, thread must clean up (StopServer can't wait from DllMain) */
+    if (s_unloading)
+    {
+        s_listener = NULL;
+        s_poller_active = 0;
+        ClearAllSlots();
+        mg_mgr_free(&s_mgr);
+    }
+    return 0;
+}
+#else
+static void* ServerThreadFunc(void* param)
+{
+    (void)param;
+    while (s_running)
+    {
+        mg_mgr_poll(&s_mgr, 10);
+    }
+    /* If DLL is being unloaded, thread must clean up (StopServer can't wait from destructor) */
+    if (s_unloading)
+    {
+        s_listener = NULL;
+        s_poller_active = 0;
+        ClearAllSlots();
+        mg_mgr_free(&s_mgr);
+    }
+    return NULL;
+}
+#endif
 
 /*
  * Start the HTTP server on the specified port.
@@ -440,6 +596,9 @@ EXPORT int StartServer(int port)
 
     /* Reset unload flag */
     s_unloading = 0;
+
+    /* Initialize slots */
+    InitSlots();
 
     /* Initialize the event manager */
     mg_mgr_init(&s_mgr);
@@ -510,13 +669,17 @@ EXPORT void StopServer(void)
 
     s_listener = NULL;
     s_poller_active = 0;
-    s_has_request = 0;
+    ClearAllSlots();
 
     mg_mgr_free(&s_mgr);
 }
 
 /*
  * Activate or deactivate C# polling.
+ *
+ * When deactivating (domain reload), write error responses into any
+ * pending/processing slots so the Mongoose poll loop can send them
+ * and free the connections.
  */
 EXPORT void SetPollingActive(int active)
 {
@@ -524,39 +687,94 @@ EXPORT void SetPollingActive(int active)
 
     if (!active)
     {
-        /* Clear response state when deactivating */
-        s_has_response = 0;
-        s_response_buffer[0] = '\0';
+        /*
+         * Write domain-reload error responses into pending/processing slots.
+         * The Mongoose poll loop (CheckPendingResponse) will send these
+         * and transition the slots back to empty.
+         */
+        int i;
+        for (i = 0; i < PROXY_MAX_SLOTS; i++)
+        {
+            int slot_state = s_slots[i].state;
+            if (slot_state == SLOT_STATE_PENDING || slot_state == SLOT_STATE_PROCESSING)
+            {
+                BuildSlotErrorResponse(&s_slots[i], -32000,
+                    "Request interrupted by Unity domain reload. Please retry.",
+                    "{\"recoverable\":true,\"retryAfterMs\":2000,\"reason\":\"domain_reload\"}");
+                MEMORY_BARRIER();
+                s_slots[i].state = SLOT_STATE_RESPONDED;
+            }
+        }
     }
 }
 
 /*
- * Get the pending request body, if any.
- * Atomically consumes the request: clears s_has_request so subsequent
- * polls on the next editor tick won't return the same request while the
- * HTTP handler thread is still waiting for the response.
+ * Get the next pending request.
+ * Iterates slots, finds the first with state==pending, atomically transitions
+ * it to processing, and copies the request JSON and session ID to output buffers.
+ *
+ * Called from the C# main thread.
  */
-EXPORT const char* GetPendingRequest(void)
+EXPORT int GetNextRequest(char* outJson, int outJsonSize, char* outSessionId, int outSessionIdSize)
 {
-    if (s_has_request)
+    if (outJson == NULL || outJsonSize <= 0)
     {
-        s_has_request = 0;
-        return s_request_buffer;
+        return -1;
     }
-    return NULL;
+
+    int i;
+    for (i = 0; i < PROXY_MAX_SLOTS; i++)
+    {
+        if (s_slots[i].state == SLOT_STATE_PENDING)
+        {
+            /*
+             * Claim this slot: pending -> processing.
+             * Thread safety invariant: this function is ONLY called from the C# main thread
+             * (single caller). The Mongoose thread never writes pending->processing.
+             * SetPollingActive(0) can write to pending slots from the main thread, but
+             * it and GetNextRequest are never called concurrently (both run on main thread).
+             */
+            s_slots[i].state = SLOT_STATE_PROCESSING;
+            MEMORY_BARRIER();
+
+            /* Copy request JSON */
+            strncpy(outJson, s_slots[i].request, outJsonSize - 1);
+            outJson[outJsonSize - 1] = '\0';
+
+            /* Copy session ID */
+            if (outSessionId != NULL && outSessionIdSize > 0)
+            {
+                strncpy(outSessionId, s_slots[i].session_id, outSessionIdSize - 1);
+                outSessionId[outSessionIdSize - 1] = '\0';
+            }
+
+            return s_slots[i].slot_id;
+        }
+    }
+
+    return -1;
 }
 
 /*
- * Send a response back to the waiting HTTP request.
- * Note: Response size validation is handled by the C# layer which has access
- * to the request ID for proper JSON-RPC error responses.
+ * Send a response for a specific slot.
+ * Copies the response JSON into the slot buffer and sets state to responded.
+ * The Mongoose poll loop will pick it up and send the HTTP reply.
+ *
+ * Called from the C# main thread.
  */
-EXPORT void SendResponse(const char* json)
+EXPORT void SendResponseForSlot(int slotId, const char* json)
 {
+    if (slotId < 0 || slotId >= PROXY_MAX_SLOTS)
+    {
+        return;
+    }
+
     if (json == NULL)
     {
         return;
     }
+
+    RequestSlot* slot = &s_slots[slotId];
 
     size_t json_length = strlen(json);
     if (json_length >= PROXY_MAX_RESPONSE_SIZE)
@@ -565,15 +783,79 @@ EXPORT void SendResponse(const char* json)
          * Response should have been validated by C# layer.
          * If we get here, truncate but this should not happen in normal operation.
          */
-        strncpy(s_response_buffer, json, PROXY_MAX_RESPONSE_SIZE - 1);
-        s_response_buffer[PROXY_MAX_RESPONSE_SIZE - 1] = '\0';
+        strncpy(slot->response, json, PROXY_MAX_RESPONSE_SIZE - 1);
+        slot->response[PROXY_MAX_RESPONSE_SIZE - 1] = '\0';
     }
     else
     {
-        strcpy(s_response_buffer, json);
+        strcpy(slot->response, json);
     }
 
-    s_has_response = 1;
+    /* Memory barrier: ensure response data is written before state change is visible */
+    MEMORY_BARRIER();
+
+    slot->state = SLOT_STATE_RESPONDED;
+}
+
+/*
+ * Get the number of active (non-empty) slots.
+ */
+EXPORT int GetQueueDepth(void)
+{
+    int count = 0;
+    int i;
+    for (i = 0; i < PROXY_MAX_SLOTS; i++)
+    {
+        if (s_slots[i].state != SLOT_STATE_EMPTY)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+/*
+ * Get the number of distinct session IDs across active slots.
+ */
+EXPORT int GetActiveSessionCount(void)
+{
+    /* Collect unique session IDs from non-empty slots */
+    char seen_sessions[PROXY_MAX_SLOTS][PROXY_SESSION_ID_SIZE];
+    int unique_count = 0;
+    int i, j;
+
+    for (i = 0; i < PROXY_MAX_SLOTS; i++)
+    {
+        if (s_slots[i].state == SLOT_STATE_EMPTY)
+        {
+            continue;
+        }
+
+        if (s_slots[i].session_id[0] == '\0')
+        {
+            continue;
+        }
+
+        /* Check if we've already seen this session ID */
+        int already_seen = 0;
+        for (j = 0; j < unique_count; j++)
+        {
+            if (strcmp(seen_sessions[j], s_slots[i].session_id) == 0)
+            {
+                already_seen = 1;
+                break;
+            }
+        }
+
+        if (!already_seen && unique_count < PROXY_MAX_SLOTS)
+        {
+            strncpy(seen_sessions[unique_count], s_slots[i].session_id, PROXY_SESSION_ID_SIZE - 1);
+            seen_sessions[unique_count][PROXY_SESSION_ID_SIZE - 1] = '\0';
+            unique_count++;
+        }
+    }
+
+    return unique_count;
 }
 
 /*

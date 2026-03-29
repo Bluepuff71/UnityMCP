@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -30,6 +31,12 @@ namespace UnityMCP.Editor.Core
         /// </summary>
         public const int MaxResponseSize = 262144;  // 256KB
 
+        /// <summary>
+        /// Maximum request size supported by the proxy buffer.
+        /// Must match PROXY_MAX_REQUEST_SIZE in proxy.h.
+        /// </summary>
+        private const int MaxRequestSize = 262144;  // 256KB
+
         #region P/Invoke Declarations
 
         [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
@@ -42,10 +49,16 @@ namespace UnityMCP.Editor.Core
         private static extern void SetPollingActive(int active);
 
         [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr GetPendingRequest();
+        private static extern int GetNextRequest(StringBuilder outJson, int outJsonSize, StringBuilder outSessionId, int outSessionIdSize);
 
         [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void SendResponse([MarshalAs(UnmanagedType.LPStr)] string json);
+        private static extern void SendResponseForSlot(int slotId, [MarshalAs(UnmanagedType.LPStr)] string json);
+
+        [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int GetQueueDepth();
+
+        [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int GetActiveSessionCount();
 
         [DllImport(DLL_NAME, CallingConvention = CallingConvention.Cdecl)]
         private static extern void ConfigureBindAddress([MarshalAs(UnmanagedType.LPStr)] string address);
@@ -69,15 +82,28 @@ namespace UnityMCP.Editor.Core
         private static bool s_initialized = false;
 
         /// <summary>
-        /// Re-entrancy guard for PollForRequests. Although GetPendingRequest() atomically
-        /// consumes requests (clears s_has_request), this guard provides additional safety
-        /// against re-entrant EditorApplication.update calls during tool execution
+        /// Re-entrancy guard for PollForRequests. Although GetNextRequest() atomically
+        /// transitions slots from pending to processing, this guard provides additional
+        /// safety against re-entrant EditorApplication.update calls during tool execution
         /// (e.g., from Camera.Render or AssetDatabase operations).
         /// </summary>
         private static bool s_isProcessingRequest = false;
 
         /// <summary>
-        /// Deduplication cache: maps JSON-RPC request ID → cached response.
+        /// Reusable StringBuilder buffers for GetNextRequest P/Invoke marshaling.
+        /// Pre-allocated to match native buffer sizes.
+        /// </summary>
+        private static readonly StringBuilder s_requestBuffer = new StringBuilder(MaxRequestSize);
+        private static readonly StringBuilder s_sessionIdBuffer = new StringBuilder(64);
+
+        /// <summary>
+        /// Timestamp of last session pruning check.
+        /// </summary>
+        private static DateTime s_lastPruneTime = DateTime.Now;
+        private static readonly TimeSpan PruneInterval = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Deduplication cache: maps "{sessionId}:{requestId}" → cached response.
         /// The MCP transport may retry requests with the same ID if the first
         /// attempt times out. Without deduplication, each retry executes the
         /// tool again (creating duplicate GameObjects, etc.).
@@ -346,89 +372,110 @@ namespace UnityMCP.Editor.Core
 
         /// <summary>
         /// Polls the proxy for pending requests on every editor update tick.
+        /// Drains the native request queue one request at a time using the slot-based API.
         /// Runs on Unity's main thread, so no ThreadAbortException is possible.
         /// </summary>
         private static void PollForRequests()
         {
-            // Re-entrancy guard: GetPendingRequest() atomically consumes the request
-            // (clears s_has_request), preventing duplicate processing across editor ticks.
-            // This guard provides additional safety against re-entrant calls during
-            // the same tick (e.g., if tool execution pumps EditorApplication.update
-            // via Camera.Render or AssetDatabase operations).
+            // Re-entrancy guard against re-entrant EditorApplication.update calls during
+            // tool execution (e.g., from Camera.Render or AssetDatabase operations).
             if (s_isProcessingRequest) return;
 
-            // Defer request consumption while Unity is compiling. The request stays in
-            // the native buffer; the HTTP thread blocks with its existing 30s timeout.
-            // If compilation triggers domain reload, OnBeforeReload sets polling inactive
-            // and the native proxy returns a structured domain reload error.
+            // Defer request consumption while Unity is compiling. Requests stay in
+            // the native queue; the HTTP connections will timeout or get domain-reload
+            // errors from the native proxy.
             if (EditorApplication.isCompiling) return;
 
-            IntPtr ptr = GetPendingRequest();
-            if (ptr == IntPtr.Zero)
+            // Periodically prune expired sessions
+            var now = DateTime.Now;
+            if (now - s_lastPruneTime > PruneInterval)
             {
-                return;
+                s_lastPruneTime = now;
+                SessionManager.PruneExpiredSessions();
             }
+
+            // Get next pending request from the native queue
+            s_requestBuffer.Clear();
+            s_sessionIdBuffer.Clear();
+            int slotId = GetNextRequest(s_requestBuffer, MaxRequestSize, s_sessionIdBuffer, 64);
+            if (slotId < 0) return;
 
             s_isProcessingRequest = true;
             try
             {
-                string jsonRequest = Marshal.PtrToStringAnsi(ptr);
-                string requestId = ExtractRequestId(jsonRequest);
-                string toolName = ExtractToolName(jsonRequest);
-                string argumentsSummary = toolName != null ? ExtractArguments(jsonRequest) : null;
+                string jsonRequest = s_requestBuffer.ToString();
+                string sessionId = s_sessionIdBuffer.ToString();
 
-                // Deduplication: if we already processed a request with this ID,
-                // return the cached response instead of re-executing the tool.
-                // The MCP transport may retry requests with the same ID on timeout.
-                if (requestId != null && requestId != "null" && s_responseCache.TryGetValue(requestId, out string cachedResponse))
-                {
-                    SendResponse(cachedResponse);
-                    return;
-                }
-
-                var stopwatch = Stopwatch.StartNew();
-
-                try
-                {
-                    string response = MCPServer.Instance.HandleRequest(jsonRequest);
-
-                    if (response != null && response.Length >= MaxResponseSize)
-                    {
-                        stopwatch.Stop();
-                        Debug.LogWarning($"[MCPProxy] Response size ({response.Length} bytes) exceeds maximum ({MaxResponseSize} bytes). Returning error response.");
-                        string errorResponse = BuildErrorResponse(
-                            -32603,
-                            $"Response too large ({response.Length} bytes). Maximum supported size is {MaxResponseSize - 1} bytes. Try reducing max_depth or using more specific queries.",
-                            requestId);
-                        CacheResponse(requestId, errorResponse);
-                        SendResponse(errorResponse);
-                        if (toolName != null)
-                            ActivityLog.Record(toolName, false, "Response too large",
-                                stopwatch.ElapsedMilliseconds, argumentsSummary, response.Length);
-                        return;
-                    }
-
-                    CacheResponse(requestId, response);
-                    SendResponse(response);
-                    stopwatch.Stop();
-                    if (toolName != null)
-                        ActivityLog.Record(toolName, true, null,
-                            stopwatch.ElapsedMilliseconds, argumentsSummary, response?.Length ?? 0);
-                }
-                catch (Exception exception)
-                {
-                    stopwatch.Stop();
-                    string errorResponse = BuildErrorResponse(-32603, exception.Message, requestId);
-                    CacheResponse(requestId, errorResponse);
-                    SendResponse(errorResponse);
-                    if (toolName != null)
-                        ActivityLog.Record(toolName, false, exception.Message,
-                            stopwatch.ElapsedMilliseconds, argumentsSummary, 0);
-                }
+                ProcessRequest(slotId, jsonRequest, sessionId);
             }
             finally
             {
                 s_isProcessingRequest = false;
+            }
+        }
+
+        /// <summary>
+        /// Processes a single request from the native queue, routing it through
+        /// session management and the MCP server.
+        /// </summary>
+        /// <param name="slotId">The native slot ID for routing the response back.</param>
+        /// <param name="jsonRequest">The raw JSON-RPC request string.</param>
+        /// <param name="sessionId">The MCP session ID for this request.</param>
+        private static void ProcessRequest(int slotId, string jsonRequest, string sessionId)
+        {
+            // Track session activity
+            SessionManager.TouchSession(sessionId);
+
+            string requestId = ExtractRequestId(jsonRequest);
+            string toolName = ExtractToolName(jsonRequest);
+            string argumentsSummary = toolName != null ? ExtractArguments(jsonRequest) : null;
+
+            // Deduplication: include sessionId in cache key to avoid cross-session collisions
+            string cacheKey = $"{sessionId}:{requestId}";
+            if (requestId != null && requestId != "null" && s_responseCache.TryGetValue(cacheKey, out string cachedResponse))
+            {
+                SendResponseForSlot(slotId, cachedResponse);
+                return;
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+
+            try
+            {
+                string response = MCPServer.Instance.HandleRequest(jsonRequest, sessionId);
+
+                if (response != null && response.Length >= MaxResponseSize)
+                {
+                    stopwatch.Stop();
+                    Debug.LogWarning($"[MCPProxy] Response size ({response.Length} bytes) exceeds maximum ({MaxResponseSize} bytes). Returning error response.");
+                    string errorResponse = BuildErrorResponse(
+                        -32603,
+                        $"Response too large ({response.Length} bytes). Maximum supported size is {MaxResponseSize - 1} bytes. Try reducing max_depth or using more specific queries.",
+                        requestId);
+                    CacheResponse(cacheKey, errorResponse);
+                    SendResponseForSlot(slotId, errorResponse);
+                    if (toolName != null)
+                        ActivityLog.Record(toolName, false, "Response too large",
+                            stopwatch.ElapsedMilliseconds, argumentsSummary, response.Length, sessionId);
+                    return;
+                }
+
+                CacheResponse(cacheKey, response);
+                SendResponseForSlot(slotId, response);
+                stopwatch.Stop();
+                if (toolName != null)
+                    ActivityLog.Record(toolName, true, null,
+                        stopwatch.ElapsedMilliseconds, argumentsSummary, response?.Length ?? 0, sessionId);
+            }
+            catch (Exception exception)
+            {
+                stopwatch.Stop();
+                string errorResponse = BuildErrorResponse(-32603, exception.Message, requestId);
+                CacheResponse(cacheKey, errorResponse);
+                SendResponseForSlot(slotId, errorResponse);
+                if (toolName != null)
+                    ActivityLog.Record(toolName, false, exception.Message,
+                        stopwatch.ElapsedMilliseconds, argumentsSummary, 0, sessionId);
             }
         }
 

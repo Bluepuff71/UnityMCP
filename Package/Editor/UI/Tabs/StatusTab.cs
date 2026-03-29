@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -22,6 +23,10 @@ namespace UnityMCP.Editor.UI.Tabs
         private readonly Label _resourceCountLabel;
         private readonly Label _promptCountLabel;
         private readonly Label _recipeCountLabel;
+
+        // Agents section elements
+        private readonly Label _agentCountLabel;
+        private readonly VisualElement _agentListContainer;
 
         // Configuration elements
         private readonly IntegerField _portField;
@@ -103,6 +108,17 @@ namespace UnityMCP.Editor.UI.Tabs
             _connectionCard.Add(statRow);
 
             scrollView.Add(_connectionCard);
+            scrollView.Add(CreateSpacer(12));
+
+            // --- Connected Agents Section ---
+            _agentCountLabel = new Label("Connected Agents: 0 / 10");
+            _agentCountLabel.AddToClassList("section-header");
+            scrollView.Add(_agentCountLabel);
+
+            _agentListContainer = new VisualElement();
+            _agentListContainer.style.marginBottom = 8;
+            scrollView.Add(_agentListContainer);
+
             scrollView.Add(CreateSpacer(12));
 
             // --- Configuration Section ---
@@ -196,6 +212,7 @@ namespace UnityMCP.Editor.UI.Tabs
         public void OnActivate()
         {
             RefreshConnectionCard();
+            RefreshAgents();
             RefreshRemoteAccess();
         }
 
@@ -204,6 +221,7 @@ namespace UnityMCP.Editor.UI.Tabs
         public void Refresh()
         {
             RefreshConnectionCard();
+            RefreshAgents();
         }
 
         #region Connection Card
@@ -244,6 +262,58 @@ namespace UnityMCP.Editor.UI.Tabs
         private void CopyEndpoint()
         {
             EditorGUIUtility.systemCopyBuffer = _endpointLabel.text;
+        }
+
+        #endregion
+
+        #region Connected Agents
+
+        private void RefreshAgents()
+        {
+            List<SessionManager.SessionInfo> sessions = SessionManager.GetAllSessions();
+            _agentCountLabel.text = $"Connected Agents: {sessions.Count} / 10";
+
+            _agentListContainer.Clear();
+
+            if (sessions.Count == 0)
+            {
+                Label noAgentsLabel = new Label("No agents connected");
+                noAgentsLabel.AddToClassList("muted");
+                _agentListContainer.Add(noAgentsLabel);
+                return;
+            }
+
+            foreach (var session in sessions)
+            {
+                VisualElement agentRow = new VisualElement();
+                agentRow.AddToClassList("row");
+                agentRow.style.marginBottom = 2;
+
+                Label nameLabel = new Label(session.FriendlyName);
+                nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+                nameLabel.style.minWidth = 100;
+                agentRow.Add(nameLabel);
+
+                Label sessionLabel = new Label(session.SessionId);
+                sessionLabel.AddToClassList("mono");
+                sessionLabel.AddToClassList("muted");
+                sessionLabel.style.flexGrow = 1;
+                sessionLabel.style.overflow = Overflow.Hidden;
+                agentRow.Add(sessionLabel);
+
+                int lockCount = LockManager.QueryLocks(session.SessionId).Count;
+                Label lockLabel = new Label($"{lockCount} locks");
+                lockLabel.AddToClassList("pill");
+                lockLabel.AddToClassList("pill--stat");
+                agentRow.Add(lockLabel);
+
+                Label requestsLabel = new Label($"{session.RequestCount} reqs");
+                requestsLabel.AddToClassList("pill");
+                requestsLabel.AddToClassList("pill--stat");
+                agentRow.Add(requestsLabel);
+
+                _agentListContainer.Add(agentRow);
+            }
         }
 
         #endregion
