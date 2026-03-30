@@ -599,7 +599,17 @@ namespace UnityMCP.Editor.Utilities
                             property.objectReferenceValue = resolved;
                             return true;
                         }
-                        return false;
+                        // Auto-resolve raw instance IDs for convenience
+                        try
+                        {
+                            int instanceId = Convert.ToInt32(value);
+                            property.objectReferenceValue = EditorUtility.InstanceIDToObject(instanceId);
+                            return true;
+                        }
+                        catch
+                        {
+                            return false;
+                        }
 
                     default:
                         // Unsupported type - fall back to reflection

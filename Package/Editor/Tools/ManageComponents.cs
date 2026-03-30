@@ -593,6 +593,17 @@ namespace UnityMCP.Editor.Tools
                             });
                             continue;
                         }
+                        // Property exists but value couldn't be set — report specific error
+                        string valueHint = serializedProperty.propertyType == SerializedPropertyType.ObjectReference
+                            ? " For object references, use {\"$ref\": <instanceID>} or a raw instance ID integer."
+                            : "";
+                        results.Add(new Dictionary<string, object>
+                        {
+                            { "property", propertyName },
+                            { "success", false },
+                            { "error", $"Property '{propertyName}' found (type: {serializedProperty.propertyType}) but the value could not be applied.{valueHint}" }
+                        });
+                        continue;
                     }
 
                     // Fall back to reflection: try C# property
