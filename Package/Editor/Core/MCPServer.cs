@@ -160,6 +160,25 @@ COORDINATION: Locks are per-resource (individual GameObjects, files, components)
 
                 JToken paramsToken = requestObject["params"];
 
+                // Session tracking: touch existing sessions or auto-create after domain reload.
+                // Only reject requests with no session ID at all (proxy always provides one
+                // for initialized clients via the Mcp-Session-Id header).
+                if (method != "initialize" && method != "notifications/initialized")
+                {
+                    if (string.IsNullOrEmpty(sessionId))
+                    {
+                        return CreateErrorResponse(MCPErrorCodes.InvalidRequest,
+                            "Missing session ID. Send initialize first.", requestId)
+                            .ToString(Formatting.None);
+                    }
+
+                    if (!SessionManager.TouchSession(sessionId))
+                    {
+                        // Unknown session — likely lost to domain reload. Re-create it.
+                        SessionManager.CreateSession(sessionId);
+                    }
+                }
+
                 JObject response = method switch
                 {
                     "initialize" => HandleInitialize(requestId, sessionId),
@@ -198,11 +217,8 @@ COORDINATION: Locks are per-resource (individual GameObjects, files, components)
 
         private JObject HandleInitialize(string requestId, string sessionId = null)
         {
-            // Create session for this agent if session ID is available
-            if (!string.IsNullOrEmpty(sessionId))
-            {
-                SessionManager.CreateSession(sessionId);
-            }
+            // Create or retrieve session for this agent
+            SessionManager.CreateSession(sessionId);
 
             var result = new JObject
             {
@@ -435,6 +451,12 @@ COORDINATION: Locks are per-resource (individual GameObjects, files, components)
             catch (Exception exception)
             {
                 return CreateSuccessResponse(BuildToolErrorResult($"Tool execution failed: {exception.Message}"), requestId);
+            }
+            finally
+            {
+                // Release auto-acquired locks after tool execution; manual locks persist
+                if (!string.IsNullOrEmpty(sessionId))
+                    LockManager.ReleaseAutoLocks(sessionId);
             }
         }
 
