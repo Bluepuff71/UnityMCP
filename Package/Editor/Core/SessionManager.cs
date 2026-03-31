@@ -23,7 +23,7 @@ namespace UnityMCP.Editor.Core
         private static readonly Dictionary<string, SessionInfo> s_sessions = new Dictionary<string, SessionInfo>();
         private static readonly object s_lock = new object();
         private const int MaxSessions = 10;
-        private static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(15);
         private static int s_agentCounter = 0;
 
         /// <summary>Fired when sessions are added or removed. UI subscribes to trigger Repaint.</summary>
@@ -70,39 +70,23 @@ namespace UnityMCP.Editor.Core
 
         /// <summary>
         /// Updates LastActivity and increments RequestCount for the given session.
-        /// If the session doesn't exist, creates it (handles agents that skip initialize).
+        /// Returns false if the session does not exist (caller should reject the request).
         /// </summary>
         /// <param name="sessionId">The session to touch.</param>
-        public static void TouchSession(string sessionId)
+        /// <returns>True if the session was found and updated, false if unknown.</returns>
+        public static bool TouchSession(string sessionId)
         {
-            bool sessionCreated = false;
-
             lock (s_lock)
             {
                 if (s_sessions.TryGetValue(sessionId, out var sessionInfo))
                 {
                     sessionInfo.LastActivity = DateTime.Now;
                     sessionInfo.RequestCount++;
+                    return true;
                 }
-                else
-                {
-                    // Auto-create for agents that skip initialize
-                    s_agentCounter++;
-                    var newSession = new SessionInfo
-                    {
-                        SessionId = sessionId,
-                        FriendlyName = $"Agent-{s_agentCounter}",
-                        ConnectTime = DateTime.Now,
-                        LastActivity = DateTime.Now,
-                        RequestCount = 1
-                    };
-                    s_sessions[sessionId] = newSession;
-                    sessionCreated = true;
-                }
-            }
 
-            if (sessionCreated)
-                OnSessionsChanged?.Invoke();
+                return false;
+            }
         }
 
         /// <summary>

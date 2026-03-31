@@ -131,6 +131,31 @@ namespace UnityMCP.Editor.Core
         }
 
         /// <summary>
+        /// Releases only auto-acquired locks for a session, preserving manual locks.
+        /// Called after destructive tool execution completes.
+        /// </summary>
+        public static void ReleaseAutoLocks(string sessionId)
+        {
+            bool anyReleased = false;
+
+            lock (s_lock)
+            {
+                var keysToRemove = s_locks
+                    .Where(kvp => kvp.Value.SessionId == sessionId && kvp.Value.IsAutoLock == true)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var key in keysToRemove)
+                    s_locks.Remove(key);
+
+                anyReleased = keysToRemove.Count > 0;
+            }
+
+            if (anyReleased)
+                OnLocksChanged?.Invoke();
+        }
+
+        /// <summary>
         /// Returns a snapshot of locks, optionally filtered by session.
         /// </summary>
         /// <param name="sessionId">If provided, only return locks held by this session.</param>

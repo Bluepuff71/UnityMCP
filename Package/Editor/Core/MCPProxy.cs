@@ -423,9 +423,6 @@ namespace UnityMCP.Editor.Core
         /// <param name="sessionId">The MCP session ID for this request.</param>
         private static void ProcessRequest(int slotId, string jsonRequest, string sessionId)
         {
-            // Track session activity
-            SessionManager.TouchSession(sessionId);
-
             string requestId = ExtractRequestId(jsonRequest);
             string toolName = ExtractToolName(jsonRequest);
             string argumentsSummary = toolName != null ? ExtractArguments(jsonRequest) : null;
