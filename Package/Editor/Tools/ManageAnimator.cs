@@ -1612,6 +1612,7 @@ namespace UnityMCP.Editor.Tools
 
         private static Type ResolveBehaviourType(string behaviourType)
         {
+            // Try exact match first (fully-qualified name)
             Type resolvedType = null;
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -1619,8 +1620,31 @@ namespace UnityMCP.Editor.Tools
                 if (resolvedType != null) break;
             }
 
+            // Fallback: search by short name across all StateMachineBehaviour subclasses
             if (resolvedType == null)
-                throw MCPException.InvalidParams($"Type not found: '{behaviourType}'. Use the fully-qualified type name.");
+            {
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    try
+                    {
+                        foreach (var type in assembly.GetTypes())
+                        {
+                            if (typeof(StateMachineBehaviour).IsAssignableFrom(type) &&
+                                (type.Name.Equals(behaviourType, StringComparison.OrdinalIgnoreCase) ||
+                                 type.FullName.Equals(behaviourType, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                resolvedType = type;
+                                break;
+                            }
+                        }
+                    }
+                    catch (System.Reflection.ReflectionTypeLoadException) { }
+                    if (resolvedType != null) break;
+                }
+            }
+
+            if (resolvedType == null)
+                throw MCPException.InvalidParams($"Type not found: '{behaviourType}'. Use the class name or fully-qualified type name (e.g., 'MyNamespace.MyBehaviour').");
             if (!typeof(StateMachineBehaviour).IsAssignableFrom(resolvedType))
                 throw MCPException.InvalidParams($"'{behaviourType}' is not a StateMachineBehaviour subclass.");
 
