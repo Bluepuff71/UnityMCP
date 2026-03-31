@@ -181,7 +181,7 @@ COORDINATION: Locks are per-resource (individual GameObjects, files, components)
 
                 JObject response = method switch
                 {
-                    "initialize" => HandleInitialize(requestId, sessionId),
+                    "initialize" => HandleInitialize(paramsToken, requestId, sessionId),
                     "tools/list" => HandleToolsList(requestId),
                     "tools/call" => HandleToolsCall(paramsToken, requestId, sessionId),
                     "resources/list" => HandleResourcesList(requestId),
@@ -215,10 +215,15 @@ COORDINATION: Locks are per-resource (individual GameObjects, files, components)
 
         #region MCP Method Handlers
 
-        private JObject HandleInitialize(string requestId, string sessionId = null)
+        private JObject HandleInitialize(JToken paramsToken, string requestId, string sessionId = null)
         {
             // Create or retrieve session for this agent
             SessionManager.CreateSession(sessionId);
+
+            // Use clientInfo.name from the MCP initialize request as the display name
+            string agentName = paramsToken?["clientInfo"]?["name"]?.ToString();
+            if (!string.IsNullOrEmpty(sessionId) && !string.IsNullOrEmpty(agentName))
+                SessionManager.SetSessionName(sessionId, agentName);
 
             var result = new JObject
             {
