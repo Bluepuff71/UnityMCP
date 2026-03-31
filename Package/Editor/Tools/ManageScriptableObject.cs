@@ -706,7 +706,36 @@ namespace UnityMCP.Editor.Tools
                     break;
 
                 case SerializedPropertyType.ObjectReference:
-                    property.objectReferenceValue = ResolveObjectReference(value);
+                    UnityEngine.Object objectToAssign = null;
+                    if (SerializedPropertyHelper.IsObjectReference(value))
+                    {
+                        objectToAssign = SerializedPropertyHelper.ResolveObjectReference(
+                            (Dictionary<string, object>)value, typeof(UnityEngine.Object));
+                    }
+                    else if (value is string assetPathOrGuid)
+                    {
+                        // Support asset paths and GUIDs as plain strings
+                        string assetPath = assetPathOrGuid;
+                        if (Guid.TryParse(assetPath, out _))
+                            assetPath = AssetDatabase.GUIDToAssetPath(assetPath);
+                        if (!string.IsNullOrEmpty(assetPath))
+                        {
+                            assetPath = PathUtilities.NormalizePath(assetPath);
+                            objectToAssign = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+                        }
+                    }
+                    else
+                    {
+                        // Raw instance ID (int/long from JSON)
+                        int instanceId = Convert.ToInt32(value);
+                        objectToAssign = EditorUtility.InstanceIDToObject(instanceId);
+                    }
+                    property.objectReferenceValue = objectToAssign;
+                    if (objectToAssign != null && property.objectReferenceValue != objectToAssign)
+                    {
+                        throw new ArgumentException(
+                            $"Assignment rejected — type '{objectToAssign.GetType().Name}' is not compatible with this field.");
+                    }
                     break;
 
                 case SerializedPropertyType.LayerMask:
@@ -1182,35 +1211,6 @@ namespace UnityMCP.Editor.Tools
             }
 
             throw new ArgumentException($"Cannot parse AnimationCurve from: {value}");
-        }
-
-        /// <summary>
-        /// Resolves an object reference from an asset path or GUID.
-        /// </summary>
-        private static UnityEngine.Object ResolveObjectReference(object value)
-        {
-            if (value == null)
-            {
-                return null;
-            }
-
-            string assetPath = value.ToString();
-
-            // Check if it's a GUID
-            if (Guid.TryParse(assetPath, out _))
-            {
-                assetPath = AssetDatabase.GUIDToAssetPath(assetPath);
-            }
-
-            if (string.IsNullOrEmpty(assetPath))
-            {
-                return null;
-            }
-
-            // Normalize the path
-            assetPath = PathUtilities.NormalizePath(assetPath);
-
-            return AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
         }
 
         #endregion
