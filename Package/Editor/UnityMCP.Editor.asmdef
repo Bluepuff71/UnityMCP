@@ -28,6 +28,11 @@
             "name": "com.unity.textmeshpro",
             "expression": "1.0.0",
             "define": "UNITY_MCP_TMP"
+        },
+        {
+            "name": "Unity",
+            "expression": "6000.0.0",
+            "define": "UNITY_MCP_TMP"
         }
     ],
     "noEngineReferences": false
