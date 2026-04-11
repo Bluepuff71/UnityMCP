@@ -185,7 +185,7 @@ COORDINATION: Locks are per-resource (individual GameObjects, files, components)
 
                 JObject response = method switch
                 {
-                    "initialize" => HandleInitialize(requestId, sessionId),
+                    "initialize" => HandleInitialize(paramsToken, requestId, sessionId),
                     "tools/list" => HandleToolsList(requestId),
                     "tools/call" => HandleToolsCall(paramsToken, requestId, sessionId),
                     "resources/list" => HandleResourcesList(requestId),
@@ -219,10 +219,23 @@ COORDINATION: Locks are per-resource (individual GameObjects, files, components)
 
         #region MCP Method Handlers
 
-        private JObject HandleInitialize(string requestId, string sessionId = null)
+        private JObject HandleInitialize(JToken paramsToken, string requestId, string sessionId = null)
         {
             // Create or retrieve session for this agent
             SessionManager.CreateSession(sessionId);
+
+            // Use clientInfo.name from the MCP initialize request as the display name.
+            // Note: unlike agent_set_name (which rejects whitespace and >32 chars with
+            // MCPException), this path is deliberately more tolerant. Whitespace-only
+            // names fall through the guard below, and names longer than 32 chars are
+            // silently truncated inside SessionManager.SetSessionName. The asymmetry
+            // is intentional: agent_set_name is an explicit user tool that should fail
+            // loud so the caller can correct their input, while auto-registration is a
+            // protocol-level fallback that should preserve as much identifying info as
+            // possible from whatever clientInfo.name the client sends.
+            string agentName = paramsToken?["clientInfo"]?["name"]?.ToString();
+            if (!string.IsNullOrEmpty(sessionId) && !string.IsNullOrWhiteSpace(agentName))
+                SessionManager.SetSessionName(sessionId, agentName);
 
             var result = new JObject
             {

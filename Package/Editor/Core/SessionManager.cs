@@ -209,9 +209,41 @@ namespace UnityMCP.Editor.Core
                 if (name != null && name.Length > 32)
                     name = name.Substring(0, 32);
 
+                if (name != null)
+                    name = DeduplicateName(name, sessionId);
+
                 sessionInfo.FriendlyName = name;
                 return true;
             }
+        }
+
+        /// <summary>
+        /// Appends a numeric suffix if another session already uses the same name.
+        /// Must be called while holding <see cref="s_lock"/>.
+        /// </summary>
+        private static string DeduplicateName(string name, string excludeSessionId)
+        {
+            bool IsTaken(string candidate)
+            {
+                foreach (var kvp in s_sessions)
+                {
+                    if (kvp.Key != excludeSessionId && kvp.Value.FriendlyName == candidate)
+                        return true;
+                }
+                return false;
+            }
+
+            if (!IsTaken(name))
+                return name;
+
+            for (int i = 2; i < 100; i++)
+            {
+                string candidate = $"{name} ({i})";
+                if (!IsTaken(candidate))
+                    return candidate;
+            }
+
+            return name;
         }
 
         /// <summary>
