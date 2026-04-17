@@ -2,7 +2,7 @@
 
 ![Unity 2022.3+](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)
 ![Unity 6 Compatible](https://img.shields.io/badge/Unity%206-Compatible-brightgreen?logo=unity)
-![Release](https://img.shields.io/github/v/tag/Bluepuff71/UnityMCP?label=version)
+![Release](https://img.shields.io/github/v/tag/emeryporter/UnityMCP?label=version)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 Unity-native [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for AI-powered game development. Connect Claude, Codex, Cursor, and other AI assistants directly to the Unity Editor — no Node.js, Python, or external runtimes required. Install the package and start building.
@@ -45,7 +45,7 @@ Canvas UI building tools, Input Action management, Project Settings management, 
 ### Latest version (recommended)
 
 ```
-https://github.com/Bluepuff71/UnityMCP.git?path=/Package
+https://github.com/emeryporter/UnityMCP.git?path=/Package
 ```
 
 ### Specific version
@@ -53,10 +53,10 @@ https://github.com/Bluepuff71/UnityMCP.git?path=/Package
 Append a `#version` tag to pin to a release:
 
 ```
-https://github.com/Bluepuff71/UnityMCP.git?path=/Package#2.2.0
+https://github.com/emeryporter/UnityMCP.git?path=/Package#2.2.0
 ```
 
-See [Releases](https://github.com/Bluepuff71/UnityMCP/releases) for available versions.
+See [Releases](https://github.com/emeryporter/UnityMCP/releases) for available versions.
 
 ## Setup
 
