@@ -1240,7 +1240,14 @@ namespace UnityMCP.Editor.Tools
                     // Scene objects typically have negative instance IDs
                     if (TryConvertToInt(value, out int instanceId))
                     {
+#if UNITY_6000_1_OR_NEWER
+                        // EntityIdToObject was introduced in Unity 6.1 (6000.1) and replaces
+                        // the now-deprecated InstanceIDToObject.
                         newObj = EditorUtility.EntityIdToObject(instanceId);
+#else
+                        // Unity 6.0 (6000.0) and earlier: EntityIdToObject does not exist yet.
+                        newObj = EditorUtility.InstanceIDToObject(instanceId);
+#endif
                         if (newObj != null)
                         {
                             resolvedSource = $"instanceId:{instanceId}";
