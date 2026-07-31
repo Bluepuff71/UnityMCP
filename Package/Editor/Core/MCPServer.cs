@@ -17,7 +17,6 @@ namespace UnityMCP.Editor.Core
         private static MCPServer _instance;
         private static readonly object InstanceLock = new object();
 
-        private int _port = 8080;
         private const string ServerName = "UnityMCP";
         internal const string ServerVersion = "2.2.4";
         private const int MainThreadTimeoutSeconds = 30;
@@ -63,11 +62,13 @@ ASYNC JOBS: Build, test, and profiler operations return a job_id. Poll the same 
 
         /// <summary>
         /// Gets or sets the port the server listens on.
+        /// Backed by MCPProxy.Port (persisted in EditorPrefs) so the value drives
+        /// the actual native bind and survives domain reloads.
         /// </summary>
         public int Port
         {
-            get => _port;
-            set => _port = value;
+            get => MCPProxy.Port;
+            set => MCPProxy.Port = value;
         }
 
         #region JSON-RPC Response Builders

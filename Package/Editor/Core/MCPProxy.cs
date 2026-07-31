@@ -92,6 +92,17 @@ namespace UnityMCP.Editor.Core
         public static bool IsInitialized => s_initialized;
 
         /// <summary>
+        /// Gets or sets the TCP port the proxy binds to.
+        /// Persisted in EditorPrefs so it survives domain reloads and editor restarts.
+        /// Takes effect the next time the server is started.
+        /// </summary>
+        public static int Port
+        {
+            get => EditorPrefs.GetInt("UnityMCP_Port", DEFAULT_PORT);
+            set => EditorPrefs.SetInt("UnityMCP_Port", value);
+        }
+
+        /// <summary>
         /// Gets or sets whether verbose logging is enabled.
         /// When false, only warnings and errors are logged.
         /// </summary>
@@ -307,10 +318,11 @@ namespace UnityMCP.Editor.Core
                 // Configure remote access before starting the server
                 ApplyRemoteAccessConfig();
 
-                int result = StartServer(DEFAULT_PORT);
+                int port = Port;
+                int result = StartServer(port);
                 if (result < 0)
                 {
-                    Debug.LogWarning($"[MCPProxy] Failed to bind to port {DEFAULT_PORT}. If you just updated the package, restart the Unity Editor. Otherwise, check if another Unity instance is using the same port.");
+                    Debug.LogWarning($"[MCPProxy] Failed to bind to port {port}. If you just updated the package, restart the Unity Editor. Otherwise, check if another Unity instance is using the same port.");
                     return;
                 }
 
@@ -327,7 +339,7 @@ namespace UnityMCP.Editor.Core
 
                 s_initialized = true;
 
-                if (VerboseLogging) Debug.Log($"[MCPProxy] MCP proxy initialized on port {DEFAULT_PORT}");
+                if (VerboseLogging) Debug.Log($"[MCPProxy] MCP proxy initialized on port {port}");
             }
             catch (DllNotFoundException dllException)
             {
