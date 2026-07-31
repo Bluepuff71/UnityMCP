@@ -24,6 +24,7 @@
 #else
     #include <pthread.h>
     #include <unistd.h>
+    #include <fcntl.h>
     typedef pthread_t ThreadHandle;
     #define PROXY_SLEEP_MS(ms) usleep((ms) * 1000)
     #define GET_PROCESS_ID() ((unsigned long)getpid())
@@ -409,6 +410,37 @@ static void HandleHttpRequest(struct mg_connection* connection, struct mg_http_m
 }
 
 /*
+ * Mark the listening socket as non-inheritable so that child processes
+ * spawned by Unity (asset importers, shader compilers, crash handler, etc.)
+ * do not inherit the socket handle.
+ *
+ * Without this, if Unity exits abnormally (crash or force-kill) while a child
+ * process is alive, the inherited handle keeps port 8080 bound until that
+ * child process exits — which can appear to hold the port "until reboot".
+ *
+ * On Windows, socket() returns an inheritable HANDLE by default; we clear
+ * HANDLE_FLAG_INHERIT. On POSIX, we set FD_CLOEXEC.
+ */
+static void MakeSocketNonInheritable(struct mg_connection* connection)
+{
+    if (connection == NULL || connection->fd == NULL)
+    {
+        return;
+    }
+
+#ifdef _WIN32
+    SetHandleInformation((HANDLE)connection->fd, HANDLE_FLAG_INHERIT, 0);
+#else
+    int fd = (int)(size_t)connection->fd;
+    int flags = fcntl(fd, F_GETFD);
+    if (flags != -1)
+    {
+        fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+    }
+#endif
+}
+
+/*
  * Mongoose event handler for all connection events.
  */
 static void EventHandler(struct mg_connection* connection, int event, void* event_data)
@@ -458,6 +490,10 @@ EXPORT int StartServer(int port)
         mg_mgr_free(&s_mgr);
         return -1;  /* Failed to bind to port */
     }
+
+    /* Prevent Unity child processes from inheriting the listening socket,
+     * which would keep the port bound after an abnormal editor exit. */
+    MakeSocketNonInheritable(s_listener);
 
     /* Set running flag before creating thread */
     s_running = 1;
